@@ -103,9 +103,6 @@
     "macOS": {
       "minimumSystemVersion": "13.0",
       "entitlements": "entitlements.plist"
-    },
-    "resources": [
-      "resources/models/*"
-    ]
+    }
   }
 }

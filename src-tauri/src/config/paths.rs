@@ -39,16 +39,13 @@ pub struct AppPaths {
     /**
      * SOURCE OF TRUTH KEYWORDS: bundled_models_dir, one_download
      * WHAT:  Models shipped INSIDE the app bundle, if any.
-     * WHY:   Vocs is distributed as a single download that works the moment
-     *        it opens — no second wait, no first-run fetch, nothing to go wrong
-     *        on a bad connection. The weights ride along in Contents/Resources
-     *        and are used from there, read-only, rather than being copied into
-     *        Application Support: a copy would mean 547MB written on first
-     *        launch and 1.1GB on disk for one model.
-     *
-     *        `None` when nothing was bundled, which is the developer build and
-     *        the path where a model is still downloaded on demand. Both work;
-     *        only the first is what a user receives.
+     * WHY:   Released builds ship without weights — the download stays small and
+     *        an update does not re-send 574MB — so this is `None` and the model
+     *        is fetched once on first run into Application Support. The field
+     *        remains for a build that does bundle weights: they are used from
+     *        Contents/Resources, read-only, rather than copied, because a copy
+     *        would be 547MB written on first launch and 1.1GB on disk for one
+     *        model.
      * WHERE: Set by bootstrap from Tauri's resource directory; consulted by
      *        model_file.
      */

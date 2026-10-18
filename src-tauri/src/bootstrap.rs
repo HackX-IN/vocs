@@ -175,13 +175,16 @@ pub const ONBOARDING_WINDOW: &str = "onboarding";
  */
 pub fn setup(app: &AppHandle) -> AppResult<()> {
     /*
-     * SOURCE OF TRUTH KEYWORDS: bundled_model, single_download
-     * The model ships inside the app, so point the paths at it before anything
-     * asks where a model is. Everything downstream then behaves as though the
-     * user had already downloaded it: the store finds it present and skips the
-     * fetch, the engine loads it from Resources, and onboarding's download step
-     * completes at once. A user opens the app and dictates — no second wait and
-     * nothing to fail on a poor connection.
+     * SOURCE OF TRUTH KEYWORDS: bundled_model, first_run_download
+     * Released builds do NOT carry the model: the DMG stays small and an update
+     * is a few megabytes instead of re-downloading 574MB of weights every time.
+     * The model is fetched once, on first run, by onboarding's download step
+     * (resumable, hash-verified, disk-checked).
+     *
+     * This lookup is kept for a developer or an enterprise build that drops
+     * weights into `resources/models` and re-adds the bundle resource: when the
+     * directory exists the store finds the model present and skips the fetch.
+     * When it does not — every released build — this is a no-op.
      */
     let paths = AppPaths::resolve()?.with_bundled_models(
         app.path()
