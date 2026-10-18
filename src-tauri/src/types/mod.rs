@@ -19,7 +19,10 @@ pub mod session;
 pub mod settings;
 pub mod transcript;
 
-pub use audio::{AudioChunk, AudioLevel, CaptureMode, ChunkKind, DeviceInfo, TARGET_SAMPLE_RATE};
+pub use audio::{
+    AudioChunk, AudioLevel, CaptureMode, ChunkKind, DeviceInfo, MicTestStopReason, MicTestUpdate,
+    TARGET_SAMPLE_RATE,
+};
 pub use dictionary::{DictionaryEntry, DictionaryId, MatchKind};
 pub use language::{language_label, language_options, LanguageOption, AUTO_LANGUAGE};
 pub use engine::{

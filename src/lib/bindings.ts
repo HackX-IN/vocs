@@ -53,6 +53,8 @@ export const commands = {
 	requestPermission: (input: PermissionInput) => typedError<PermissionState, AppError>(__TAURI_INVOKE("request_permission", { input })),
 	openPrivacyPane: (input: PermissionInput) => typedError<null, AppError>(__TAURI_INVOKE("open_privacy_pane", { input })),
 	listInputDevices: () => typedError<DeviceInfo[], AppError>(__TAURI_INVOKE("list_input_devices")),
+	startMicTest: () => typedError<null, AppError>(__TAURI_INVOKE("start_mic_test")),
+	stopMicTest: () => typedError<null, AppError>(__TAURI_INVOKE("stop_mic_test")),
 	checkForUpdate: () => typedError<UpdateCheck, AppError>(__TAURI_INVOKE("check_for_update")),
 	installUpdate: () => typedError<null, AppError>(__TAURI_INVOKE("install_update")),
 };
@@ -60,6 +62,7 @@ export const commands = {
 /** Events */
 export const events = {
 	audioLevelChanged: makeEvent<AudioLevelChanged>("audio-level-changed"),
+	micTestChanged: makeEvent<MicTestChanged>("mic-test-changed"),
 	modelDownloadProgress: makeEvent<ModelDownloadProgress>("model-download-progress"),
 	modelStateChanged: makeEvent<ModelStateChanged>("model-state-changed"),
 	onboardingProgress: makeEvent<OnboardingProgress>("onboarding-progress"),
@@ -533,6 +536,38 @@ export type MetricDef = {
 	/**  Shown on the dashboard latency panel rather than kept for diagnostics. */
 	user_facing: boolean,
 };
+
+/**
+ *  The Settings microphone check: a level, or the end of the check. Its own
+ *  event so the pill, which listens for `AudioLevelChanged`, never animates for
+ *  a check that is not a recording.
+ */
+export type MicTestChanged = {
+	update: MicTestUpdate,
+};
+
+export type MicTestStopReason = 
+/**  The user, or a newer check, ended it. */
+"REQUESTED" | 
+/**  Nobody stopped it, so it stopped itself rather than leave the mic lit. */
+"TIMED_OUT" | 
+/**  The device went away mid-check. */
+"DEVICE_LOST";
+
+/**
+ * 
+ *  * SOURCE OF TRUTH KEYWORDS: MicTestUpdate, MicTestStopReason
+ *  * WHAT:  What the Settings microphone check pushes: a level, or the end of the
+ *  *        check and why it ended.
+ *  * WHY:   One enum on one event rather than a level event plus a stop event, so
+ *  *        the meter cannot receive a level after the stop that ended it. The
+ *  *        reason is carried because the three endings need different words — a
+ *  *        timeout is silent housekeeping, a lost device needs saying.
+ *  * WHERE: Emitted by pipeline/mic_monitor.rs through the EventSink port; drawn
+ *  *        by the MicTestPanel in Settings.
+ *  
+ */
+export type MicTestUpdate = { kind: "LEVEL"; level: AudioLevel } | { kind: "STOPPED"; reason: MicTestStopReason };
 
 /**
  * 

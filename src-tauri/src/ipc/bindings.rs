@@ -80,6 +80,9 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             commands::system::request_permission,
             commands::system::open_privacy_pane,
             commands::system::list_input_devices,
+            // Microphone check
+            commands::mic_test::start_mic_test,
+            commands::mic_test::stop_mic_test,
             // Updates
             commands::updates::check_for_update,
             commands::updates::install_update,
@@ -89,6 +92,7 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             events::TranscriptDelivered,
             events::PermissionsChanged,
             events::AudioLevelChanged,
+            events::MicTestChanged,
             events::ModelDownloadProgress,
             events::ModelStateChanged,
             events::OnboardingProgress,

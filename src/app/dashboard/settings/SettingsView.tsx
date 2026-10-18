@@ -39,6 +39,7 @@ import { cn } from "@/lib/utils";
 import { ErrorSurface, ScrollArea, SettingControl, Skeleton } from "@/components/global";
 import type { SettingOption } from "@/components/global";
 import { PermissionNotice } from "./_components/PermissionNotice";
+import { MicTestPanel } from "./_components/MicTestPanel";
 import { ModelManager } from "./_components/ModelManager";
 import { DictionaryManager } from "./_components/DictionaryManager";
 import { AppProfiles } from "./_components/AppProfiles";
@@ -192,9 +193,10 @@ export function SettingsView({ registry, section }: SettingsViewProps) {
 }
 
 /** Panels that are not settings but belong inside a section. */
-type SectionPanel = "MODELS_PANEL" | "DICTIONARY_PANEL" | "PRIVACY_PANEL";
+type SectionPanel = "MIC_TEST_PANEL" | "MODELS_PANEL" | "DICTIONARY_PANEL" | "PRIVACY_PANEL";
 
 const EXTRAS: Partial<Record<SettingSection, SectionPanel>> = {
+  RECORDING: "MIC_TEST_PANEL",
   TRANSCRIPTION: "MODELS_PANEL",
   VOCABULARY: "DICTIONARY_PANEL",
   PRIVACY: "PRIVACY_PANEL",
@@ -247,6 +249,7 @@ function SettingsSection({
         />
       ))}
 
+      {extra === "MIC_TEST_PANEL" ? <MicTestPanel /> : null}
       {extra === "MODELS_PANEL" ? <ModelManager /> : null}
       {extra === "DICTIONARY_PANEL" ? <DictionaryManager /> : null}
       {extra === "PRIVACY_PANEL" ? <ClearHistoryControl /> : null}

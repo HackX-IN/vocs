@@ -18,11 +18,13 @@ use tauri::AppHandle;
 use tauri_specta::Event;
 
 use crate::ipc::events::{
-    AudioLevelChanged, ModelDownloadProgress, ModelStateChanged, SessionStateChanged,
-    TranscriptDelivered,
+    AudioLevelChanged, MicTestChanged, ModelDownloadProgress, ModelStateChanged,
+    SessionStateChanged, TranscriptDelivered,
 };
 use crate::ports::events::EventSink;
-use crate::types::{AudioLevel, DownloadProgress, ModelId, ModelState, SessionState};
+use crate::types::{
+    AudioLevel, DownloadProgress, MicTestUpdate, ModelId, ModelState, SessionState,
+};
 
 pub struct TauriEventSink {
     app: AppHandle,
@@ -55,6 +57,12 @@ impl EventSink for TauriEventSink {
         // Droppable by design: a missed meter frame is invisible, and the pill
         // has a hard frame budget while inference is running.
         let _ = AudioLevelChanged { level }.emit(&self.app);
+    }
+
+    fn mic_test_update(&self, update: MicTestUpdate) {
+        // Levels are droppable like the pill's; a Stopped that fails to emit
+        // leaves a meter that decays to silence, which is still honest.
+        let _ = MicTestChanged { update }.emit(&self.app);
     }
 
     fn transcript_delivered(&self, word_count: u32, delivery: crate::types::DeliveryKind) {

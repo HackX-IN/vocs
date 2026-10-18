@@ -1,6 +1,6 @@
 /*!
  * SOURCE OF TRUTH KEYWORDS: commands, session, history, settings, stats,
- *   dictionary, models, system, updates
+ *   dictionary, models, system, updates, mic_test
  * WHAT:  Barrel for the IPC command handlers, one module per capability.
  * WHY:   Every function here is thin on purpose. If a handler starts checking
  *        permissions, validating input by hand, or mapping errors, that work
@@ -13,6 +13,7 @@ pub mod dictionary;
 pub mod engine;
 pub mod files;
 pub mod history;
+pub mod mic_test;
 pub mod models;
 pub mod profiles;
 pub mod session;

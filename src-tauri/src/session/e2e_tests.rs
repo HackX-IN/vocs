@@ -167,6 +167,7 @@ impl EventSink for RecordingEventSink {
         self.states.lock().push(state.clone());
     }
     fn audio_level(&self, _level: AudioLevel) {}
+    fn mic_test_update(&self, _update: crate::types::MicTestUpdate) {}
     fn set_pill_visible(&self, visible: bool) {
         self.pill_visible.lock().push(visible);
     }

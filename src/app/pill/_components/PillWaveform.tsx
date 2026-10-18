@@ -1,6 +1,6 @@
 /**
  * SOURCE OF TRUTH KEYWORDS: PillWaveform, audioLevelChanged, WaveformHandle,
- *   displayLevel, waveform-input-ceiling, waveform-input-gamma, AudioLevel
+ *   displayLevel, AudioLevel
  * WHAT:  Subscribes to audio-level-changed, maps the audio's RMS onto the
  *        waveform's visual range, and pushes it straight into the Waveform's
  *        imperative handle.
@@ -16,28 +16,23 @@
  *        a 0..1 display level, and anything feeding it something else has to
  *        say so at its own boundary.
  * WHERE: The pill's RECORDING state. Wraps components/global/waveform; curve
- *        values are tokens (docs/04 §7).
+ *        values are tokens (docs/04 §7) and the mapping lives in lib/audio-level.ts
+ *        so the Settings microphone check draws the identical curve.
  */
 
-import { useRef, useState } from "react";
+import { useRef } from "react";
 import { events } from "@/lib/bindings";
+import { toDisplayLevel, useLevelCurve } from "@/lib/audio-level";
 import { useTauriEvent } from "@/lib/use-event";
-import { readNumberToken } from "@/lib/motion";
 import { Waveform, type WaveformHandle } from "@/components/global";
 
 export function PillWaveform({ className }: { className?: string }) {
   const waveform = useRef<WaveformHandle>(null);
-  // Read once: this runs on every audio frame, and getComputedStyle there
-  // would cost a style resolution per frame.
-  const [curve] = useState(() => ({
-    ceiling: readNumberToken("--waveform-input-ceiling"),
-    gamma: readNumberToken("--waveform-input-gamma"),
-  }));
+  const curve = useLevelCurve();
 
   useTauriEvent(events.audioLevelChanged, (payload) => {
     const rms = payload.level.rms ?? payload.level.peak ?? 0;
-    const ratio = Math.min(1, Math.max(0, rms / curve.ceiling));
-    waveform.current?.push(Math.pow(ratio, curve.gamma));
+    waveform.current?.push(toDisplayLevel(rms, curve));
   });
 
   return <Waveform ref={waveform} className={className} />;

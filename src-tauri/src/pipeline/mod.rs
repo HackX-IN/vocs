@@ -11,8 +11,10 @@
 
 pub mod assembler;
 pub mod chunker;
+pub mod mic_monitor;
 pub mod vad;
 pub mod worker;
 
 pub use chunker::Chunker;
+pub use mic_monitor::MicMonitor;
 pub use vad::SpeechDetector;

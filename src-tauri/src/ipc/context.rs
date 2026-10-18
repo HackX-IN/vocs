@@ -24,6 +24,7 @@ use tokio::sync::mpsc;
 use crate::config::AppPaths;
 use crate::db::Database;
 use crate::error::{AppError, AppResult, ErrorCode};
+use crate::pipeline::MicMonitor;
 use crate::ports::{
     AudioSource, EventSink, ModelStore, PermissionProvider, TextEnhancer, TextInjector,
     TranscriptionEngine,
@@ -149,6 +150,8 @@ pub struct AppState {
     /// PUSHES it — the frontend never polls — so an emit handle is not a
     /// convenience here, it is how the UI learns anything.
     pub app: tauri::AppHandle,
+    /// The Settings microphone check. See pipeline/mic_monitor.rs.
+    pub mic_monitor: MicMonitor,
     /// Capabilities with a command currently executing. See InflightGuard.
     inflight: Arc<Mutex<HashSet<CapabilityKey>>>,
     /// Last state the actor published. See `current_state`.
@@ -166,6 +169,7 @@ impl AppState {
         Self {
             paths,
             db,
+            mic_monitor: MicMonitor::new(Arc::clone(&ports.audio), Arc::clone(&ports.events)),
             ports,
             session,
             app,
@@ -323,6 +327,15 @@ impl CommandContext {
 
     pub fn session(&self) -> &SessionHandle {
         &self.state.session
+    }
+
+    pub fn mic_monitor(&self) -> &MicMonitor {
+        &self.state.mic_monitor
+    }
+
+    /// The last state the session actor published. See AppState::current_state.
+    pub fn session_state(&self) -> SessionState {
+        self.state.current_state()
     }
 }
 

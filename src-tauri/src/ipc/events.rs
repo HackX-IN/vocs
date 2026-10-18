@@ -1,6 +1,6 @@
 /*!
  * SOURCE OF TRUTH KEYWORDS: SessionStateChanged, AudioLevelChanged,
- *   ModelDownloadProgress, OnboardingProgress, emit_state, TypedEvent
+ *   MicTestChanged, ModelDownloadProgress, OnboardingProgress, emit_state, TypedEvent
  * WHAT:  Every event Rust pushes to the frontend, as typed structs.
  * WHY:   Rust owns domain state and PUSHES it. The frontend never polls and
  *        never keeps a second copy — so the pill cannot show a state the
@@ -17,7 +17,9 @@ use specta::Type;
 use tauri_specta::Event;
 
 use crate::ipc::commands::system::PermissionReport;
-use crate::types::{AudioLevel, DeliveryKind, DownloadProgress, ModelId, ModelState, SessionState};
+use crate::types::{
+    AudioLevel, DeliveryKind, DownloadProgress, MicTestUpdate, ModelId, ModelState, SessionState,
+};
 
 /// The pill's entire input. Emitted on every transition.
 #[derive(Debug, Clone, Serialize, Deserialize, Type, Event)]
@@ -73,6 +75,14 @@ pub struct PermissionsChanged {
 #[derive(Debug, Clone, Serialize, Deserialize, Type, Event)]
 pub struct AudioLevelChanged {
     pub level: AudioLevel,
+}
+
+/// The Settings microphone check: a level, or the end of the check. Its own
+/// event so the pill, which listens for `AudioLevelChanged`, never animates for
+/// a check that is not a recording.
+#[derive(Debug, Clone, Serialize, Deserialize, Type, Event)]
+pub struct MicTestChanged {
+    pub update: MicTestUpdate,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Type, Event)]

@@ -25,7 +25,7 @@
  *        the end-to-end tests. Consumed by session/actor.rs.
  */
 
-use crate::types::{AudioLevel, DownloadProgress, ModelId, ModelState, SessionState};
+use crate::types::{AudioLevel, DownloadProgress, MicTestUpdate, ModelId, ModelState, SessionState};
 
 pub trait EventSink: Send + Sync {
     /// The recording state changed. The pill renders exactly this.
@@ -33,6 +33,11 @@ pub trait EventSink: Send + Sync {
 
     /// A meter reading for the waveform. High frequency and droppable.
     fn audio_level(&self, level: AudioLevel);
+
+    /// The Settings microphone check produced a level, or ended. Separate from
+    /// `audio_level` so the pill, which listens to that one, never draws a
+    /// waveform for a check that is not a recording.
+    fn mic_test_update(&self, update: MicTestUpdate);
 
     /// Show or hide the pill overlay.
     /// A recording's text reached the user. See ipc::events::TranscriptDelivered.
@@ -83,6 +88,7 @@ pub struct NullEventSink;
 impl EventSink for NullEventSink {
     fn session_state_changed(&self, _state: &SessionState) {}
     fn audio_level(&self, _level: AudioLevel) {}
+    fn mic_test_update(&self, _update: MicTestUpdate) {}
     fn transcript_delivered(&self, _word_count: u32, _delivery: crate::types::DeliveryKind) {}
 
     fn set_pill_visible(&self, _visible: bool) {}

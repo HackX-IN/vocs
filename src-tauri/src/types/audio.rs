@@ -1,6 +1,7 @@
 /*!
  * SOURCE OF TRUTH KEYWORDS: AudioChunk, AudioLevel, CaptureMode, DeviceInfo,
- *   TARGET_SAMPLE_RATE, TARGET_CHANNELS, ChunkKind
+ *   TARGET_SAMPLE_RATE, TARGET_CHANNELS, ChunkKind, MicTestUpdate,
+ *   MicTestStopReason
  * WHAT:  The audio vocabulary: the format everything downstream assumes, a
  *        decoded chunk, the meter value the pill draws, and the capture mode.
  * WHY:   TARGET_SAMPLE_RATE is a constant rather than a parameter because
@@ -70,10 +71,39 @@ pub enum ChunkKind {
  *        budget while inference is running.
  * WHERE: Emitted on the audio:level event; drawn by the Waveform component.
  */
-#[derive(Debug, Clone, Copy, Serialize, Deserialize, Type)]
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, Type)]
 pub struct AudioLevel {
     pub rms: f32,
     pub peak: f32,
+}
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: MicTestUpdate, MicTestStopReason
+ * WHAT:  What the Settings microphone check pushes: a level, or the end of the
+ *        check and why it ended.
+ * WHY:   One enum on one event rather than a level event plus a stop event, so
+ *        the meter cannot receive a level after the stop that ended it. The
+ *        reason is carried because the three endings need different words — a
+ *        timeout is silent housekeeping, a lost device needs saying.
+ * WHERE: Emitted by pipeline/mic_monitor.rs through the EventSink port; drawn
+ *        by the MicTestPanel in Settings.
+ */
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize, Type)]
+#[serde(tag = "kind", rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum MicTestUpdate {
+    Level { level: AudioLevel },
+    Stopped { reason: MicTestStopReason },
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum MicTestStopReason {
+    /// The user, or a newer check, ended it.
+    Requested,
+    /// Nobody stopped it, so it stopped itself rather than leave the mic lit.
+    TimedOut,
+    /// The device went away mid-check.
+    DeviceLost,
 }
 
 /**
