@@ -412,7 +412,7 @@ Phase 2 is the risk concentration. If measured latency there misses the target, 
 
 **Release flow.** Tag `v1.2.3` → GitHub Actions builds universal (arm64 + x86_64), signs, publishes the DMG and manifest. Free on public repositories.
 
-**Decided: free path now.** Ship ad-hoc signed, add Apple credentials whenever you want them. The workflow already passes every Apple secret through and Tauri skips signing and notarization while they are empty, so turning it on is adding secrets — no new step, no flag, no restructure.
+**Decided: free path now — no Apple Developer account.** Sign every release with ONE stable self-signed certificate (see README, "Distributing without an Apple Developer account"), never ad-hoc: TCC keys the Accessibility grant to the signing identity, so an ad-hoc build gets a new identity on every update and silently drops the user's grant. Add Apple credentials whenever you want them. The workflow already passes every Apple secret through and Tauri skips signing and notarization while they are empty, so turning it on is adding secrets — no new step, no flag, no restructure.
 
 **Two things must be settled BEFORE the first public tag. Both become permanent afterwards.**
 
@@ -425,8 +425,8 @@ Releases are published as **drafts**, so a broken build is never what every inst
 **The notarization wall, stated plainly.** Distributing to third parties *without* Gatekeeper warnings requires an Apple Developer membership ($99/yr) for signing and notarization. Without it:
 
 - On your own machine: no impact whatsoever.
-- For others: first launch needs right-click → Open, and the download shows an "unidentified developer" warning.
-- Updates still work — the updater's minisign signing is independent of Apple's and stays free.
+- For others: the first launch is blocked by Gatekeeper. On current macOS the old right-click → Open bypass is gone; the user must open System Settings → Privacy & Security and choose **Open Anyway**, or run `xattr -dr com.apple.quarantine /Applications/Vocs.app`. The website's download page has to say so.
+- Updates still work, and do NOT hit the prompt again: the updater downloads the bundle itself, so it never carries the quarantine flag. The updater's minisign signing is independent of Apple's and stays free.
 
 The build pipeline is written so that adding credentials later is two GitHub secrets and one workflow flag. Nothing needs restructuring, and nothing needs deciding today.
 

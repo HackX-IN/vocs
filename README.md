@@ -91,6 +91,40 @@ artifact goes unsigned. In CI both come from repository secrets.
 > installation is permanently stranded on whatever version it has — there is no
 > recovery, because the public key is compiled into the apps already out there.
 
+### Distributing without an Apple Developer account
+
+Vocs is distributed as a DMG from our own website, not the App Store, and
+without Apple notarisation. That works, with two consequences you must plan for.
+
+**What a user sees on the first launch.** Gatekeeper blocks the app ("Apple
+could not verify…"). The user opens **System Settings → Privacy & Security**,
+scrolls to the message about Vocs and chooses **Open Anyway** (or runs
+`xattr -dr com.apple.quarantine /Applications/Vocs.app`). This happens once.
+In-app updates are downloaded by the app itself, so they do not trigger it
+again. The download page on the website must show these steps.
+
+**Sign every release with the same self-signed certificate, forever.** An
+ad-hoc signature is new on every build, so each update would silently reset the
+user's Accessibility grant and pasting would stop working. A stable certificate
+keeps the grant. Create it once:
+
+1. Keychain Access → Certificate Assistant → *Create a Certificate…* — name it
+   `Vocs Signing`, identity type *Self Signed Root*, type *Code Signing*.
+2. Export it with its private key as a `.p12` and keep it in a password manager.
+   **Losing or replacing it voids every user's Accessibility grant.**
+3. Add three repository secrets: `APPLE_CERTIFICATE` (`base64 -i vocs.p12`),
+   `APPLE_CERTIFICATE_PASSWORD`, and `APPLE_SIGNING_IDENTITY` (`Vocs Signing`).
+   Leave `APPLE_ID`, `APPLE_PASSWORD` and `APPLE_TEAM_ID` unset; the release
+   workflow then signs without notarising.
+
+The updater needs its own, separate keypair (`pnpm tauri signer generate`); its
+private half goes in `TAURI_SIGNING_PRIVATE_KEY`.
+
+If an Apple Developer account is added later, the only change is the secrets: a
+Developer ID certificate in `APPLE_CERTIFICATE` and the three Apple variables.
+Existing users then need to re-grant Accessibility once, because the signing
+identity changes.
+
 ## Permissions, and what happens without them
 
 | Permission | Needed for | Without it |

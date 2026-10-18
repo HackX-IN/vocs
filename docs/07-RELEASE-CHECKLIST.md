@@ -9,10 +9,10 @@ not a dev build — permissions and signing behave differently.
 
 ## 1. Clean install (a Mac that has never had Vocs)
 
-- [ ] Open the DMG, drag to Applications, launch. No Gatekeeper "unidentified developer" block (needs the signed, notarised build).
+- [ ] Open the DMG, drag to Applications, launch. Gatekeeper blocks it (no notarisation, by decision); **Open Anyway** in System Settings → Privacy & Security lets it run, and it never asks again.
 - [ ] Onboarding opens. Microphone prompt appears once; granting it works.
 - [ ] Accessibility step deep-links to the right System Settings pane; granting it enables pasting.
-- [ ] Model step: download completes, or the bundled model is found. Interrupt the network mid-download; it recovers.
+- [ ] Model step: the download completes with progress shown. Turn Wi-Fi off mid-download, turn it back on: it resumes rather than restarting. Quit mid-download and relaunch: it resumes.
 - [ ] Hotkey step: the test dictation produces text.
 - [ ] Quit, relaunch: no onboarding again, hotkey still works, permissions still held.
 
@@ -50,7 +50,7 @@ For each, dictate a short sentence and a 5-minute passage; text lands in the rig
 ## 5. Updates
 
 - [ ] Install `v1.0.0-rc1`, publish `rc2`; **Check for updates** finds it, installs it, relaunches, signature verified
-- [ ] After the update, permissions are still granted (the signing identity did not change)
+- [ ] After the update, permissions are still granted (the signing identity did not change) and Gatekeeper does not block the updated app
 
 ## 6. Soak and performance
 
