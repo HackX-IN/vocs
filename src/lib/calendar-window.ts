@@ -21,6 +21,7 @@ export interface CalendarDay {
   /** Local date as YYYY-MM-DD. */
   date: string;
   session_count: number;
+  word_count: number;
 }
 
 /** A Date as the local YYYY-MM-DD the backend uses. */
@@ -39,7 +40,7 @@ export function fillCalendar(
   length: number | null,
   today: Date = new Date(),
 ): CalendarDay[] {
-  const counts = new Map(days.map((day) => [day.date, day.session_count]));
+  const byDate = new Map(days.map((day) => [day.date, day]));
   const end = new Date(today.getFullYear(), today.getMonth(), today.getDate());
 
   let start: Date;
@@ -54,7 +55,7 @@ export function fillCalendar(
   const out: CalendarDay[] = [];
   for (const cursor = new Date(start); cursor <= end; cursor.setDate(cursor.getDate() + 1)) {
     const key = localDateKey(cursor);
-    out.push({ date: key, session_count: counts.get(key) ?? 0 });
+    out.push({ date: key, session_count: byDate.get(key)?.session_count ?? 0, word_count: byDate.get(key)?.word_count ?? 0 });
   }
-  return out.length >= 2 ? out : [{ date: localDateKey(start), session_count: 0 }, ...out];
+  return out.length >= 2 ? out : [{ date: localDateKey(start), session_count: 0, word_count: 0 }, ...out];
 }

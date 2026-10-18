@@ -23,7 +23,7 @@
 import { useMemo, useState } from "react";
 import { DotColumns, Eyebrow, SegmentedControl, type SegmentOption } from "@/components/global";
 import { formatChartDate, formatCount } from "@/lib/format";
-import { fillCalendar } from "@/lib/calendar-window";
+import { fillCalendar, type CalendarDay } from "@/lib/calendar-window";
 import type { ActivityDay } from "@/lib/bindings";
 
 export type ActivityRange = "30" | "90" | "all";
@@ -49,7 +49,7 @@ export function useActivityRange() {
 }
 
 /** The tooltip body for one day: its date, then what was done on it. */
-export function DayReadout({ day }: { day: ActivityDay | undefined }) {
+export function DayReadout({ day }: { day: CalendarDay | undefined }) {
   if (!day) return null;
   return (
     <div className="flex flex-col gap-0.5">
