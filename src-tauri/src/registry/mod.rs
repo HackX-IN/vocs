@@ -440,33 +440,30 @@ fn build_capabilities() -> Vec<Capability> {
             ],
         },
         /*
-         * SOURCE OF TRUTH KEYWORDS: Billing, free_forever
-         * WHAT:  A Billing page that exists to say there is nothing to pay for.
-         * WHY:   The operator asked for it as a joke, and it is a good one
-         *        precisely because a billing entry is the last thing a user of a
-         *        local-first tool expects to find. It also answers a real
-         *        question — people DO look for the pricing page — so the joke
-         *        and the honest answer are the same page.
+         * SOURCE OF TRUTH KEYWORDS: Billing, Community, free_forever, open_source
+         * WHAT:  A Community & Support page for the open-source project.
+         * WHY:   Vocs is 100% local-first, free, and open source. This page shares
+         *        the open-source manifesto and provides links for the community
+         *        to star the repository, report issues, and sponsor the project.
          *
          *        Declares no settings and no metrics, which is the point: it is
          *        a nav entry and nothing else. That is legal here because the
          *        reachability test walks settings and metrics, and a capability
-         *        with neither has nothing to be unreachable. Do NOT invent a
-         *        setting to make it look more like its neighbours.
+         *        with neither has nothing to be unreachable.
          * WHERE: Rendered from the registry by the dashboard shell; the page
          *        itself is a frontend component on the `billing` route.
          */
         Capability {
             key: CapabilityKey::Billing,
-            name: text("Billing"),
-            description: text("What Vocs costs, which is nothing."),
+            name: text("Community"),
+            description: text("Vocs is 100% free, private, and open source. Support the project."),
             requires: vec![],
             engine_needs: vec![],
             nav: Some(NavDef {
-                label: text("Billing"),
-                // Last in the sidebar. It is a punchline, not a feature.
+                label: text("Community"),
+                // Last in the sidebar.
                 route: text("billing"),
-                icon: text("CreditCard"),
+                icon: text("Heart"),
                 order: 40,
             }),
             hotkey: None,
