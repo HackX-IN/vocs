@@ -38,6 +38,7 @@ import { useEffect, useState } from "react";
 import { X } from "lucide-react";
 import { commands, events, type AppError } from "@/lib/bindings";
 import { unwrapCommand } from "@/lib/ipc";
+import { Button } from "@/components/global";
 import { useTauriEvent } from "@/lib/use-event";
 
 export function UpdateNotice() {
@@ -90,14 +91,9 @@ export function UpdateNotice() {
       </p>
 
       <div className="flex shrink-0 items-center gap-1">
-        <button
-          type="button"
-          onClick={install}
-          disabled={installing}
-          className="hairline h-[var(--control-height-sm)] rounded-input bg-sunken px-3 text-label text-text-primary transition-colors hover:bg-sunken-strong disabled:opacity-50"
-        >
+        <Button onClick={install} disabled={installing} className="h-[var(--control-height-sm)] text-label">
           {installing ? "Installing…" : error ? "Try again" : "Install and restart"}
-        </button>
+        </Button>
         <button
           type="button"
           onClick={() => setDismissed(true)}

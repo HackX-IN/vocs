@@ -39,7 +39,7 @@ export function StepShell({ title, description, children, action }: StepShellPro
             already. A fourth turns it into a watermark, which is the thing the
             original "first screen only" rule existed to prevent; the rule did
             not change, the first screen did (docs/04 §12). */}
-        <h1 className="text-title text-text-primary">{title}</h1>
+        <h1 className="font-display text-title text-text-primary">{title}</h1>
         <p className="max-w-96 text-body text-text-secondary">{description}</p>
       </header>
 

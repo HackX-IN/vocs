@@ -39,7 +39,7 @@ import {
 } from "@/lib/bindings";
 import { unwrapCommand, useCommand } from "@/lib/ipc";
 import { useTauriEvent } from "@/lib/use-event";
-import { ErrorSurface } from "@/components/global";
+import { Button, ErrorSurface } from "@/components/global";
 import { StepShell } from "./_components/StepShell";
 import { usePermissions } from "@/lib/use-permissions";
 import { dictationModeFrom } from "@/lib/dictation-mode";
@@ -156,13 +156,9 @@ export function Onboarding() {
           }
           action={
             tested ? (
-              <button
-                type="button"
-                onClick={finish}
-                className="h-[var(--control-height)] rounded-input bg-text-primary px-4 text-body font-medium text-opaque-elevated transition-opacity hover:opacity-90 cursor-pointer"
-              >
+              <Button variant="primary" onClick={finish}>
                 Start using Vocs
-              </button>
+              </Button>
             ) : null
           }
         >

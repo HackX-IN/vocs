@@ -19,7 +19,7 @@ import { commands, events, type DownloadProgress, type ModelReport } from "@/lib
 import { unwrapCommand } from "@/lib/ipc";
 import { useTauriEvent } from "@/lib/use-event";
 import { formatBytes, formatEta, formatRate } from "@/lib/format";
-import { ProgressBar } from "@/components/global";
+import { Button, ProgressBar } from "@/components/global";
 
 export interface ModelStepProps {
   model: ModelReport;
@@ -95,14 +95,10 @@ export function ModelStep({ model, onChanged }: ModelStepProps) {
         {descriptor.approx_ram_mb} MB of memory while running.
       </p>
       {state.kind === "FAILED" ? <p className="text-body text-danger">{state.message}</p> : null}
-      <button
-        type="button"
-        onClick={start}
-        className="hairline flex h-8 w-fit items-center gap-2 rounded-input bg-sunken px-3 text-body text-text-primary transition-colors hover:bg-sunken-strong"
-      >
+      <Button variant="primary" onClick={start} className="w-fit">
         <Download className="size-4" />
         {state.kind === "FAILED" ? "Try again" : "Download"}
-      </button>
+      </Button>
     </div>
   );
 }

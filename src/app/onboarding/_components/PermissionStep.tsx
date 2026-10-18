@@ -19,6 +19,7 @@ import { useCallback } from "react";
 import { Check, ExternalLink } from "lucide-react";
 import { commands, type OsPermission, type PermissionReport } from "@/lib/bindings";
 import { unwrapCommand } from "@/lib/ipc";
+import { Button } from "@/components/global";
 
 const PERMISSION_COPY: Readonly<Record<OsPermission, { label: string; why: string; required: boolean }>> = {
   MICROPHONE: {
@@ -72,22 +73,14 @@ export function PermissionStep({
             {report.state === "GRANTED" ? (
               <Check className="size-4 shrink-0 text-success" aria-label="Granted" />
             ) : report.state === "NOT_DETERMINED" ? (
-              <button
-                type="button"
-                onClick={() => request(report.permission)}
-                className="hairline h-8 shrink-0 rounded-input bg-glass px-3 text-body text-text-primary transition-colors hover:bg-sunken-strong"
-              >
+              <Button variant="primary" onClick={() => request(report.permission)}>
                 Allow
-              </button>
+              </Button>
             ) : (
-              <button
-                type="button"
-                onClick={() => openSettings(report.permission)}
-                className="hairline flex h-8 shrink-0 items-center gap-1 rounded-input bg-glass px-3 text-body text-text-primary transition-colors hover:bg-sunken-strong"
-              >
+              <Button onClick={() => openSettings(report.permission)}>
                 <ExternalLink className="size-4" />
                 System Settings
-              </button>
+              </Button>
             )}
           </li>
         );

@@ -66,6 +66,10 @@ export function HistoryRow({ session }: { session: SessionSummary }) {
     session.language !== null ? formatLanguage(session.language) : null,
     session.duration_ms !== null ? formatClock(session.duration_ms) : null,
     session.delivery === "CLIPBOARD_ONLY" ? "Clipboard only" : null,
+    // Words that exist but were never pasted: withheld at the paste preview.
+    // Said out loud, because a dictation that silently did not appear in the
+    // document is exactly what the user would otherwise come here to find out.
+    session.delivery === "NONE" && title !== null && session.outcome === "DELIVERED" ? "Not pasted" : null,
     session.reverted ? "Original" : null,
   ].filter((entry): entry is string => entry !== null);
 

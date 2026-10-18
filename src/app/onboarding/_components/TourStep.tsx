@@ -28,7 +28,7 @@ import type { HotkeyBinding } from "@/lib/bindings";
 import type { DictationMode } from "@/lib/dictation-mode";
 import { glyphsForBinding } from "@/lib/hotkey";
 import { cn } from "@/lib/utils";
-import { Keycap, Mark } from "@/components/global";
+import { Button, Keycap, Mark } from "@/components/global";
 
 interface TourSlide {
   /** Derived from the gesture, because slide one teaches it and the two
@@ -99,7 +99,7 @@ export function TourStep({
       <TourMedia key={slide.media} src={slide.media} title={title} />
 
       <header className="flex flex-col items-center gap-2 text-center">
-        <h1 className="text-title text-text-primary">{title}</h1>
+        <h1 className="font-display text-title text-text-primary">{title}</h1>
         <p className="max-w-96 text-body text-text-secondary">
           {slide.body(hotkey, mode)}
         </p>
@@ -116,13 +116,9 @@ export function TourStep({
           <ChevronLeft className="size-4" />
         </button>
 
-        <button
-          type="button"
-          onClick={() => (isLast ? onDone() : setIndex((current) => current + 1))}
-          className="h-[var(--control-height)] rounded-input bg-text-primary px-4 text-body font-medium text-opaque-elevated transition-opacity hover:opacity-90"
-        >
+        <Button variant="primary" onClick={() => (isLast ? onDone() : setIndex((current) => current + 1))}>
           {isLast ? "Set up Vocs" : "Next"}
-        </button>
+        </Button>
 
         {/* Balances the back button so the primary action stays optically
             centred on slide one, where back is hidden. Without it the button
@@ -142,8 +138,8 @@ export function TourStep({
             aria-current={dotIndex === index}
             onClick={() => setIndex(dotIndex)}
             className={cn(
-              "size-[var(--pill-dot-size)] rounded-pill transition-colors",
-              dotIndex === index ? "bg-text-primary" : "bg-sunken hover:bg-sunken-strong",
+              "size-[var(--step-dot-size)] rounded-pill transition-colors",
+              dotIndex === index ? "bg-accent" : "bg-sunken-strong hover:bg-text-tertiary",
             )}
           />
         ))}
