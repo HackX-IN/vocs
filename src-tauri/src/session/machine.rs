@@ -222,7 +222,17 @@ impl SessionMachine {
 
         let (to, effects) = match (&self.state, &event) {
             // ── Starting ─────────────────────────────────────────────────
-            (SessionState::Idle, SessionEvent::StartRequested) => {
+            /*
+             * SOURCE OF TRUTH KEYWORDS: start_from_failed, failed_is_not_a_lockout
+             * A failure lingers on the pill for a few seconds so its reason can be
+             * read, and during those seconds the hotkey did NOTHING — the machine
+             * refused a start from Failed. To the person pressing it that is the
+             * app not working, right after it just told them something went
+             * wrong. Failed is a message, not a lock: starting from it is the
+             * same start as from Idle, and the pending Reset that would have
+             * cleared it is ignored when it arrives (see the Reset arm below).
+             */
+            (SessionState::Idle | SessionState::Failed { .. }, SessionEvent::StartRequested) => {
                 let session_id = SessionId::new();
                 self.session_id = Some(session_id.clone());
                 (
@@ -441,6 +451,11 @@ impl SessionMachine {
             (SessionState::Idle, SessionEvent::Reset) => {
                 (SessionState::Idle, vec![])
             }
+
+            // The linger timer's Reset can arrive after the user has already
+            // moved on (a new recording started from Failed). It is a timer, not
+            // a user action, so being late is expected and it changes nothing.
+            (_, SessionEvent::Reset) => (self.state.clone(), vec![]),
 
             // ── Everything else is a disagreement, not a no-op ────────────
             (state, event) => {
@@ -1016,5 +1031,25 @@ mod tests {
         m.handle(SessionEvent::StopRequested).expect("stop");
         m.handle(SessionEvent::StartRequested)
             .expect("stopping can never cost the next recording");
+    }
+
+    #[test]
+    fn a_failure_does_not_lock_the_hotkey_and_its_late_reset_is_harmless() {
+        let mut m = machine();
+        m.handle(SessionEvent::DeliveryFailed(AppError::new(
+            ErrorCode::TranscriptionFailed,
+            "nothing",
+        )))
+        .expect("idle can show it");
+        assert!(matches!(m.state(), SessionState::Failed { .. }));
+
+        // The user presses the hotkey while the failure is still on the pill.
+        let started = m.handle(SessionEvent::StartRequested).expect("a start from Failed");
+        assert!(matches!(m.state(), SessionState::Arming));
+        assert!(started.effects.iter().any(|e| matches!(e, Effect::StartCapture)));
+
+        // The three-second linger timer fires into the new recording.
+        m.handle(SessionEvent::Reset).expect("a late reset is not a disagreement");
+        assert!(matches!(m.state(), SessionState::Arming), "and it must not end the recording");
     }
 }
