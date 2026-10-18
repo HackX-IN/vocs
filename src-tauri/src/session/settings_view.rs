@@ -44,6 +44,7 @@ pub struct SessionSettings {
     pub paste_delay_ms: u64,
     pub clipboard_restore_delay_ms: u64,
     pub strip_fillers: bool,
+    pub filler_strength: crate::types::FillerStrength,
     pub spoken_commands: bool,
     pub apply_corrections: bool,
     pub normalise_punctuation: bool,
@@ -117,6 +118,10 @@ impl SessionSettings {
             _ => CaptureMode::OnDemand,
         };
 
+        // One line, because registry/reachability.rs finds a setting's consumer
+        // by reading `let field = …keys::X` here.
+        let filler_strength = crate::types::FillerStrength::from_stored(&read_choice(stored, keys::FILLER_STRENGTH).unwrap_or_default());
+
         Self {
             model_id: read_choice(stored, keys::TRANSCRIPTION_MODEL)
                 .unwrap_or_else(|| "large-v3-turbo-q5_0".to_string()),
@@ -138,6 +143,7 @@ impl SessionSettings {
                 .unwrap_or(150.0)
                 .max(0.0) as u64,
             strip_fillers: read_bool(stored, keys::STRIP_FILLERS).unwrap_or(false),
+            filler_strength,
             spoken_commands: read_bool(stored, keys::SPOKEN_COMMANDS).unwrap_or(true),
             apply_corrections: read_bool(stored, keys::APPLY_CORRECTIONS).unwrap_or(false),
             normalise_punctuation: read_bool(stored, keys::NORMALISE_PUNCTUATION).unwrap_or(true),

@@ -168,6 +168,7 @@ async fn deliver(ctx: &SessionContext, pending: PendingDelivery) {
         language: language.clone(),
         dictionary,
         strip_fillers: settings.strip_fillers,
+        filler_strength: settings.filler_strength,
         expand_spoken_commands: settings.spoken_commands,
         normalise_punctuation: settings.normalise_punctuation,
         capitalise_sentences: settings.capitalise_sentences,

@@ -65,7 +65,7 @@ impl TextEnhancer for RuleEnhancer {
 
         // 3. Fillers, before the dictionary can try to match across one.
         if context.strip_fillers {
-            out = fillers::strip_fillers(&out, language, &context.dictionary);
+            out = fillers::strip_fillers(&out, language, &context.dictionary, context.filler_strength);
         }
 
         /*
@@ -117,6 +117,7 @@ mod tests {
             language: Some(LanguageCode("en".into())),
             dictionary: vec![],
             strip_fillers: true,
+            filler_strength: Default::default(),
             expand_spoken_commands: true,
             normalise_punctuation: true,
             capitalise_sentences: true,
@@ -160,6 +161,7 @@ mod tests {
             language: Some(LanguageCode("en".into())),
             dictionary: vec![],
             strip_fillers: false,
+            filler_strength: Default::default(),
             expand_spoken_commands: false,
             normalise_punctuation: false,
             capitalise_sentences: false,

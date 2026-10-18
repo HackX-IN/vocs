@@ -37,6 +37,7 @@ pub const CLIPBOARD_RESTORE_DELAY_MS: &str = "output.clipboard_restore_delay_ms"
 pub const CAPITALISE_SENTENCES: &str = "enhance.capitalise_sentences";
 pub const NORMALISE_PUNCTUATION: &str = "enhance.normalise_punctuation";
 pub const STRIP_FILLERS: &str = "enhance.strip_fillers";
+pub const FILLER_STRENGTH: &str = "enhance.filler_strength";
 pub const SPOKEN_COMMANDS: &str = "enhance.spoken_commands";
 pub const APPLY_CORRECTIONS: &str = "enhance.apply_corrections";
 

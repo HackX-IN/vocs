@@ -26,12 +26,17 @@
  *        token with leading punctuation (an opening quote or bracket) is never
  *        touched, which also keeps quoted speech intact.
  *
+ *        How much of that happens is the user's setting (FillerStrength): Light
+ *        stops at the hesitations, Standard adds the punctuation-gated words,
+ *        Strict adds the bracketed adverbs. Each level is a strict superset of
+ *        the one below, so turning it up can only remove more, never differently.
+ *
  *        Terms the user put in their dictionary are protected: a band called
  *        "Like", a product called "Uh", is theirs to keep.
  * WHERE: Called by adapters/rules/mod.rs ahead of the dictionary pass.
  */
 
-use crate::types::{DictionaryEntry, LanguageCode};
+use crate::types::{DictionaryEntry, FillerStrength, LanguageCode};
 
 /// Collapsed form (runs of one letter folded to one) of sounds with no meaning.
 /// "ummm" → "um", "hmmm" → "hm", "errr" → "er".
@@ -166,13 +171,23 @@ fn closes_clause(tail: &str, is_last: bool, comma_only: bool) -> bool {
 }
 
 /// Length in tokens of the discourse filler starting at `at`, if it is one.
-fn discourse_filler_at(tokens: &[Token<'_>], at: usize, protected: &[String]) -> Option<usize> {
+fn discourse_filler_at(
+    tokens: &[Token<'_>],
+    at: usize,
+    protected: &[String],
+    strength: FillerStrength,
+) -> Option<usize> {
+    // Light stops at hesitations: nothing here may run.
+    if strength < FillerStrength::Standard {
+        return None;
+    }
     let boundary = left_boundary(tokens, at);
 
+    let adverbs: &[&[&str]] = if strength >= FillerStrength::Strict { PARENTHETICAL_ONLY } else { &[] };
     let candidates = DISCOURSE_FILLERS
         .iter()
         .map(|phrase| (*phrase, false))
-        .chain(PARENTHETICAL_ONLY.iter().map(|phrase| (*phrase, true)));
+        .chain(adverbs.iter().map(|phrase| (*phrase, true)));
 
     for (phrase, parenthetical) in candidates {
         if !phrase_at(tokens, at, phrase) {
@@ -214,6 +229,7 @@ pub fn strip_fillers(
     text: &str,
     language: Option<&LanguageCode>,
     dictionary: &[DictionaryEntry],
+    strength: FillerStrength,
 ) -> String {
     if !is_english(language) {
         return text.to_string();
@@ -223,12 +239,12 @@ pub fn strip_fillers(
     // Line by line: a newline (from "new line" / "new paragraph") must survive,
     // and it is also a sentence boundary the token walk should respect.
     text.split('\n')
-        .map(|line| strip_line(line, &protected))
+        .map(|line| strip_line(line, &protected, strength))
         .collect::<Vec<_>>()
         .join("\n")
 }
 
-fn strip_line(line: &str, protected: &[String]) -> String {
+fn strip_line(line: &str, protected: &[String], strength: FillerStrength) -> String {
     let tokens = tokenise(line);
     let mut out: Vec<String> = Vec::with_capacity(tokens.len());
     // A dropped token that began a sentence passes its capital to the next word.
@@ -245,7 +261,7 @@ fn strip_line(line: &str, protected: &[String]) -> String {
         {
             Some(1)
         } else {
-            discourse_filler_at(&tokens, at, protected)
+            discourse_filler_at(&tokens, at, protected, strength)
         };
 
         let Some(width) = dropped else {
@@ -294,7 +310,11 @@ mod tests {
     }
 
     fn strip(text: &str) -> String {
-        strip_fillers(text, Some(&en()), &[])
+        strip_fillers(text, Some(&en()), &[], FillerStrength::Standard)
+    }
+
+    fn strip_at(text: &str, strength: FillerStrength) -> String {
+        strip_fillers(text, Some(&en()), &[], strength)
     }
 
     fn protect(pattern: &str, replacement: &str) -> DictionaryEntry {
@@ -374,11 +394,39 @@ mod tests {
     }
 
     #[test]
-    fn meaningful_adverbs_go_only_when_bracketed_by_commas() {
-        assert_eq!(strip("It was, basically, done"), "It was, done");
-        assert_eq!(strip("Actually, I changed my mind"), "Actually, I changed my mind");
-        assert_eq!(strip("I actually like it"), "I actually like it");
-        assert_eq!(strip("it is literally on fire"), "it is literally on fire");
+    fn meaningful_adverbs_go_only_at_strict_and_only_when_bracketed_by_commas() {
+        let strict = |text: &str| strip_at(text, FillerStrength::Strict);
+        assert_eq!(strict("It was, basically, done"), "It was, done");
+        assert_eq!(strict("Actually, I changed my mind"), "Actually, I changed my mind");
+        assert_eq!(strict("I actually like it"), "I actually like it");
+        assert_eq!(strict("it is literally on fire"), "it is literally on fire");
+        // Below Strict they are never touched, bracketed or not.
+        assert_eq!(strip("It was, basically, done"), "It was, basically, done");
+    }
+
+    #[test]
+    fn light_removes_only_the_sounds_that_mean_nothing() {
+        let light = |text: &str| strip_at(text, FillerStrength::Light);
+        assert_eq!(light("um it was, like, fine, you know"), "it was, like, fine, you know");
+        assert_eq!(light("we should, uh, go"), "we should, go");
+    }
+
+    #[test]
+    fn each_level_removes_everything_the_one_below_does() {
+        let text = "Um it was, like, done, basically, you know.";
+        let light = strip_at(text, FillerStrength::Light);
+        let standard = strip_at(text, FillerStrength::Standard);
+        let strict = strip_at(text, FillerStrength::Strict);
+        assert!(light.len() >= standard.len() && standard.len() >= strict.len());
+        assert_eq!(strict, "It was, done.");
+    }
+
+    #[test]
+    fn an_unknown_stored_strength_reads_as_the_default() {
+        assert_eq!(FillerStrength::from_stored("nonsense"), FillerStrength::Standard);
+        assert_eq!(FillerStrength::from_stored("light"), FillerStrength::Light);
+        assert_eq!(FillerStrength::from_stored("strict"), FillerStrength::Strict);
+        assert_eq!(FillerStrength::Strict.as_str(), "strict");
     }
 
     // ── safety ───────────────────────────────────────────────────────────
@@ -396,23 +444,23 @@ mod tests {
     #[test]
     fn dictionary_terms_are_protected() {
         let band = [protect("like", "Like")];
-        assert_eq!(strip_fillers("Like, I love Like", Some(&en()), &band), "Like, I love Like");
+        assert_eq!(strip_fillers("Like, I love Like", Some(&en()), &band, FillerStrength::Standard), "Like, I love Like");
         let hum = [protect("uh", "UH")];
-        assert_eq!(strip_fillers("uh yes", Some(&en()), &hum), "uh yes");
+        assert_eq!(strip_fillers("uh yes", Some(&en()), &hum, FillerStrength::Standard), "uh yes");
     }
 
     #[test]
     fn a_disabled_dictionary_entry_does_not_protect_anything() {
         let mut off = protect("like", "Like");
         off.enabled = false;
-        assert_eq!(strip_fillers("Like, I know", Some(&en()), &[off]), "I know");
+        assert_eq!(strip_fillers("Like, I know", Some(&en()), &[off], FillerStrength::Standard), "I know");
     }
 
     #[test]
     fn other_languages_are_never_touched() {
         let hindi = LanguageCode("hi".into());
-        assert_eq!(strip_fillers("um like, you know", Some(&hindi), &[]), "um like, you know");
-        assert_eq!(strip_fillers("um like", None, &[]), "um like");
+        assert_eq!(strip_fillers("um like, you know", Some(&hindi), &[], FillerStrength::Strict), "um like, you know");
+        assert_eq!(strip_fillers("um like", None, &[], FillerStrength::Strict), "um like");
     }
 
     #[test]

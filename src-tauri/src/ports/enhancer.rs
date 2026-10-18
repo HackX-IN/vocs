@@ -13,7 +13,7 @@
  */
 
 use crate::error::AppResult;
-use crate::types::{DictionaryEntry, LanguageCode};
+use crate::types::{DictionaryEntry, FillerStrength, LanguageCode};
 
 /**
  * SOURCE OF TRUTH KEYWORDS: EnhanceContext
@@ -29,6 +29,8 @@ pub struct EnhanceContext {
     pub language: Option<LanguageCode>,
     pub dictionary: Vec<DictionaryEntry>,
     pub strip_fillers: bool,
+    /// Only consulted when `strip_fillers` is on.
+    pub filler_strength: FillerStrength,
     pub expand_spoken_commands: bool,
     pub normalise_punctuation: bool,
     pub capitalise_sentences: bool,

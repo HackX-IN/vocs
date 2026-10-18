@@ -434,9 +434,21 @@ fn build_capabilities() -> Vec<Capability> {
                 toggle(
                     keys::STRIP_FILLERS,
                     "Remove filler words",
-                    "Drop “um”, “uh” and “er”, plus “like” and “you know” when you say them as filler (set off by commas). Words you mean, as in “I like it”, are never touched.",
+                    "Drop “um”, “uh” and “er”, and — depending on the level below — “like” and “you know” when you say them as filler. Words you mean, as in “I like it”, are never touched.",
                     SettingSection::Output,
                     false,
+                ),
+                choice(
+                    keys::FILLER_STRENGTH,
+                    "How much filler to remove",
+                    "Only applies when filler removal is on. Higher levels can change what you said, so start light.",
+                    SettingSection::Output,
+                    &[
+                        ("light", "Light", "Just “um”, “uh” and “er”"),
+                        ("standard", "Standard", "Plus “like” and “you know” when you say them as filler"),
+                        ("strict", "Strict", "Also “actually” and “basically” between commas"),
+                    ],
+                    "standard",
                 ),
                 toggle(
                     keys::SPOKEN_COMMANDS,
@@ -737,6 +749,7 @@ mod tests {
             keys::CAPITALISE_SENTENCES,
             keys::NORMALISE_PUNCTUATION,
             keys::STRIP_FILLERS,
+            keys::FILLER_STRENGTH,
             keys::SPOKEN_COMMANDS,
             keys::APPLY_CORRECTIONS,
             keys::RETENTION_DAYS,

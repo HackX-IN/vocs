@@ -42,6 +42,6 @@ pub use session::{
     DeliveryKind, RecordingMode, SessionId, SessionOutcome, SessionState, SessionSummary,
 };
 pub use settings::{
-    ChoiceSource, HotkeyBinding, KeyModifier, SettingChoice, SettingKind, SettingValue,
+    ChoiceSource, FillerStrength, HotkeyBinding, KeyModifier, SettingChoice, SettingKind, SettingValue,
 };
 pub use transcript::{LanguageCode, LanguageHint, Transcript, TranscriptSegment};

@@ -44,6 +44,51 @@ pub enum SettingKind {
 }
 
 /**
+ * SOURCE OF TRUTH KEYWORDS: FillerStrength, correction_strength, from_stored
+ * WHAT:  How much filler the enhancer removes: only meaningless sounds, those
+ *        plus filler words set off by punctuation, or also meaningful adverbs
+ *        when commas bracket them.
+ * WHY:   One person's filler is another's emphasis, so the amount is theirs to
+ *        choose and the tiers are ordered by how much meaning they risk: Light
+ *        can never change a sentence, Standard changes only words that
+ *        punctuation marks as filler, Strict will also drop "basically" and
+ *        "actually" from between commas. Stored as a plain choice string
+ *        because it is a setting; parsed here so no caller matches on strings.
+ * WHERE: Read by session/settings_view.rs, carried on EnhanceContext, and
+ *        applied by adapters/rules/fillers.rs.
+ */
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord)]
+pub enum FillerStrength {
+    /// Hesitations only: um, uh, er.
+    Light,
+    /// Plus filler words that punctuation sets off: ", like,", ", you know."
+    #[default]
+    Standard,
+    /// Plus meaningful adverbs, when bracketed by commas.
+    Strict,
+}
+
+impl FillerStrength {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            FillerStrength::Light => "light",
+            FillerStrength::Standard => "standard",
+            FillerStrength::Strict => "strict",
+        }
+    }
+
+    /// An unrecognised value (hand-edited, or from a newer build) reads as the
+    /// default rather than failing the session.
+    pub fn from_stored(value: &str) -> Self {
+        match value {
+            "light" => FillerStrength::Light,
+            "strict" => FillerStrength::Strict,
+            _ => FillerStrength::Standard,
+        }
+    }
+}
+
+/**
  * SOURCE OF TRUTH KEYWORDS: ChoiceSource
  * WHAT:  Where a dynamic setting's options come from.
  * WHY:   Input devices, installed models and supported languages cannot be
