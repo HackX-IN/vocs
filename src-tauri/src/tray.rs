@@ -114,10 +114,23 @@ pub(crate) fn copy_last_transcript(app: &AppHandle) {
  * WHAT:  Brings the dashboard to the front, properly.
  * WHY:   See the module WHY — an accessory app must activate explicitly or its
  *        window opens behind everything. `set_focus` is what does that here;
- *        `show` alone is the bug.
+ *        `show` alone is the bug. Safe to call from any thread: it schedules the
+ *        window work on the main thread, which AppKit requires.
  * WHERE: The tray menu, and any deep link into settings.
  */
 pub fn show_dashboard(app: &AppHandle) {
+    // AppKit only lets the main thread move and order windows. The tray menu
+    // calls this from there, but a second launch (the single-instance callback)
+    // and the application menu's async actions do not — and from any other
+    // thread `NSWindow setFrame` traps the whole process. Hop over once, here,
+    // so no caller has to know.
+    let handle = app.clone();
+    if let Err(err) = app.run_on_main_thread(move || show_dashboard_on_main(&handle)) {
+        tracing::error!(error = %err, "could not schedule the dashboard on the main thread");
+    }
+}
+
+fn show_dashboard_on_main(app: &AppHandle) {
     let Some(window) = app.get_webview_window(DASHBOARD_WINDOW) else {
         tracing::error!("the dashboard window is missing");
         return;
