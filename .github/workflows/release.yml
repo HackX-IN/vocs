@@ -1,0 +1,263 @@
+# SOURCE OF TRUTH KEYWORDS: release, tauri-action, universal-apple-darwin,
+#   TAURI_SIGNING_PRIVATE_KEY, latest.json, notarization, updater-artifacts
+# WHAT:  Tag `v*` -> universal macOS build -> signed updater artifacts -> a
+#        GitHub Release carrying the DMG and latest.json.
+# WHY:   The signature is the whole security model of the updater: the app will
+#        refuse any bundle that does not verify against the public key baked
+#        into tauri.conf.json, so the private key never leaves GitHub Secrets
+#        and never enters the repository. Losing it is unrecoverable — no
+#        existing install can ever be updated again — which is why it is a
+#        secret and not a file.
+#
+#        NOTARIZATION is deliberately pre-wired rather than left to a later
+#        restructure (docs/02 §12 locks this in). The Apple variables are
+#        already passed through to the build below; when they are empty Tauri
+#        skips signing and notarization entirely, and when the secrets exist it
+#        performs both. Turning it on is therefore adding repository secrets
+#        and nothing else — no new step, no new job, no reordering.
+# WHERE: Triggered by pushing a tag. Consumes the keypair generated with
+#        `pnpm tauri signer generate`; feeds the endpoint configured in
+#        src-tauri/tauri.conf.json under plugins.updater.endpoints.
+
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  # Lets a release be re-cut without moving a tag, which is the usual reason a
+  # release job gets run twice.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing tag to build (e.g. v0.1.0)"
+        required: true
+        type: string
+
+# The job writes a Release, so it needs write access to repository contents.
+permissions:
+  contents: write
+
+# A second tag pushed while the first is still building would race to publish
+# the same latest.json. Queue instead, and never cancel a half-published run.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  macos:
+    # macOS 14+ runners are Apple silicon. Both halves of the universal binary
+    # are cross-compiled from here, which is why the x86_64 target is added
+    # explicitly below.
+    runs-on: macos-14
+    timeout-minutes: 90
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.ref }}
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: pnpm
+
+      - name: Install Rust with both macOS targets
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-apple-darwin, x86_64-apple-darwin
+
+      # Keyed on the lockfile AND the target, so the universal build does not
+      # keep evicting a cache built for one architecture.
+      - uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+          key: universal-apple-darwin
+
+      - run: pnpm install --frozen-lockfile
+
+      # Fails in seconds rather than after a ~40 minute universal build. A
+      # tagged release that dies at the signing step has already burned the
+      # build, and the tag has to be re-cut to retry.
+      - name: Verify the signing key is present
+        env:
+          KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+        run: |
+          if [ -z "$KEY" ]; then
+            echo "::error::TAURI_SIGNING_PRIVATE_KEY is not set. Without it the"
+            echo "::error::build produces artifacts every installed copy of"
+            echo "::error::Vocs will refuse, and the failure would only show"
+            echo "::error::up at update time on a user's machine."
+            exit 1
+          fi
+
+      # CLAUDE.md §4 puts clippy at deny level, so a release that has not passed
+      # it has not met the bar the rulebook sets. Placed before the build
+      # because it compiles for the HOST arch only and shares the cargo cache
+      # with the step below — roughly half the work of the universal build, and
+      # a lint failure after a two-architecture compile is a tag that has to be
+      # re-cut for something a single command would have caught.
+      - name: Clippy at deny level
+        working-directory: src-tauri
+        run: cargo clippy --all-targets -- -D warnings
+
+      # Apple's variables are exported HERE, conditionally, rather than being
+      # listed in the build step's `env:` — and the difference is not cosmetic.
+      #
+      # A workflow `env:` entry fed by a missing secret is not absent, it is
+      # the EMPTY STRING, and Tauri treats "set" as "use it": it ran
+      # `security import` against an empty certificate and the whole release
+      # failed with "failed to import keychain certificate". The comment beside
+      # those lines claimed "Tauri skips both when they are empty". It does not,
+      # and nobody had run a release to find out.
+      #
+      # Exporting through $GITHUB_ENV only when a value is non-empty makes the
+      # variables genuinely ABSENT until the secrets exist, which is what the
+      # original comment promised. Adding the secrets is still the entire
+      # change — it just works now.
+      - name: Enable Apple signing and notarization when configured
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_PASSWORD: ${{ secrets.APPLE_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+        run: |
+          # APPLE_CERTIFICATE is handled entirely by the trust step above and
+          # must not reach Tauri, or it imports the certificate a second time
+          # into a keychain that has no trust settings — which is the failure
+          # this whole arrangement exists to avoid.
+          for name in APPLE_SIGNING_IDENTITY APPLE_ID APPLE_PASSWORD APPLE_TEAM_ID; do
+            value="${!name}"
+            if [ -n "$value" ]; then
+              printf '%s=%s\n' "$name" "$value" >> "$GITHUB_ENV"
+              echo "$name is configured"
+            fi
+          done
+          if [ -z "${APPLE_SIGNING_IDENTITY}" ]; then
+            echo "::warning::No Apple Developer ID configured — this build is UNSIGNED." \
+                 "macOS will warn on first open until the certificate secrets are added."
+          fi
+
+      # Tauri resolves a signing identity with `security find-identity -v`,
+      # and `-v` means VALID — which excludes a self-signed certificate, since
+      # it chains to no trusted root. That is why an earlier run died with
+      # "failed to resolve signing identity" despite the certificate importing
+      # fine. Marking it trusted on the runner fixes it, and is safe HERE in a
+      # way it would not be on a person's machine: this keychain and this
+      # runner are destroyed when the job ends.
+      #
+      # The certificate must stay the same one forever. macOS keys an
+      # Accessibility grant to the certificate that signed the app, so a new
+      # certificate silently voids every existing user's permission.
+      - name: Trust the signing certificate on this runner
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+        run: |
+          set -euo pipefail
+          # Guarded HERE and not in `if:` — `secrets` is not a permitted context
+          # in a step-level condition and using it there fails the whole
+          # workflow at parse time, before any job runs.
+          if [ -z "${APPLE_CERTIFICATE:-}" ]; then
+            echo "::warning::No signing certificate configured — this build will be UNSIGNED."
+            exit 0
+          fi
+          KC=build.keychain
+          KCPASS=$(uuidgen)
+          security create-keychain -p "$KCPASS" "$KC"
+          security set-keychain-settings "$KC"          # never auto-lock
+          security unlock-keychain -p "$KCPASS" "$KC"
+          echo "$APPLE_CERTIFICATE" | base64 --decode > /tmp/cert.p12
+          security import /tmp/cert.p12 -k "$KC" -P "$APPLE_CERTIFICATE_PASSWORD" \
+            -T /usr/bin/codesign -A
+          # Without this, codesign fails with errSecInternalComponent even on an
+          # unlocked keychain. -T alone is not enough on modern macOS.
+          security set-key-partition-list -S apple-tool:,apple:,codesign: \
+            -s -k "$KCPASS" "$KC" >/dev/null
+          # Export the public certificate and trust it for code signing.
+          openssl pkcs12 -in /tmp/cert.p12 -clcerts -nokeys -legacy \
+            -passin pass:"$APPLE_CERTIFICATE_PASSWORD" -out /tmp/cert.pem 2>/dev/null
+          sudo security add-trusted-cert -d -r trustRoot -p codeSign \
+            -k /Library/Keychains/System.keychain /tmp/cert.pem
+          security list-keychains -d user -s "$KC" login.keychain
+          rm -f /tmp/cert.p12 /tmp/cert.pem
+          echo "identities available to codesign:"
+          security find-identity -v -p codesigning "$KC"
+
+      - name: Build, sign and publish
+        uses: tauri-apps/tauri-action@v0
+        env:
+          # ── Updater signing. Without these the build produces artifacts the
+          # app will refuse to install, which fails silently at update time
+          # rather than at build time — so they are required, not optional.
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          # MUST be set even when the key has no password. An UNSET variable
+          # makes Tauri fall back to prompting for one; on a runner that reads
+          # from a closed stdin, and it reports the result as
+          # "incorrect updater private key password: Device not configured",
+          # which sends you hunting for a wrong password that does not exist.
+          # The `|| ''` keeps it defined when the secret is absent entirely.
+          # An empty value here is DELIBERATE — do not "tidy it up".
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD || '' }}
+
+          # APPLE_CERTIFICATE is deliberately absent: the step above already
+          # imported and trusted it, and letting Tauri import it a second time
+          # creates a second keychain without the trust settings.
+
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ inputs.tag || github.ref_name }}
+          releaseName: "Vocs __VERSION__"
+          releaseBody: "See the assets below to download and install."
+          # Published as a draft: the DMG should be opened and launched once
+          # before anyone is told it exists. Publishing the release is what
+          # points latest.json at it, so a broken build is never something
+          # every install downloads automatically.
+          releaseDraft: true
+          prerelease: false
+          # Writes latest.json from the signed artifacts. Without this the
+          # release carries a DMG nobody's updater can see.
+          includeUpdaterJson: true
+          # `createUpdaterArtifacts` is FALSE in tauri.conf.json and turned on
+          # here, which is the only place a signing key exists.
+          #
+          # It has to default off, and the reason is worth stating: the moment a
+          # pubkey is present in the config, Tauri refuses to build AT ALL
+          # without the matching private key — "a public key has been found, but
+          # no private key". That broke CI's plain build job and every local
+          # `pnpm tauri build` run by anyone who does not hold the key, which is
+          # everyone except whoever cut the last release. Contributors should be
+          # able to build the app; only a release needs to be signable.
+          args: --target universal-apple-darwin --config '{"bundle":{"createUpdaterArtifacts":true}}'
+
+
+      # A bundle whose signature does not VERIFY is not a signable failure —
+      # it builds, it launches, and macOS quietly refuses to trust it. That is
+      # not hypothetical: every build for a day signed only the inner
+      # executable and left no _CodeSignature/CodeResources, so the app was
+      # "valid" to every check we ran and invalid to the one that matters. TCC
+      # would not honour an Accessibility grant for it, so the operator had the
+      # switch ON, the app prompted anyway, and pasting never worked.
+      #
+      # Verifying the ARTIFACT is the only check that could have caught it.
+      # Hash-comparing the binary did not, because the binary was fine and the
+      # bundle around it was not.
+      - name: Verify the signed bundle
+        run: |
+          APP=$(find src-tauri/target -type d -name "Vocs.app" -path "*/bundle/macos/*" | head -1)
+          if [ -z "$APP" ]; then
+            echo "::error::no Vocs.app was produced"; exit 1
+          fi
+          echo "checking $APP"
+          codesign --verify --deep --strict --verbose=2 "$APP"
+          codesign -dv "$APP" 2>&1 | grep -qE "^Identifier=com\.hackx\.vocs" \
+            || { echo "::error::wrong bundle identifier — TCC grants will not persist"; exit 1; }
+          codesign -d --entitlements :- "$APP" 2>/dev/null | grep -q "audio-input" \
+            || { echo "::error::microphone entitlement missing"; exit 1; }
+          echo "bundle verifies, identifier and entitlement correct"
