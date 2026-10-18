@@ -1,5 +1,6 @@
 /*!
- * SOURCE OF TRUTH KEYWORDS: AppProfile, bundle_id, overrides, per_app_profile
+ * SOURCE OF TRUTH KEYWORDS: AppProfile, bundle_id, overrides, per_app_profile,
+ *   excluded
  * WHAT:  One application's sparse setting overrides.
  * WHY:   Sparse on purpose: a profile names only what it CHANGES, so everything
  *        it does not mention keeps following the global setting. A profile that
@@ -26,4 +27,8 @@ pub struct AppProfile {
     /// Sparse: only the settings this profile changes.
     pub overrides: HashMap<String, SettingValue>,
     pub enabled: bool,
+    /// Vocs does not record while this app is in front. `default` so a backup
+    /// made before this existed still restores.
+    #[serde(default)]
+    pub excluded: bool,
 }

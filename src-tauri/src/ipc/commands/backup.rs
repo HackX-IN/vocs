@@ -237,6 +237,7 @@ mod tests {
             display_name: "App".into(),
             overrides: overrides.iter().map(|(k, v)| ((*k).to_string(), v.clone())).collect(),
             enabled: true,
+            excluded: false,
         }
     }
 

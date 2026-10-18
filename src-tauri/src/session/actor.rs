@@ -397,6 +397,18 @@ impl SessionActor {
          * `ensure` rather than `check`: never-asked means ask. See
          * PermissionProvider::ensure.
          */
+        // The user turned Vocs off for this app. Checked before the microphone
+        // is touched, so an excluded app never so much as prompts for access.
+        if let Some(app) = self.settings.excluded_app.clone() {
+            tracing::info!(app, "refusing to record in an excluded app");
+            let err = AppError::new(
+                ErrorCode::AppExcluded,
+                format!("Vocs is turned off in {app}. You can change that in Settings, under Per-app profiles."),
+            );
+            let _ = self.ctx.session.send(SessionEvent::ArmingFailed(err)).await;
+            return;
+        }
+
         let microphone = self.ctx.ports.permissions.ensure(OsPermission::Microphone);
         if !microphone.is_granted() {
             tracing::warn!(state = ?microphone, "refusing to record without the microphone");

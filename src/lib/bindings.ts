@@ -146,6 +146,11 @@ export type AppProfile = {
 	/**  Sparse: only the settings this profile changes. */
 	overrides: { [key in string]: SettingValue },
 	enabled: boolean,
+	/**
+	 *  Vocs does not record while this app is in front. `default` so a backup
+	 *  made before this existed still restores.
+	 */
+	excluded?: boolean,
 };
 
 /**
@@ -399,7 +404,12 @@ export type ErrorCode = "MICROPHONE_DENIED" | "ACCESSIBILITY_DENIED" |
  *  The device opened and delivered pure silence — the capture path is
  *  broken rather than the room being quiet. See AppError::microphone_silent.
  */
-"MICROPHONE_SILENT" | "AUDIO_FORMAT_UNSUPPORTED" | "MODEL_MISSING" | "MODEL_DOWNLOAD_FAILED" | "MODEL_CHECKSUM_MISMATCH" | "ENGINE_NOT_READY" | "ENGINE_UNSUPPORTED_LANGUAGE" | "TRANSCRIPTION_FAILED" | "SESSION_ALREADY_ACTIVE" | "SESSION_NOT_FOUND" | "ILLEGAL_TRANSITION" | "FINALIZE_TIMEOUT" | "SECURE_INPUT_ACTIVE" | "INJECTION_FAILED" | "CLIPBOARD_UNAVAILABLE" | "HOTKEY_CONFLICT" | "HOTKEY_REGISTRATION_FAILED" | "INVALID_INPUT" | "NOT_FOUND" | "DATABASE" | "IO" | "NETWORK" | "INTERNAL";
+"MICROPHONE_SILENT" | "AUDIO_FORMAT_UNSUPPORTED" | "MODEL_MISSING" | "MODEL_DOWNLOAD_FAILED" | "MODEL_CHECKSUM_MISMATCH" | "ENGINE_NOT_READY" | "ENGINE_UNSUPPORTED_LANGUAGE" | "TRANSCRIPTION_FAILED" | "SESSION_ALREADY_ACTIVE" | "SESSION_NOT_FOUND" | "ILLEGAL_TRANSITION" | "FINALIZE_TIMEOUT" | 
+/**
+ *  The frontmost app has a profile that turns Vocs off. A choice the user
+ *  made, so the message names the app and where to change it.
+ */
+"APP_EXCLUDED" | "SECURE_INPUT_ACTIVE" | "INJECTION_FAILED" | "CLIPBOARD_UNAVAILABLE" | "HOTKEY_CONFLICT" | "HOTKEY_REGISTRATION_FAILED" | "INVALID_INPUT" | "NOT_FOUND" | "DATABASE" | "IO" | "NETWORK" | "INTERNAL";
 
 /**
  * 

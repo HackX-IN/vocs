@@ -22,7 +22,7 @@ use crate::types::{AppProfile, SettingValue};
 pub fn list_profiles(db: &Database) -> AppResult<Vec<AppProfile>> {
     db.with_connection(|conn| {
         let mut stmt = conn.prepare(
-            "SELECT bundle_id, display_name, settings_json, enabled
+            "SELECT bundle_id, display_name, settings_json, enabled, excluded
                FROM app_profiles ORDER BY display_name COLLATE NOCASE",
         )?;
         let rows = stmt.query_map([], row_to_profile)?;
@@ -45,7 +45,7 @@ pub fn list_profiles(db: &Database) -> AppResult<Vec<AppProfile>> {
 pub fn get_profile(db: &Database, bundle_id: &str) -> AppResult<Option<AppProfile>> {
     db.with_connection(|conn| {
         let mut stmt = conn.prepare(
-            "SELECT bundle_id, display_name, settings_json, enabled
+            "SELECT bundle_id, display_name, settings_json, enabled, excluded
                FROM app_profiles WHERE bundle_id = ?1 AND enabled = 1",
         )?;
         let mut rows = stmt.query(params![bundle_id])?;
@@ -60,17 +60,21 @@ pub fn upsert_profile(db: &Database, profile: &AppProfile) -> AppResult<()> {
     let encoded = serde_json::to_string(&profile.overrides)?;
     db.with_connection(|conn| {
         conn.execute(
-            "INSERT INTO app_profiles (bundle_id, display_name, settings_json, enabled)
-             VALUES (?1, ?2, ?3, ?4)
+            // `excluded.` below is SQLite's name for the row that failed to
+            // insert, and has nothing to do with the `excluded` column.
+            "INSERT INTO app_profiles (bundle_id, display_name, settings_json, enabled, excluded)
+             VALUES (?1, ?2, ?3, ?4, ?5)
              ON CONFLICT (bundle_id) DO UPDATE SET
                display_name = excluded.display_name,
                settings_json = excluded.settings_json,
-               enabled = excluded.enabled",
+               enabled = excluded.enabled,
+               excluded = excluded.excluded",
             params![
                 profile.bundle_id,
                 profile.display_name,
                 encoded,
-                profile.enabled
+                profile.enabled,
+                profile.excluded
             ],
         )?;
         Ok(())
@@ -98,6 +102,7 @@ fn row_to_profile(row: &Row<'_>) -> rusqlite::Result<AppProfile> {
         display_name: row.get(1)?,
         overrides,
         enabled: row.get(3)?,
+        excluded: row.get(4)?,
     })
 }
 
@@ -114,6 +119,7 @@ mod tests {
                 .map(|(k, v)| ((*k).to_string(), v.clone()))
                 .collect(),
             enabled: true,
+            excluded: false,
         }
     }
 
@@ -174,6 +180,26 @@ mod tests {
         assert!(get_profile(&db, "com.apple.Terminal")?.is_none());
         // But it is still listed, so it can be re-enabled.
         assert_eq!(list_profiles(&db)?.len(), 1);
+        Ok(())
+    }
+
+    #[test]
+    fn an_excluded_profile_round_trips_and_the_flag_survives_an_update() -> AppResult<()> {
+        let db = Database::open_in_memory()?;
+        let mut vault = profile("com.1password.1password", &[]);
+        vault.excluded = true;
+        upsert_profile(&db, &vault)?;
+
+        let read = get_profile(&db, "com.1password.1password")?.expect("stored");
+        assert!(read.excluded);
+
+        vault.display_name = "1Password".into();
+        upsert_profile(&db, &vault)?;
+        assert!(get_profile(&db, "com.1password.1password")?.expect("stored").excluded);
+
+        vault.excluded = false;
+        upsert_profile(&db, &vault)?;
+        assert!(!get_profile(&db, "com.1password.1password")?.expect("stored").excluded);
         Ok(())
     }
 }

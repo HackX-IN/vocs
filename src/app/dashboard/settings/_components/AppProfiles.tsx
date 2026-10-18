@@ -1,6 +1,6 @@
 /**
  * SOURCE OF TRUTH KEYWORDS: AppProfiles, listAppProfiles, saveAppProfile,
- *   deleteAppProfile, AppProfile, bundleCandidates, displayNameFor
+ *   deleteAppProfile, AppProfile, bundleCandidates, displayNameFor, excluded-apps
  * WHAT:  Per-app profiles: which apps have one, whether it is on, and what it
  *        overrides.
  * WHY:   The app is chosen from bundle ids seen in HISTORY, offered as
@@ -89,7 +89,13 @@ export function AppProfiles({ defs, globals, dynamic, engine, permissions }: App
       event.preventDefault();
       const trimmed = bundleId.trim();
       if (trimmed.length === 0) return;
-      save({ bundle_id: trimmed, display_name: displayNameFor(trimmed), overrides: {}, enabled: true });
+      save({
+        bundle_id: trimmed,
+        display_name: displayNameFor(trimmed),
+        overrides: {},
+        enabled: true,
+        excluded: false,
+      });
       setBundleId("");
     },
     [bundleId, save],
@@ -162,6 +168,17 @@ export function AppProfiles({ defs, globals, dynamic, engine, permissions }: App
                 <Trash2 className="size-4" />
               </button>
             </div>
+
+            <label className="flex items-center gap-2 text-caption text-text-secondary">
+              <input
+                type="checkbox"
+                checked={profile.excluded ?? false}
+                onChange={(event) => save({ ...profile, excluded: event.target.checked })}
+                className="accent-[var(--accent)]"
+              />
+              Turn Vocs off in {profile.display_name}
+              <span className="text-text-tertiary">— no recording, nothing pasted. For password managers and the like.</span>
+            </label>
 
             <ProfileOverrides
               profile={profile}

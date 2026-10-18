@@ -62,6 +62,9 @@ pub enum ErrorCode {
     SessionNotFound,
     IllegalTransition,
     FinalizeTimeout,
+    /// The frontmost app has a profile that turns Vocs off. A choice the user
+    /// made, so the message names the app and where to change it.
+    AppExcluded,
 
     // ── Delivery ─────────────────────────────────────────────────────────
     SecureInputActive,

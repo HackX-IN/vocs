@@ -52,6 +52,9 @@ pub struct SessionSettings {
     /// The user's own recognition bias, ahead of the dictionary terms. None
     /// when blank, so the actor never builds a prompt out of whitespace.
     pub context_prompt: Option<String>,
+    /// The display name of the frontmost app when its profile turns Vocs off.
+    /// None everywhere else, including when no app could be identified.
+    pub excluded_app: Option<String>,
 }
 
 impl SessionSettings {
@@ -78,11 +81,15 @@ impl SessionSettings {
      */
     pub fn load_for_app(db: &Database, bundle_id: Option<&str>) -> Self {
         let mut stored = services::settings::get_all_settings(db).unwrap_or_default();
+        let mut excluded_app = None;
 
         if let Some(bundle_id) = bundle_id {
             match services::profiles::get_profile(db, bundle_id) {
                 Ok(Some(profile)) => {
                     tracing::debug!(bundle_id, overrides = profile.overrides.len(), "applying app profile");
+                    if profile.excluded {
+                        excluded_app = Some(profile.display_name.clone());
+                    }
                     stored.extend(profile.overrides);
                 }
                 Ok(None) => {}
@@ -90,7 +97,7 @@ impl SessionSettings {
             }
         }
 
-        Self::from_stored(&stored)
+        Self { excluded_app, ..Self::from_stored(&stored) }
     }
 
     fn from_stored(stored: &Stored) -> Self {
@@ -139,6 +146,7 @@ impl SessionSettings {
             context_prompt: read_choice(stored, keys::CONTEXT_PROMPT)
                 .map(|text| text.trim().to_string())
                 .filter(|text| !text.is_empty()),
+            excluded_app: None,
         }
     }
 }
@@ -301,5 +309,35 @@ mod tests {
             _ => None,
         };
         assert!(resolved.is_none());
+    }
+
+    fn profile_for(bundle_id: &str, excluded: bool, enabled: bool) -> crate::types::AppProfile {
+        crate::types::AppProfile {
+            bundle_id: bundle_id.into(),
+            display_name: "Vault".into(),
+            overrides: Default::default(),
+            enabled,
+            excluded,
+        }
+    }
+
+    #[test]
+    fn an_excluded_apps_profile_marks_the_session_excluded() {
+        let db = Database::open_in_memory().expect("db");
+        services::profiles::upsert_profile(&db, &profile_for("com.vault", true, true)).expect("saved");
+
+        let there = SessionSettings::load_for_app(&db, Some("com.vault"));
+        assert_eq!(there.excluded_app.as_deref(), Some("Vault"));
+
+        // Every other app, and an unidentifiable one, is unaffected.
+        assert!(SessionSettings::load_for_app(&db, Some("com.other")).excluded_app.is_none());
+        assert!(SessionSettings::load_for_app(&db, None).excluded_app.is_none());
+    }
+
+    #[test]
+    fn a_switched_off_profile_does_not_exclude_anything() {
+        let db = Database::open_in_memory().expect("db");
+        services::profiles::upsert_profile(&db, &profile_for("com.vault", true, false)).expect("saved");
+        assert!(SessionSettings::load_for_app(&db, Some("com.vault")).excluded_app.is_none());
     }
 }
