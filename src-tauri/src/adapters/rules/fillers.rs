@@ -282,7 +282,10 @@ fn strip_line(line: &str, protected: &[String], strength: FillerStrength) -> Str
 
         // A stop on the dropped phrase ends the sentence the word before it is
         // in. Commas are the filler's own debris and go with it.
-        if let Some(end) = last.tail.chars().find(|c| SENTENCE_END.contains(c)) {
+        // An ellipsis trails off; it is not a stop, and turning "wait um..." into
+        // "wait." would end a sentence the speaker left open.
+        let stop = if last.tail.contains("...") { None } else { last.tail.chars().find(|c| SENTENCE_END.contains(c)) };
+        if let Some(end) = stop {
             if let Some(previous) = out.last_mut() {
                 let trimmed = previous.trim_end_matches(CLAUSE_PUNCTUATION).len();
                 previous.truncate(trimmed);
@@ -474,6 +477,12 @@ mod tests {
         let hindi = LanguageCode("hi".into());
         assert_eq!(strip_fillers("um like, you know", Some(&hindi), &[], FillerStrength::Strict), "um like, you know");
         assert_eq!(strip_fillers("um like", None, &[], FillerStrength::Strict), "um like");
+    }
+
+    #[test]
+    fn a_hesitation_that_trails_off_does_not_end_the_sentence_before_it() {
+        assert_eq!(strip("wait um... what"), "wait what");
+        assert_eq!(strip("I don't know uh..."), "I don't know");
     }
 
     #[test]
