@@ -434,7 +434,7 @@ fn build_capabilities() -> Vec<Capability> {
                 toggle(
                     keys::STRIP_FILLERS,
                     "Remove filler words",
-                    "Drop “um”, “uh”, “you know” and similar so speech reads like writing.",
+                    "Drop “um”, “uh” and “er”, plus “like” and “you know” when you say them as filler (set off by commas). Words you mean, as in “I like it”, are never touched.",
                     SettingSection::Output,
                     false,
                 ),

@@ -23,6 +23,7 @@
  * WHERE: Implements the TextEnhancer port; called by pipeline/deliver.rs.
  */
 
+pub mod fillers;
 pub mod text;
 
 use crate::error::AppResult;
@@ -64,7 +65,7 @@ impl TextEnhancer for RuleEnhancer {
 
         // 3. Fillers, before the dictionary can try to match across one.
         if context.strip_fillers {
-            out = text::strip_fillers(&out, language);
+            out = fillers::strip_fillers(&out, language, &context.dictionary);
         }
 
         /*

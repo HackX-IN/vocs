@@ -1,7 +1,7 @@
 /*!
  * SOURCE OF TRUTH KEYWORDS: normalise_whitespace, expand_spoken_commands,
- *   strip_fillers, apply_dictionary, dedupe_stutters, normalise_punctuation,
- *   capitalise_sentences, ensure_terminal_punctuation, FILLERS, SPOKEN_COMMANDS
+ *   apply_dictionary, dedupe_stutters, normalise_punctuation,
+ *   capitalise_sentences, ensure_terminal_punctuation, SPOKEN_COMMANDS
  * WHAT:  The individual enhancement rules. Each is a pure function from string
  *        to string.
  * WHY:   Pure because that makes them table-testable, and the table tests are
@@ -18,13 +18,6 @@
  */
 
 use crate::types::{DictionaryEntry, LanguageCode, MatchKind};
-
-/// Fillers are listed per language. A language absent from here simply gets no
-/// filler removal — see the module WHY.
-const ENGLISH_FILLERS: &[&str] = &[
-    "um", "uh", "erm", "hmm", "mhm", "uhh", "umm", "er", "ah", "like", "you know", "i mean",
-    "sort of", "kind of", "basically", "literally", "actually",
-];
 
 /// Only the unambiguous ones. "period" is deliberately absent as a bare word
 /// because it is a real noun — it is handled as "full stop" and "new line"
@@ -105,29 +98,6 @@ pub fn expand_spoken_commands(text: &str, language: Option<&LanguageCode>) -> St
         out = replace_whole_words(&out, phrase, replacement, false);
     }
     out
-}
-
-/**
- * WHAT:  Removes filler words.
- * WHY:   Whole-word and case-insensitive. Off by default in settings, because
- *        one person's filler is another person's emphasis — "actually" and
- *        "literally" carry meaning often enough that removing them silently
- *        would be a change to what someone said.
- */
-pub fn strip_fillers(text: &str, language: Option<&LanguageCode>) -> String {
-    if !is_english(language) {
-        return text.to_string();
-    }
-
-    let mut out = text.to_string();
-    let mut fillers: Vec<&&str> = ENGLISH_FILLERS.iter().collect();
-    // Longest first so "you know" is removed before "know" could be considered.
-    fillers.sort_by_key(|f| std::cmp::Reverse(f.len()));
-
-    for filler in fillers {
-        out = replace_whole_words(&out, filler, "", false);
-    }
-    normalise_whitespace(&out)
 }
 
 /**
@@ -592,6 +562,31 @@ pub fn ensure_terminal_punctuation(text: &str) -> String {
  * WHERE: The matching primitive under the dictionary, filler and spoken-command
  *        rules.
  */
+/**
+ * SOURCE OF TRUTH KEYWORDS: fold_case
+ * WHAT:  Lowercases a string without ever changing its length in bytes.
+ * WHY:   `str::to_lowercase` can change length — "İ" (2 bytes) becomes "i̇"
+ *        (3), "ẞ" (3) becomes "ß" (2) — and the matcher uses offsets found in
+ *        the folded copy to slice the original. One such character before a
+ *        match shifted every offset after it and the slice ran off the end: a
+ *        panic mid-dictation on an ordinary Turkish or German word. A character
+ *        whose lowercase is not a single same-width character is left as it
+ *        is; the worst outcome is that it fails to match case-insensitively,
+ *        which is a missed replacement and not a crash.
+ * WHERE: replace_whole_words, for case-insensitive matching only.
+ */
+fn fold_case(text: &str) -> String {
+    text.chars()
+        .map(|ch| {
+            let mut lower = ch.to_lowercase();
+            match (lower.next(), lower.next()) {
+                (Some(single), None) if single.len_utf8() == ch.len_utf8() => single,
+                _ => ch,
+            }
+        })
+        .collect()
+}
+
 fn replace_whole_words(
     haystack: &str,
     needle: &str,
@@ -605,12 +600,12 @@ fn replace_whole_words(
     let subject = if case_sensitive {
         haystack.to_string()
     } else {
-        haystack.to_lowercase()
+        fold_case(haystack)
     };
     let pattern = if case_sensitive {
         needle.to_string()
     } else {
-        needle.to_lowercase()
+        fold_case(needle)
     };
 
     let mut out = String::with_capacity(haystack.len());
@@ -695,30 +690,6 @@ mod tests {
         let hindi = LanguageCode("hi".into());
         let text = "comma new line";
         assert_eq!(expand_spoken_commands(text, Some(&hindi)), text);
-    }
-
-    // ── fillers ──────────────────────────────────────────────────────────
-
-    #[test]
-    fn fillers_are_removed_whole_word_only() {
-        let out = strip_fillers("um so I was like thinking", Some(&english()));
-        assert_eq!(out, "so I was thinking");
-    }
-
-    #[test]
-    fn filler_removal_does_not_touch_words_that_contain_a_filler() {
-        // "like" is a filler; "likely" is not.
-        let out = strip_fillers("that is likely umbrella weather", Some(&english()));
-        assert_eq!(out, "that is likely umbrella weather");
-    }
-
-    #[test]
-    fn filler_removal_never_runs_on_an_unknown_language() {
-        // The rule that stops us deleting real Hindi or Arabic words.
-        let arabic = LanguageCode("ar".into());
-        let text = "um like actually";
-        assert_eq!(strip_fillers(text, Some(&arabic)), text);
-        assert_eq!(strip_fillers(text, None), text);
     }
 
     // ── dictionary ───────────────────────────────────────────────────────
@@ -826,10 +797,26 @@ mod tests {
         assert_eq!(ensure_terminal_punctuation("a list\n\n"), "a list\n\n");
     }
 
+    /**
+     * WHAT:  Case-insensitive replacement is safe on text whose lowercase form
+     *        is a different length.
+     * WHY:   The matcher searches a lowercased copy and slices the original with
+     *        the offsets it found, so a character that lowercases to a different
+     *        number of bytes ("İ" is 2 bytes, "i̇" is 3) shifted every later
+     *        offset and the slice ran off the end of the string: a panic in the
+     *        middle of a dictation, triggered by an ordinary Turkish word.
+     */
+    #[test]
+    fn case_folding_that_changes_byte_length_cannot_misalign_the_match() {
+        let entries = [entry("ok", "okay", MatchKind::Word)];
+        assert_eq!(apply_dictionary("İstanbul ok", &entries), "İstanbul okay");
+        assert_eq!(apply_dictionary("ẞ ok", &entries), "ẞ okay");
+        assert_eq!(apply_dictionary("OK İ OK", &entries), "okay İ okay");
+    }
+
     #[test]
     fn empty_input_stays_empty_through_every_rule() {
         assert_eq!(normalise_whitespace(""), "");
-        assert_eq!(strip_fillers("", Some(&english())), "");
         assert_eq!(dedupe_stutters(""), "");
         assert_eq!(capitalise_sentences(""), "");
         assert_eq!(ensure_terminal_punctuation(""), "");
