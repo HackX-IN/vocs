@@ -142,6 +142,10 @@ pub fn measure_realtime_factor(
     })?;
     let elapsed_seconds = started.elapsed().as_secs_f32();
 
+    // Untimed, and after the measurement so the factor stays the honest
+    // worst case: the first decode on the paths a dictation actually takes.
+    warm_dictation_paths(state, n_threads)?;
+
     // A zero elapsed time is not a real result; report it as unmeasured rather
     // than as an infinitely fast engine.
     let factor = if elapsed_seconds > 0.0 {
@@ -155,6 +159,33 @@ pub fn measure_realtime_factor(
         audio_seconds: PROBE_SECONDS,
         elapsed_seconds,
     })
+}
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: warm_dictation_paths, first_dictation_latency, cold_decode
+ * WHAT:  Runs one throwaway decode down each path a dictation uses and the probe
+ *        above does not: the shrunken-context tail, with the language left to
+ *        auto-detect.
+ * WHY:   The first decode of each kind on a fresh model pays for allocating its
+ *        compute buffers and compiling its Metal kernels. Measured on an M2 with
+ *        large-v3-turbo-q5_0, that first auto-language tail took 2.8 s where
+ *        every later one took ~0.5 s — so the first dictation after launch (and
+ *        every launch is "the first" to the person using it) felt broken. The
+ *        probe only exercises the full-context, pinned-language path, which
+ *        warms neither of these.
+ * WHERE: End of measure_realtime_factor, during prepare — never on the hotkey path.
+ */
+fn warm_dictation_paths(state: &mut WhisperState, n_threads: std::ffi::c_int) -> AppResult<()> {
+    let audio = probe_signal(WARMUP_SECONDS * 2.0);
+    let params = build_full_params(DecodeProfile::Tail, audio.len(), None, None, n_threads);
+    state.full(params, &audio).map_err(|err| {
+        AppError::new(
+            ErrorCode::EngineNotReady,
+            "Vocs could not warm up the transcription model.",
+        )
+        .with_detail(format!("{err:?}"))
+    })?;
+    Ok(())
 }
 
 #[cfg(test)]
