@@ -22,7 +22,8 @@ and no audio ever leaves your machine.
 - **Searchable local history**, so a failed paste is never a lost thought. Where
   the rules changed your words, History shows what you said against what was
   delivered, and **Use original** takes your wording instead. **Copy Last
-  Transcript** in the menu bar is the way back from a paste that went nowhere.
+  Transcript** in the menu bar, or an optional global shortcut (off until you
+  turn it on), is the way back from a paste that went nowhere.
 - **Filler removal that does not eat real words**, at three strengths. "I like
   pizza" is never touched; "it was, like, fine" loses the "like".
 - **A context line for the model** — jargon, product names, the topic — that it

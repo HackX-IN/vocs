@@ -260,6 +260,7 @@ pub fn setup(app: &AppHandle) -> AppResult<()> {
         tracing::error!(error = %err, "could not register the dictation hotkey; the app will start without it");
     }
     watch_settings_for_rebinds(app);
+    crate::copy_last_hotkey::apply(app);
     prepare_engine(
         app,
         Arc::clone(&ports.engine),
@@ -787,6 +788,14 @@ fn watch_settings_for_rebinds(app: &AppHandle) {
         if touched(keys::LAUNCH_AT_LOGIN) {
             apply_launch_at_login(&handler_app);
         }
+        // The copy-last chord must also be re-checked when dictation moves,
+        // because the two may not share a key.
+        if touched(keys::COPY_LAST_ENABLED)
+            || touched(keys::COPY_LAST_HOTKEY)
+            || touched(keys::DICTATION_HOTKEY)
+        {
+            crate::copy_last_hotkey::apply(&handler_app);
+        }
     });
 }
 
@@ -943,7 +952,7 @@ fn recording_mode(db: &Database) -> RecordingMode {
 }
 
 /// The user's binding if they have set one, otherwise the registry default.
-fn dictation_binding(db: &Database) -> HotkeyBinding {
+pub(crate) fn dictation_binding(db: &Database) -> HotkeyBinding {
     let stored = services::settings::get_setting(db, keys::DICTATION_HOTKEY).ok().flatten();
 
     if let Some(SettingValue::Hotkey(binding)) = stored {
@@ -966,7 +975,7 @@ fn dictation_binding(db: &Database) -> HotkeyBinding {
  *        that silently never fires.
  * WHERE: register_hotkeys.
  */
-fn to_shortcut(binding: &HotkeyBinding) -> AppResult<Shortcut> {
+pub(crate) fn to_shortcut(binding: &HotkeyBinding) -> AppResult<Shortcut> {
     let mut modifiers = Modifiers::empty();
     for modifier in &binding.modifiers {
         modifiers |= match modifier {

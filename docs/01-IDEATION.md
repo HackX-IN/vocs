@@ -94,7 +94,7 @@ These are the constraints the whole design bends around. If a decision violates 
 | S13 | **Microphone level meter** | Settings → Recording. Same device and level curve as the pill; the mic is closed by a watchdog if the window is forgotten. |
 | S14 | **Back up and restore** | Dictionary and per-app profiles as one versioned JSON file. A merge: adds and updates, never deletes; every entry re-validated on import. |
 | S15 | **Excluded apps** | A per-app profile can turn Vocs off while that app is frontmost (`app_profiles.excluded`). Refused before the microphone is touched. |
-| S16 | **Copy Last Transcript** | Menu bar item: the way back from a paste that went nowhere. A global hotkey for it is not built — the hotkey machinery in `bootstrap.rs` assumes a single binding. |
+| S16 | **Copy Last Transcript** | Menu bar item: the way back from a paste that went nowhere. An optional global shortcut (`output.copy_last_enabled`, off by default) lives in `copy_last_hotkey.rs`, registered independently of the dictation binding. |
 | S17 | **Export diagnostics** | Opt-in support file instead of telemetry. Never contains transcripts, dictionary terms, audio, bundle ids or the context line. |
 | S18 | **Disk-space preflight** | The model download checks free space (remaining bytes + 256 MB) before fetching, and names both numbers if it will not fit. |
 

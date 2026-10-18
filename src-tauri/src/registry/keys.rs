@@ -32,6 +32,8 @@ pub const AUTO_PASTE: &str = "output.auto_paste";
 pub const RESTORE_CLIPBOARD: &str = "output.restore_clipboard";
 pub const PASTE_DELAY_MS: &str = "output.paste_delay_ms";
 pub const CLIPBOARD_RESTORE_DELAY_MS: &str = "output.clipboard_restore_delay_ms";
+pub const COPY_LAST_ENABLED: &str = "output.copy_last_enabled";
+pub const COPY_LAST_HOTKEY: &str = "output.copy_last_hotkey";
 
 // ── Enhancement ──────────────────────────────────────────────────────────
 pub const CAPITALISE_SENTENCES: &str = "enhance.capitalise_sentences";

@@ -60,6 +60,7 @@ vocs/
     └── src/
         ├── main.rs · lib.rs         # wiring only, no logic
         ├── bootstrap.rs             # ★ the ONLY file naming a concrete adapter
+        ├── copy_last_hotkey.rs      # optional global shortcut: copy the last transcript
         ├── tray.rs                  # menu bar item; pill show/hide
         │
         ├── registry/                # ★ SINGLE SOURCE OF TRUTH

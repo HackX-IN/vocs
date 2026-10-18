@@ -215,6 +215,13 @@ fn default_hotkey() -> HotkeyBinding {
     }
 }
 
+fn copy_last_default_hotkey() -> HotkeyBinding {
+    HotkeyBinding {
+        modifiers: vec![KeyModifier::Control, KeyModifier::Option],
+        key: text("KeyC"),
+    }
+}
+
 // ── The table ────────────────────────────────────────────────────────────
 
 fn build_capabilities() -> Vec<Capability> {
@@ -400,6 +407,24 @@ fn build_capabilities() -> Vec<Capability> {
                     ),
                     OsPermission::Accessibility,
                 ),
+                toggle(
+                    keys::COPY_LAST_ENABLED,
+                    "Copy-last shortcut",
+                    "Turn on a global shortcut that copies your most recent transcript to the clipboard — the quick way back when a paste landed in the wrong place.",
+                    SettingSection::Output,
+                    false,
+                ),
+                SettingDef {
+                    key: text(keys::COPY_LAST_HOTKEY),
+                    label: text("Copy-last shortcut keys"),
+                    description: text("Use a key combination such as ⌃⌥C. A single modifier on its own cannot be used here."),
+                    section: SettingSection::Output,
+                    kind: SettingKind::Hotkey,
+                    default: SettingValue::Hotkey(copy_last_default_hotkey()),
+                    requires_engine: vec![],
+                    requires_permission: vec![],
+                    advanced: false,
+                },
                 advanced(number(
                     keys::PASTE_DELAY_MS,
                     "Paste delay",
@@ -747,6 +772,8 @@ mod tests {
             keys::RESTORE_CLIPBOARD,
             keys::PASTE_DELAY_MS,
             keys::CLIPBOARD_RESTORE_DELAY_MS,
+            keys::COPY_LAST_ENABLED,
+            keys::COPY_LAST_HOTKEY,
             keys::CAPITALISE_SENTENCES,
             keys::NORMALISE_PUNCTUATION,
             keys::STRIP_FILLERS,

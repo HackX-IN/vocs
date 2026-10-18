@@ -87,7 +87,7 @@ pub fn install_tray(app: &AppHandle) -> AppResult<()> {
  *        and silence on success — exactly what a native Copy does.
  * WHERE: The tray menu's "Copy Last Transcript" item.
  */
-fn copy_last_transcript(app: &AppHandle) {
+pub(crate) fn copy_last_transcript(app: &AppHandle) {
     let Some(state) = app.try_state::<crate::ipc::context::AppState>() else {
         tracing::warn!("copy-last was chosen before the app finished starting");
         return;
