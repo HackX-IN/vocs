@@ -13,7 +13,7 @@
  */
 
 use crate::error::AppResult;
-use crate::types::{DictionaryEntry, FillerStrength, LanguageCode};
+use crate::types::{DictionaryEntry, FillerStrength, LanguageCode, Tone};
 
 /**
  * SOURCE OF TRUTH KEYWORDS: EnhanceContext
@@ -50,6 +50,8 @@ pub struct EnhanceContext {
     /// Off by default for the same reason as `apply_corrections`: it can change
     /// words, so it is a choice.
     pub fix_grammar: bool,
+    /// How formally to write: see `Tone`. Natural changes nothing.
+    pub tone: Tone,
 }
 
 pub trait TextEnhancer: Send + Sync {

@@ -28,8 +28,9 @@ import {
   type SettingValue,
 } from "@/lib/bindings";
 import { unwrapCommand, useCommand } from "@/lib/ipc";
-import { EmptyState, ErrorSurface } from "@/components/global";
+import { Button, EmptyState, ErrorSurface } from "@/components/global";
 import { ProfileOverrides } from "./ProfileOverrides";
+import { ProfileTone, TONE_KEY } from "./ProfileTone";
 import type { DynamicOptions } from "../to-setting-def";
 
 /** Enough history to see the apps someone actually dictates into. */
@@ -85,14 +86,22 @@ export function AppProfiles({ defs, globals, dynamic, engine, permissions }: App
   );
 
   const add = useCallback(
-    (event: FormEvent) => {
+    async (event: FormEvent) => {
       event.preventDefault();
       const trimmed = bundleId.trim();
       if (trimmed.length === 0) return;
+
+      // The registry knows which apps want which writing style (chat apps want
+      // casual, a terminal wants literal). The suggestion is applied as a plain
+      // override the user can see and change on the new card — never silently:
+      // "natural" means it has no opinion about this app.
+      const suggestion = await unwrapCommand(() => commands.suggestTone({ bundle_id: trimmed }));
+      const tone = suggestion.status === "ok" && suggestion.data !== "natural" ? suggestion.data : null;
+
       save({
         bundle_id: trimmed,
         display_name: displayNameFor(trimmed),
-        overrides: {},
+        overrides: tone ? { [TONE_KEY]: { type: "CHOICE", value: tone } } : {},
         enabled: true,
         excluded: false,
       });
@@ -120,20 +129,17 @@ export function AppProfiles({ defs, globals, dynamic, engine, permissions }: App
             <option key={candidate} value={candidate} />
           ))}
         </datalist>
-        <button
-          type="submit"
-          className="hairline flex h-8 shrink-0 items-center gap-1 rounded-input bg-sunken px-3 text-body text-text-primary transition-colors hover:bg-sunken-strong"
-        >
+        <Button type="submit">
           <Plus className="size-4" />
           Add
-        </button>
+        </Button>
       </form>
 
       {profiles.data && profiles.data.length === 0 ? (
         <EmptyState
           size="compact"
           headline="No per-app profiles"
-          description="Give an app its own settings — filler removal always on in Slack, formatting commands on in the terminal."
+          description="Give an app its own settings — casual writing in Slack, formal in Mail, literal in the terminal."
         />
       ) : null}
 
@@ -180,9 +186,13 @@ export function AppProfiles({ defs, globals, dynamic, engine, permissions }: App
               <span className="text-text-tertiary">— no recording, nothing pasted. For password managers and the like.</span>
             </label>
 
+            <ProfileTone profile={profile} defs={defs} onChange={save} />
+
             <ProfileOverrides
               profile={profile}
-              defs={defs}
+              // Writing style has its own picker above; listing it here too would
+              // be two controls for one override.
+              defs={defs.filter((def) => def.key !== TONE_KEY)}
               globals={globals}
               dynamic={dynamic}
               engine={engine}

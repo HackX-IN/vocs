@@ -48,6 +48,7 @@ pub struct SessionSettings {
     pub spoken_commands: bool,
     pub apply_corrections: bool,
     pub fix_grammar: bool,
+    pub tone: crate::types::Tone,
     pub normalise_punctuation: bool,
     pub capitalise_sentences: bool,
     pub audio_feedback: bool,
@@ -126,6 +127,9 @@ impl SessionSettings {
         // One line, for the same reachability reason as the one above.
         let fix_grammar = read_bool(stored, keys::FIX_GRAMMAR).unwrap_or(false);
 
+        // One line, for the same reachability reason as the two above.
+        let tone = crate::types::Tone::from_stored(&read_choice(stored, keys::TONE).unwrap_or_default());
+
         Self {
             model_id: read_choice(stored, keys::TRANSCRIPTION_MODEL)
                 .unwrap_or_else(|| "large-v3-turbo-q5_0".to_string()),
@@ -151,6 +155,7 @@ impl SessionSettings {
             spoken_commands: read_bool(stored, keys::SPOKEN_COMMANDS).unwrap_or(true),
             apply_corrections: read_bool(stored, keys::APPLY_CORRECTIONS).unwrap_or(false),
             fix_grammar,
+            tone,
             normalise_punctuation: read_bool(stored, keys::NORMALISE_PUNCTUATION).unwrap_or(true),
             capitalise_sentences: read_bool(stored, keys::CAPITALISE_SENTENCES).unwrap_or(true),
             audio_feedback: read_bool(stored, keys::AUDIO_FEEDBACK).unwrap_or(true),

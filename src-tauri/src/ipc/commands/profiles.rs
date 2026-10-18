@@ -94,3 +94,41 @@ pub async fn delete_app_profile(
     })
     .await
 }
+
+#[derive(Debug, serde::Deserialize, specta::Type)]
+pub struct SuggestToneInput {
+    pub bundle_id: String,
+}
+
+impl Validate for SuggestToneInput {
+    fn validate(&self) -> Result<(), String> {
+        if self.bundle_id.trim().is_empty() {
+            return Err("Name an application to suggest a style for.".into());
+        }
+        Ok(())
+    }
+}
+
+const SUGGEST_TONE: CommandSpec = CommandSpec::new("suggest_tone", CapabilityKey::Settings);
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: suggest_tone, tone_preset_suggestion
+ * WHAT:  The writing style the registry suggests for an app — the choice id
+ *        `enhance.tone` stores — or "natural" when it has no opinion.
+ * WHY:   Returns the plain choice string rather than an Option or a `Tone`:
+ *        the setting is stored as that string, so the UI can drop the answer
+ *        straight into a profile override with no mapping, and "natural" doubles
+ *        as "no suggestion" because it is also the default there is nothing to
+ *        override to. (specta also inlines an Option in return position, which
+ *        would put a second hand-kept copy of the shape in the bindings.)
+ * WHERE: Called by the per-app profile editor when a profile is created, so the
+ *        obvious preset is offered — never applied without being shown.
+ */
+#[tauri::command]
+#[specta::specta]
+pub async fn suggest_tone(state: State<'_, AppState>, input: SuggestToneInput) -> Result<String, AppError> {
+    execute(&state, SUGGEST_TONE, input, |_ctx, input| async move {
+        Ok(registry::tone::suggested_tone(&input.bundle_id).as_str().to_string())
+    })
+    .await
+}

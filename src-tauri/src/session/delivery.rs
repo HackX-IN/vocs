@@ -174,6 +174,7 @@ async fn deliver(ctx: &SessionContext, pending: PendingDelivery) {
         capitalise_sentences: settings.capitalise_sentences,
         apply_corrections: settings.apply_corrections,
         fix_grammar: settings.fix_grammar,
+        tone: settings.tone,
     };
 
     let final_text = {

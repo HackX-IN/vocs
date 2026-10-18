@@ -184,7 +184,7 @@ fn edit_at(tokens: &[Token<'_>], at: usize, protected: &[String]) -> Option<(usi
 }
 
 /// Whether a token may take part in a rule at all.
-fn usable(token: &Token<'_>, protected: &[String]) -> bool {
+pub(super) fn usable(token: &Token<'_>, protected: &[String]) -> bool {
     !token.quoted
         && !token.opens_with_mark
         && !token.core.is_empty()
@@ -231,7 +231,7 @@ fn article_for(next: &str) -> Option<&'static str> {
 }
 
 /// Gives `replacement` the capital of `original` when it had one.
-fn match_case(original: &str, replacement: &str) -> String {
+pub(super) fn match_case(original: &str, replacement: &str) -> String {
     let mut chars = replacement.chars();
     match (original.chars().next(), chars.next()) {
         (Some(first), Some(head)) if first.is_uppercase() => head.to_uppercase().chain(chars).collect(),

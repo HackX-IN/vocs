@@ -68,6 +68,22 @@ export const commands = {
 	listAppProfiles: () => typedError<AppProfile[], AppError>(__TAURI_INVOKE("list_app_profiles")),
 	saveAppProfile: (input: SaveProfileInput) => typedError<null, AppError>(__TAURI_INVOKE("save_app_profile", { input })),
 	deleteAppProfile: (input: DeleteProfileInput) => typedError<null, AppError>(__TAURI_INVOKE("delete_app_profile", { input })),
+	/**
+	 * 
+	 *  * SOURCE OF TRUTH KEYWORDS: suggest_tone, tone_preset_suggestion
+	 *  * WHAT:  The writing style the registry suggests for an app — the choice id
+	 *  *        `enhance.tone` stores — or "natural" when it has no opinion.
+	 *  * WHY:   Returns the plain choice string rather than an Option or a `Tone`:
+	 *  *        the setting is stored as that string, so the UI can drop the answer
+	 *  *        straight into a profile override with no mapping, and "natural" doubles
+	 *  *        as "no suggestion" because it is also the default there is nothing to
+	 *  *        override to. (specta also inlines an Option in return position, which
+	 *  *        would put a second hand-kept copy of the shape in the bindings.)
+	 *  * WHERE: Called by the per-app profile editor when a profile is created, so the
+	 *  *        obvious preset is offered — never applied without being shown.
+	 *  
+	 */
+	suggestTone: (input: SuggestToneInput) => typedError<string, AppError>(__TAURI_INVOKE("suggest_tone", { input })),
 	getStats: () => typedError<StatsSummary, AppError>(__TAURI_INVOKE("get_stats")),
 	listDictionary: () => typedError<DictionaryEntry[], AppError>(__TAURI_INVOKE("list_dictionary")),
 	createDictionaryEntry: (input: CreateDictionaryEntryInput) => typedError<DictionaryId, AppError>(__TAURI_INVOKE("create_dictionary_entry", { input })),
@@ -1099,6 +1115,10 @@ export type StatsSummary = {
 	activity: ActivityDay[],
 	languages: LanguageCount[],
 	latency: LatencySummary[],
+};
+
+export type SuggestToneInput = {
+	bundle_id: string,
 };
 
 /**

@@ -22,6 +22,7 @@
 
 pub mod capability;
 pub mod keys;
+pub mod tone;
 
 #[cfg(test)]
 mod icons;
@@ -476,6 +477,19 @@ fn build_capabilities() -> Vec<Capability> {
                     ],
                     "standard",
                 ),
+                choice(
+                    keys::TONE,
+                    "Writing style",
+                    "How formally your words are written. Set it per app under Per-app: casual for chat, formal for email, literal for a terminal or code editor.",
+                    SettingSection::Output,
+                    &[
+                        ("natural", "Natural", "As you said it, tidied"),
+                        ("casual", "Casual", "Chat: contractions stay, and a one-line message gets no full stop"),
+                        ("formal", "Formal", "Email: “don’t” becomes “do not”, “gonna” becomes “going to”"),
+                        ("literal", "Literal", "Exactly what was heard, for a terminal or code editor — only your dictionary applies"),
+                    ],
+                    "natural",
+                ),
                 toggle(
                     keys::SPOKEN_COMMANDS,
                     "Spoken formatting",
@@ -791,6 +805,7 @@ mod tests {
             keys::SPOKEN_COMMANDS,
             keys::APPLY_CORRECTIONS,
             keys::FIX_GRAMMAR,
+            keys::TONE,
             keys::RETENTION_DAYS,
             keys::LAUNCH_AT_LOGIN,
             keys::BASELINE_WPM,

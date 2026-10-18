@@ -44,6 +44,59 @@ pub enum SettingKind {
 }
 
 /**
+ * SOURCE OF TRUTH KEYWORDS: Tone, tone_preset, writing_style, per_app_tone
+ * WHAT:  How formally the delivered text is written: Natural (as spoken, tidied),
+ *        Casual (chat), Formal (email) or Literal (exactly what was heard).
+ * WHY:   The same sentence wants different clothes in different apps — a Slack
+ *        message does not end in a full stop and an email does not say "gonna".
+ *        It is a SETTING, not a special per-app feature, so a profile gets it for
+ *        free: a preset is just a profile that overrides `enhance.tone`, and the
+ *        suggestion table in `registry::tone` names the apps where it is the
+ *        obvious choice. Stored as a plain choice string and parsed here so no
+ *        caller matches on strings; an unrecognised value (hand-edited, or from a
+ *        newer build) reads as Natural rather than failing the session.
+ *
+ *        Literal is the structured form of "skip correction": for a terminal or
+ *        a code editor the right output is what the model heard, with only the
+ *        user's own dictionary applied, because capitalising `kubectl` or ending
+ *        a command with a full stop is a bug there.
+ * WHERE: Read by session/settings_view.rs, carried on EnhanceContext, applied by
+ *        adapters/rules (tone.rs, and the early exit in mod.rs).
+ */
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum Tone {
+    /// The words as spoken, tidied. The default, and the behaviour before tones.
+    #[default]
+    Natural,
+    /// Chat: contractions stay, and a one-line message does not end in a full stop.
+    Casual,
+    /// Email: contractions are written out and spoken shortcuts are spelled.
+    Formal,
+    /// Exactly what was heard, with only the user's dictionary applied.
+    Literal,
+}
+
+impl Tone {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Tone::Natural => "natural",
+            Tone::Casual => "casual",
+            Tone::Formal => "formal",
+            Tone::Literal => "literal",
+        }
+    }
+
+    pub fn from_stored(value: &str) -> Self {
+        match value {
+            "casual" => Tone::Casual,
+            "formal" => Tone::Formal,
+            "literal" => Tone::Literal,
+            _ => Tone::Natural,
+        }
+    }
+}
+
+/**
  * SOURCE OF TRUTH KEYWORDS: FillerStrength, correction_strength, from_stored
  * WHAT:  How much filler the enhancer removes: only meaningless sounds, those
  *        plus filler words set off by punctuation, or also meaningful adverbs

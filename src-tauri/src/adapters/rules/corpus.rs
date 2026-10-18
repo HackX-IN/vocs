@@ -61,6 +61,7 @@ fn context(language: &str) -> EnhanceContext {
         capitalise_sentences: true,
         apply_corrections: true,
         fix_grammar: true,
+        tone: crate::types::Tone::Natural,
     }
 }
 

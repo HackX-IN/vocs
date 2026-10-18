@@ -62,6 +62,7 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             commands::profiles::list_app_profiles,
             commands::profiles::save_app_profile,
             commands::profiles::delete_app_profile,
+            commands::profiles::suggest_tone,
             // Stats
             commands::stats::get_stats,
             // Dictionary

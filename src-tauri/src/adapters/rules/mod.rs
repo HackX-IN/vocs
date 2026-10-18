@@ -17,7 +17,12 @@
  *             rules decide what to leave alone;
  *          5. punctuation, then casing, then the terminal stop — casing depends
  *             on sentence boundaries existing, and the terminal stop must come
- *             last or it would be capitalised as a new sentence.
+ *             last or it would be capitalised as a new sentence;
+ *          6. the TONE rides on that: Literal leaves right after step 1 with
+ *             only the dictionary applied, Formal writes contractions out after
+ *             the stutters are gone (so an expansion cannot manufacture a
+ *             "repeat"), and Casual drops a one-line message's full stop after
+ *             the terminal stop has been added.
  *
  *        Every rule is individually toggleable through EnhanceContext, and the
  *        whole pass is measured in microseconds — it runs inside the finalize
@@ -31,12 +36,14 @@ pub mod grammar;
 pub mod repeats;
 pub mod sentences;
 pub mod text;
+pub mod tone;
 
 #[cfg(test)]
 mod corpus;
 
 use crate::error::AppResult;
 use crate::ports::enhancer::{EnhanceContext, TextEnhancer};
+use crate::types::Tone;
 
 pub struct RuleEnhancer;
 
@@ -65,6 +72,20 @@ impl TextEnhancer for RuleEnhancer {
 
         if out.is_empty() {
             return Ok(out);
+        }
+
+        /*
+         * Literal is "type exactly what was heard", and it leaves BEFORE every
+         * rule that rewrites words, punctuation or case — in a terminal,
+         * capitalising `kubectl` or ending a command with a full stop is a bug.
+         * The user's own dictionary still applies: it is their spelling, and it
+         * is never a downgrade.
+         */
+        if context.tone == Tone::Literal {
+            if !context.dictionary.is_empty() {
+                out = text::apply_dictionary(&out, &context.dictionary);
+            }
+            return Ok(text::normalise_whitespace(&out));
         }
 
         // 2. Spoken formatting: inserts punctuation and newlines.
@@ -102,6 +123,14 @@ impl TextEnhancer for RuleEnhancer {
         //    seam is an artefact of our own chunking, not something the user said.
         out = repeats::dedupe_stutters(&out);
 
+        // 5b. Formal register: contractions written out. AFTER the stutters, not
+        //     before: "it, it's gonna slip" becomes "it, it is going to slip",
+        //     and a pass that ran first would hand the stutter rule a doubled
+        //     "it" that the user never said twice.
+        if context.tone == Tone::Formal {
+            out = tone::formalise(&out, language, &context.dictionary);
+        }
+
         // 6. Spacing and quote characters.
         if context.normalise_punctuation {
             out = text::normalise_punctuation(&out);
@@ -115,6 +144,12 @@ impl TextEnhancer for RuleEnhancer {
         // 8. The terminal stop, last, so nothing capitalises after it.
         if context.normalise_punctuation {
             out = sentences::ensure_terminal_punctuation(&out);
+        }
+
+        // 9. Casual register, after the stop exists to be removed: a one-line
+        //    chat message ends without a full stop. See tone.rs.
+        if context.tone == Tone::Casual {
+            out = tone::relax_ending(&out);
         }
 
         Ok(text::normalise_whitespace(&out))
@@ -137,6 +172,7 @@ mod tests {
             capitalise_sentences: true,
             apply_corrections: true,
             fix_grammar: false,
+            tone: Tone::Natural,
         }
     }
 
@@ -182,6 +218,7 @@ mod tests {
             capitalise_sentences: false,
             apply_corrections: false,
             fix_grammar: false,
+            tone: Tone::Natural,
         };
 
         let raw = "um hello comma world";
@@ -211,6 +248,74 @@ mod tests {
         let enhancer = RuleEnhancer::new();
         assert_eq!(enhancer.enhance("", &context()).expect("enhance"), "");
         assert_eq!(enhancer.enhance("   ", &context()).expect("enhance"), "");
+    }
+
+    fn with_tone(tone: Tone) -> EnhanceContext {
+        EnhanceContext { tone, ..context() }
+    }
+
+    #[test]
+    fn natural_is_what_it_was_before_tones_existed() {
+        let enhancer = RuleEnhancer::new();
+        let raw = "i don't think we should ship it today";
+        assert_eq!(
+            enhancer.enhance(raw, &with_tone(Tone::Natural)).expect("enhance"),
+            "I don't think we should ship it today."
+        );
+    }
+
+    #[test]
+    fn casual_keeps_contractions_and_ends_a_one_line_message_without_a_stop() {
+        let enhancer = RuleEnhancer::new();
+        let out = enhancer
+            .enhance("um i don't think we should ship it today", &with_tone(Tone::Casual))
+            .expect("enhance");
+        assert_eq!(out, "I don't think we should ship it today");
+
+        // Two sentences: nothing is dropped, so the message is not half-edited.
+        let two = enhancer
+            .enhance("sounds good. see you at eight", &with_tone(Tone::Casual))
+            .expect("enhance");
+        assert_eq!(two, "Sounds good. See you at eight.");
+    }
+
+    #[test]
+    fn formal_writes_contractions_out_and_still_punctuates() {
+        let enhancer = RuleEnhancer::new();
+        let out = enhancer
+            .enhance("i don't think we can't ship it, it's gonna slip", &with_tone(Tone::Formal))
+            .expect("enhance");
+        assert_eq!(out, "I do not think we cannot ship it, it is going to slip.");
+    }
+
+    #[test]
+    fn literal_is_exactly_what_was_heard_apart_from_the_dictionary() {
+        let enhancer = RuleEnhancer::new();
+        // No capital, no stop, no filler removal, no spoken command, no grammar.
+        let raw = "um kubectl get pods comma new line";
+        assert_eq!(
+            enhancer.enhance(raw, &with_tone(Tone::Literal)).expect("enhance"),
+            "um kubectl get pods comma new line"
+        );
+
+        // The user's dictionary is their own spelling and still applies.
+        let mut ctx = with_tone(Tone::Literal);
+        ctx.dictionary = vec![DictionaryEntry {
+            id: DictionaryId(1),
+            pattern: "cube control".into(),
+            replacement: "kubectl".into(),
+            match_kind: MatchKind::Word,
+            enabled: true,
+            used_at: None,
+        }];
+        assert_eq!(enhancer.enhance("run cube control now", &ctx).expect("enhance"), "run kubectl now");
+    }
+
+    #[test]
+    fn literal_still_tidies_whitespace_and_an_empty_transcript_stays_empty() {
+        let enhancer = RuleEnhancer::new();
+        assert_eq!(enhancer.enhance("  ls   -la  ", &with_tone(Tone::Literal)).expect("enhance"), "ls -la");
+        assert_eq!(enhancer.enhance("   ", &with_tone(Tone::Literal)).expect("enhance"), "");
     }
 
     #[test]
