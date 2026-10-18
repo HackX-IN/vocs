@@ -127,6 +127,8 @@ This is far better than replacement alone, because replacement cannot fix "clod 
 
 Keep the prompt under the token budget — prioritize the most recently used terms if the dictionary is large. A prompt that overflows is silently truncated, which is worse than choosing deliberately.
 
+**The user's context line leads.** `transcription.context_prompt` (max 240 characters, enforced at the IPC boundary by `SettingDef::validate_value`) is joined ahead of the dictionary terms by `session/prompt.rs::build_prompt`. `fit_prompt` keeps the *leading* terms on overflow, so the thing the user typed on purpose is the last thing to be dropped.
+
 ### 2.4 Hallucination on silence
 
 Whisper reliably invents text when fed silence or noise. The outputs are well-known and repetitive: "Thank you.", "Thanks for watching!", "Please subscribe", subtitle-credit strings, and their equivalents in other languages (this is training-data contamination from subtitled video).
@@ -280,6 +282,9 @@ Use **bounded** channels everywhere. An unbounded queue in front of an ASR worke
 - Migrations: `PRAGMA user_version`, applied in order, each in a transaction. No migration framework needed.
 - FTS5 with `content=sessions` requires **triggers** to stay in sync on insert/update/delete. An external-content FTS table that silently drifts is worse than no search.
 - Write the session row **before** transcription starts, then update it. That is what makes crash recovery possible.
+- **Checkpoint the transcript as it grows.** `services::sessions::checkpoint_transcript` writes the assembled text after every decoded chunk, guarded by `ended_at IS NULL` so a late write can never overwrite a finished row. Escape deletes the row, and the partial text with it.
+- Migrations so far: 001 initial, 002 `error_message`, 003 `sessions.reverted` (the "Use original" flag), 004 `app_profiles.excluded`. Both later columns are `NOT NULL DEFAULT 0`, so every existing row keeps its old behaviour.
+- **Case-insensitive search must not change byte length.** `str::to_lowercase` turns `İ` (2 bytes) into `i̇` (3), so offsets found in a lowercased copy do not index the original. `rules/text.rs::fold_case` is length-preserving; use it, not `to_lowercase`, whenever offsets cross strings.
 
 ---
 
@@ -287,6 +292,8 @@ Use **bounded** channels everywhere. An unbounded queue in front of an ASR worke
 
 - **Reference corpus.** Mozilla Common Voice clips are CC0 and cover Hindi, Arabic, Spanish, French, Italian and more. Keep a small fixed set (2–3 clips per language) with expected transcripts, for accuracy regression tests. Do not commit large audio to git — fetch on demand into a gitignored fixtures directory.
 - **Rule pipeline: table tests.** Every enhancement rule gets input/output pairs. This is the cheapest, highest-value test suite in the project — rules are pure functions.
+- **The correction corpus** (`adapters/rules/corpus.rs`) is the composition test: 150+ spoken-style sentences through the whole pipeline. Its *safety* table (real uses of "like", quoted speech, protected dictionary terms, other languages) must pass 100%; its general table must pass ≥90%. `cargo test -- --nocapture` prints the misses inside that margin — read them, a pass with a margin is still a list of known misses. This test is what found `main.rs` becoming `main.Rs` and `2.5.1 is` becoming `2.5.1 Is`; add a case for every rule bug before fixing it.
+- **Guardrails read source.** `registry/reachability.rs` finds a setting's consumer by reading `session/settings_view.rs`, and it only recognises `field: …keys::X…` or `let field = …keys::X…` **on a single line**. Wrap that expression across lines and the setting is reported as read by nothing.
 - **FSM: exhaustive transition tests**, including "kill the process in state X, relaunch, assert recovery".
 - **Latency benchmark** over the fixed corpus, printing p50/p95 per stage. Runs in CI, fails on a 15% p95 regression.
 - **Do not write tests for whisper's accuracy itself.** Test *your* pipeline. Model accuracy is the model's business.

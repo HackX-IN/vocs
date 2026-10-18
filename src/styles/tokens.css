@@ -375,6 +375,9 @@
 
   --row-height: 56px;
   --row-overscan: 6;
+  /* The said-vs-fixed panel under the history list. Capped so a long
+   * transcript scrolls inside it instead of squeezing the list to nothing. */
+  --history-detail-max-height: 192px;
 
   /* The mark: the waveform at rest (docs/04 §12). Never ember — a logo that
    * looks live while nothing is happening is the same lie as a dead toggle. */

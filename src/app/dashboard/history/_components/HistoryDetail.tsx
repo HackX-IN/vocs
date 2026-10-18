@@ -51,7 +51,7 @@ export function HistoryDetail({ session, onRevertedChange }: HistoryDetailProps)
   };
 
   return (
-    <section aria-label="What was said and what was fixed" className="hairline-t flex max-h-48 shrink-0 flex-col gap-2 overflow-y-auto px-[var(--page-padding-x)] py-3">
+    <section aria-label="What was said and what was fixed" className="hairline-t flex max-h-[var(--history-detail-max-height)] shrink-0 flex-col gap-2 overflow-y-auto px-[var(--page-padding-x)] py-3">
       <div className="flex items-center justify-between gap-4">
         <p className="text-label text-text-secondary">
           {session.reverted ? "You chose the original" : "Said → fixed"}
@@ -64,7 +64,7 @@ export function HistoryDetail({ session, onRevertedChange }: HistoryDetailProps)
       {diff.error ? (
         <ErrorSurface size="compact" error={diff.error} onRetry={diff.reload} />
       ) : (
-        <p className="text-body leading-relaxed">
+        <p className="text-body">
           {(diff.data ?? []).map((segment, index) => (
             <span key={`${index}-${segment.kind}`} className={cn(SEGMENT_CLASS[segment.kind])}>
               {segment.text}{" "}

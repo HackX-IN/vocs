@@ -19,8 +19,25 @@ and no audio ever leaves your machine.
 - **99 languages**, auto-detected or pinned.
 - **A custom dictionary** for the names and jargon the model gets wrong — used
   both to bias recognition and to correct the output.
-- **Searchable local history**, so a failed paste is never a lost thought.
-- **Honest stats**, including the p50/p95 latency the app actually achieves.
+- **Searchable local history**, so a failed paste is never a lost thought. Where
+  the rules changed your words, History shows what you said against what was
+  delivered, and **Use original** takes your wording instead. **Copy Last
+  Transcript** in the menu bar is the way back from a paste that went nowhere.
+- **Filler removal that does not eat real words**, at three strengths. "I like
+  pizza" is never touched; "it was, like, fine" loses the "like".
+- **A context line for the model** — jargon, product names, the topic — that it
+  listens for ahead of your dictionary.
+- **A live microphone meter** in Settings → Recording, on the device dictation
+  will actually use.
+- **Back up and restore** your dictionary and per-app profiles as one JSON file,
+  to move them between Macs. Importing adds; it never deletes.
+- **Turn Vocs off in chosen apps**, such as a password manager.
+- **Crash-safe**: the transcript is saved as it grows, so a crash keeps what you
+  had said.
+- **Honest stats**, including the p50/p95 latency the app actually achieves, per
+  stage: capture, recognition, correction, output.
+- **Export diagnostics** — a plain-text support file you create and send
+  yourself. There is no telemetry.
 
 Everything runs on your Mac. The only network requests Vocs ever makes are the
 first-run model download and an optional update check, and both are visible and

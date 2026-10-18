@@ -446,6 +446,7 @@ Colour is `--accent` (§10). Offset rather than inset, so the ring never sits on
 
 ```
 --row-height:      56px    /* history row: first line of text + a metadata line */
+--history-detail-max-height: 192px  /* the said-vs-fixed panel; longer text scrolls inside it */
 --row-overscan:    6       /* rows rendered outside the viewport, each side */
 ```
 

@@ -73,7 +73,7 @@ These are the constraints the whole design bends around. If a decision violates 
 | M12 | Menu bar presence | Status glyph, quick toggle, open dashboard, quit |
 | M13 | In-app updates | Signed, from GitHub Releases, with release notes and a "later" option |
 | M14 | Engine adapter layer | Swap the ASR engine behind one interface — see §6 |
-| M15 | Crash-safe session recovery | Orphaned recordings finish transcribing on next launch |
+| M15 | Crash-safe session recovery | The transcript is checkpointed to the session row as each chunk is assembled; an interrupted session is recovered into History with everything but the last few seconds. (Audio is never written to disk, so "finish transcribing" is not possible — the words are what is saved.) |
 
 ### 4.2 SHOULD HAVE — I strongly recommend these for v1.0; they are what separate a demo from a product
 
@@ -81,14 +81,22 @@ These are the constraints the whole design bends around. If a decision violates 
 |---|---|---|
 | S1 | **Custom dictionary / replacements** | Every user has 20 terms the model gets wrong — names, product names, jargon. A replacement table fixes 90% of perceived accuracy problems for near-zero engineering cost. Highest value-per-line-of-code feature in the entire app. |
 | S2 | **Spoken formatting commands** | "new line", "new paragraph", "comma", "period", "quote". Essential for dictating structured prompts to an agent. Toggleable. |
-| S3 | **Filler word removal** | Strips "um", "uh", "like", "you know". Makes voice output read like writing. Toggleable. |
+| S3 | **Filler word removal** | Strips hesitations ("um", "uh", "er") always, and "like" / "you know" / "I mean" / "kind of" only when punctuation marks them as filler — never "I like pizza". Three strengths (Light / Standard / Strict). Dictionary terms and quoted speech are never touched. Toggleable. |
 | S4 | **Per-app profiles** | Different behavior in Terminal vs Slack vs an IDE — e.g. filler removal always on in Slack, formatting commands on in the terminal. Detects the frontmost app. |
-| S5 | **Audio feedback** | Two subtle sounds (start / delivered). Without them you don't trust that the hotkey registered. Toggleable. |
+| S5 | **Audio feedback** | Subtle sounds on start, stop and failure. There is deliberately NO sound on delivery: the operator asked for the off-sound to play the instant capture stops, not when the paste lands. Toggleable. |
 | S6 | **Pinned language vs auto-detect** | Auto-detect costs a beat of latency and occasionally misfires between similar languages. Pinning your primary language is faster and more accurate. Both supported. |
 | S7 | **Model manager** | Download / delete / switch models from Settings with disk usage shown. Users on 8GB machines need the small model; users on an M4 Max want the big one. |
 | S8 | **History export** | JSON / Markdown / plaintext. It's your data — no lock-in, and it costs a day. **An export always covers everything, never the current search.** An export that silently honoured a filter hands someone a partial archive they believe is complete, which is worse than no export at all — this is the one feature whose whole purpose is that their transcripts are not trapped in here. For the same reason the write goes through a native save dialog in Rust rather than a webview download: a sandboxed download that fails does so silently, and a person who believes they have a backup and does not is worse off than one who knows they have none. |
 | S9 | **Retention policy** | Auto-purge history after N days, plus one-click "delete everything". Privacy tool, not a feature. |
-| S10 | **Latency telemetry (local)** | p50/p95 shown in the dashboard. This is how you *prove* the speed claim rather than assert it, and how you catch a regression. |
+| S10 | **Latency telemetry (local)** | p50/p95 shown in the dashboard, per stage (capture, recognition, correction, output) and total. This is how you *prove* the speed claim rather than assert it, and how you catch a regression. |
+| S11 | **Context line for the model** | A free-text setting (`transcription.context_prompt`) that leads the recognition prompt ahead of dictionary terms. |
+| S12 | **Said-vs-fixed diff + "Use original"** | History shows a word-level diff where the rules changed the text; "Use original" sets a reversible `sessions.reverted` flag that copy and export honour. |
+| S13 | **Microphone level meter** | Settings → Recording. Same device and level curve as the pill; the mic is closed by a watchdog if the window is forgotten. |
+| S14 | **Back up and restore** | Dictionary and per-app profiles as one versioned JSON file. A merge: adds and updates, never deletes; every entry re-validated on import. |
+| S15 | **Excluded apps** | A per-app profile can turn Vocs off while that app is frontmost (`app_profiles.excluded`). Refused before the microphone is touched. |
+| S16 | **Copy Last Transcript** | Menu bar item: the way back from a paste that went nowhere. A global hotkey for it is not built — the hotkey machinery in `bootstrap.rs` assumes a single binding. |
+| S17 | **Export diagnostics** | Opt-in support file instead of telemetry. Never contains transcripts, dictionary terms, audio, bundle ids or the context line. |
+| S18 | **Disk-space preflight** | The model download checks free space (remaining bytes + 256 MB) before fetching, and names both numbers if it will not fit. |
 
 ### 4.3 NICE TO HAVE — post-1.0, explicitly out of MVP scope
 
