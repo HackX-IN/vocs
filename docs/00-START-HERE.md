@@ -22,6 +22,7 @@ before you touch an area you have not touched before.
 | `04-DESIGN-SYSTEM.md` | Exact tokens, materials, motion, the pill spec |
 | `05-PROJECT-STRUCTURE.md` | The full tree, where things go, naming, hard limits |
 | `06-CONVENTIONS-AND-GREP.md` | The SOURCE OF TRUTH header system and how navigation works. **Read before writing your first file.** |
+| `07-RELEASE-CHECKLIST.md` | What a person must verify on the signed DMG before a tag is cut. |
 
 ## Five-minute version
 
