@@ -39,6 +39,7 @@ import { cn } from "@/lib/utils";
 import { ErrorSurface, ScrollArea, SettingControl, Skeleton } from "@/components/global";
 import type { SettingOption } from "@/components/global";
 import { PermissionNotice } from "./_components/PermissionNotice";
+import { DiagnosticsPanel } from "./_components/DiagnosticsPanel";
 import { BackupPanel } from "./_components/BackupPanel";
 import { MicTestPanel } from "./_components/MicTestPanel";
 import { ModelManager } from "./_components/ModelManager";
@@ -266,7 +267,12 @@ function SettingsSection({
       {extra === "MIC_TEST_PANEL" ? <MicTestPanel /> : null}
       {extra === "MODELS_PANEL" ? <ModelManager /> : null}
       {extra === "DICTIONARY_PANEL" ? <DictionaryManager key={dataVersion} /> : null}
-      {extra === "PRIVACY_PANEL" ? <ClearHistoryControl /> : null}
+      {extra === "PRIVACY_PANEL" ? (
+        <>
+          <ClearHistoryControl />
+          <DiagnosticsPanel />
+        </>
+      ) : null}
       {extra === "BACKUP_PANEL" ? <BackupPanel onImported={onDataImported} /> : null}
 
       {advanced.length > 0 ? (

@@ -73,6 +73,7 @@ export const commands = {
 	requestPermission: (input: PermissionInput) => typedError<PermissionState, AppError>(__TAURI_INVOKE("request_permission", { input })),
 	openPrivacyPane: (input: PermissionInput) => typedError<null, AppError>(__TAURI_INVOKE("open_privacy_pane", { input })),
 	listInputDevices: () => typedError<DeviceInfo[], AppError>(__TAURI_INVOKE("list_input_devices")),
+	exportDiagnostics: () => typedError<string, AppError>(__TAURI_INVOKE("export_diagnostics")),
 	exportBackup: () => typedError<string, AppError>(__TAURI_INVOKE("export_backup")),
 	importBackup: (input: ImportBackupInput) => typedError<ImportSummary, AppError>(__TAURI_INVOKE("import_backup", { input })),
 	/**

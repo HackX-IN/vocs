@@ -10,6 +10,7 @@
  */
 
 pub mod backup;
+pub mod diagnostics;
 pub mod dictionary;
 pub mod engine;
 pub mod files;
