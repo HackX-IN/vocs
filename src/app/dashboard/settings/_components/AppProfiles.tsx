@@ -17,7 +17,7 @@
  */
 
 import { useCallback, useId, useMemo, useState, type FormEvent } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus } from "lucide-react";
 import {
   commands,
   type AppError,
@@ -29,12 +29,14 @@ import {
 } from "@/lib/bindings";
 import { unwrapCommand, useCommand } from "@/lib/ipc";
 import { Button, EmptyState, ErrorSurface } from "@/components/global";
-import { ProfileOverrides } from "./ProfileOverrides";
-import { ProfileTone, TONE_KEY } from "./ProfileTone";
+import { ProfileCard } from "./ProfileCard";
+import { TONE_KEY } from "./ProfileTone";
 import type { DynamicOptions } from "../to-setting-def";
 
 /** Enough history to see the apps someone actually dictates into. */
 const CANDIDATE_SCAN = 200;
+/** How many one-click app suggestions to offer. */
+const MAX_SUGGESTIONS = 6;
 const FIELD_CLASS = "hairline h-8 min-w-0 rounded-input bg-sunken px-2 text-body text-text-primary";
 
 /** "com.apple.Terminal" → "Terminal". A starting point the user can edit, not
@@ -86,9 +88,9 @@ export function AppProfiles({ defs, globals, dynamic, engine, permissions }: App
   );
 
   const add = useCallback(
-    async (event: FormEvent) => {
+    async (event: FormEvent, chosen?: string) => {
       event.preventDefault();
-      const trimmed = bundleId.trim();
+      const trimmed = (chosen ?? bundleId).trim();
       if (trimmed.length === 0) return;
 
       // The registry knows which apps want which writing style (chat apps want
@@ -116,12 +118,12 @@ export function AppProfiles({ defs, globals, dynamic, engine, permissions }: App
     <div className="flex flex-col gap-3">
       {saveError ? <ErrorSurface error={saveError} size="compact" /> : null}
 
-      <form onSubmit={add} className="flex items-center gap-2">
+      <form onSubmit={(event) => void add(event)} className="flex items-center gap-2">
         <input
           value={bundleId}
           list={listId}
           onChange={(event) => setBundleId(event.target.value)}
-          placeholder="Application bundle id, e.g. com.apple.Terminal"
+          placeholder="Or type an app's bundle id, e.g. com.apple.Terminal"
           className={`${FIELD_CLASS} flex-1`}
         />
         <datalist id={listId}>
@@ -135,6 +137,23 @@ export function AppProfiles({ defs, globals, dynamic, engine, permissions }: App
         </Button>
       </form>
 
+      {candidates.length > 0 ? (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-caption text-text-tertiary">Apps you have dictated into</span>
+          {candidates.slice(0, MAX_SUGGESTIONS).map((candidate) => (
+            <button
+              key={candidate}
+              type="button"
+              onClick={(event) => void add(event, candidate)}
+              className="hairline inline-flex h-7 items-center gap-1 rounded-pill bg-sunken px-3 text-label text-text-secondary transition-colors hover:text-text-primary"
+            >
+              <Plus className="size-3.5" aria-hidden="true" />
+              {displayNameFor(candidate)}
+            </button>
+          ))}
+        </div>
+      ) : null}
+
       {profiles.data && profiles.data.length === 0 ? (
         <EmptyState
           size="compact"
@@ -143,63 +162,19 @@ export function AppProfiles({ defs, globals, dynamic, engine, permissions }: App
         />
       ) : null}
 
-      <ul className="flex flex-col">
+      <ul className="flex flex-col gap-3">
         {(profiles.data ?? []).map((profile) => (
-          <li key={profile.bundle_id} className="hairline-b flex flex-col gap-2 py-3 last:border-b-0">
-            <div className="flex items-center gap-2">
-              <input
-                type="checkbox"
-                checked={profile.enabled}
-                aria-label={`Enable profile for ${profile.display_name}`}
-                onChange={(event) => save({ ...profile, enabled: event.target.checked })}
-                className="accent-[var(--accent)]"
-              />
-              <input
-                defaultValue={profile.display_name}
-                aria-label={`Name for ${profile.bundle_id}`}
-                onBlur={(event) => {
-                  if (event.target.value !== profile.display_name) {
-                    save({ ...profile, display_name: event.target.value });
-                  }
-                }}
-                className={`${FIELD_CLASS} w-40`}
-              />
-              <span className="min-w-0 flex-1 truncate text-caption text-text-tertiary">{profile.bundle_id}</span>
-              <button
-                type="button"
-                aria-label={`Delete profile for ${profile.display_name}`}
-                onClick={() => remove(profile)}
-                className="shrink-0 rounded-input p-1 text-text-secondary transition-colors hover:bg-sunken hover:text-danger"
-              >
-                <Trash2 className="size-4" />
-              </button>
-            </div>
-
-            <label className="flex items-center gap-2 text-caption text-text-secondary">
-              <input
-                type="checkbox"
-                checked={profile.excluded ?? false}
-                onChange={(event) => save({ ...profile, excluded: event.target.checked })}
-                className="accent-[var(--accent)]"
-              />
-              Turn Vocs off in {profile.display_name}
-              <span className="text-text-tertiary">— no recording, nothing pasted. For password managers and the like.</span>
-            </label>
-
-            <ProfileTone profile={profile} defs={defs} onChange={save} />
-
-            <ProfileOverrides
-              profile={profile}
-              // Writing style has its own picker above; listing it here too would
-              // be two controls for one override.
-              defs={defs.filter((def) => def.key !== TONE_KEY)}
-              globals={globals}
-              dynamic={dynamic}
-              engine={engine}
-              permissions={permissions}
-              onChange={save}
-            />
-          </li>
+          <ProfileCard
+            key={profile.bundle_id}
+            profile={profile}
+            defs={defs}
+            globals={globals}
+            dynamic={dynamic}
+            engine={engine}
+            permissions={permissions}
+            onSave={save}
+            onDelete={remove}
+          />
         ))}
       </ul>
     </div>

@@ -72,11 +72,11 @@ export function ProfileOverrides({
   };
 
   return (
-    <div className="flex flex-col gap-1 pl-6">
+    <div className="flex flex-col">
       {overridden.map((def) => (
-        <div key={def.key} className="flex items-center gap-2">
+        <div key={def.key} className="hairline-b flex items-center gap-2">
           <SettingControl
-            className="flex-1"
+            className="min-w-0 flex-1"
             setting={toControlSetting(def, profile.overrides[def.key], dynamic, engine, permissions, (value) =>
               setOverride(def.key, value),
             )}
@@ -93,8 +93,8 @@ export function ProfileOverrides({
       ))}
 
       {overridden.length === 0 ? (
-        <p className="py-2 text-caption text-text-tertiary">
-          Nothing overridden — this app follows every global setting.
+        <p className="pt-3 text-caption text-text-tertiary">
+          Everything else follows your global settings, including when you change them later.
         </p>
       ) : null}
 
@@ -103,9 +103,9 @@ export function ProfileOverrides({
           value={adding}
           aria-label={`Add an override for ${profile.display_name}`}
           onChange={(event) => addOverride(event.target.value)}
-          className="hairline h-8 w-fit rounded-input bg-sunken px-2 text-body text-text-secondary"
+          className="hairline my-3 h-8 w-fit rounded-input bg-sunken px-2 text-body text-text-secondary"
         >
-          <option value="">Add an override…</option>
+          <option value="">Change another setting for this app…</option>
           {available.map((def) => (
             <option key={def.key} value={def.key}>
               {def.label}

@@ -55,19 +55,20 @@ export function ProfileTone({ profile, defs, onChange }: ProfileToneProps) {
   };
 
   return (
-    <div className="flex flex-col gap-1.5 pl-6">
-      <div className="flex items-center justify-between gap-3">
-        <span className="text-label text-text-secondary">Writing style</span>
-        <SegmentedControl
-          label={`Writing style for ${profile.display_name}`}
-          options={options}
-          value={current}
-          onChange={choose}
-        />
+    <div className="hairline-b flex flex-col gap-2 py-3">
+      <div>
+        <p className="text-body text-text-primary">Writing style</p>
+        <p className="text-caption text-text-secondary">
+          {described?.description ?? "Follows the global Writing style setting."}
+        </p>
       </div>
-      <p className="text-caption text-text-tertiary">
-        {described?.description ?? "Follows the global Writing style setting."}
-      </p>
+      <SegmentedControl
+        label={`Writing style for ${profile.display_name}`}
+        options={options}
+        value={current}
+        onChange={choose}
+        className="w-fit"
+      />
     </div>
   );
 }
