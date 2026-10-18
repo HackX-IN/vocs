@@ -142,13 +142,11 @@ fn apply_window_vibrancy(app: &AppHandle) {
     let window_radius = crate::tray::design_token("--radius-window");
     for (label, material, radius) in [
         (PILL_WINDOW, NSVisualEffectMaterial::HudWindow, Some(crate::tray::pill_radius())),
-        // The caption HUD is the pill's sibling: the same dark HUD material cut
-        // to its own rounder-rectangle radius.
-        (CAPTION_WINDOW, NSVisualEffectMaterial::HudWindow, Some(crate::tray::design_token("--radius-caption"))),
-        // The rail is its own floating object, so it carries the window radius
-        // rather than the pill's. Sidebar material to match the dashboard it
-        // hangs beside.
-        (SIDEBAR_WINDOW, NSVisualEffectMaterial::Sidebar, Some(window_radius)),
+        // The caption has NO window material: it is gradient text rising out of
+        // the pill, painted on a transparent window (see app/caption).
+        // The rail is its own floating object: a full pill, cut to its own
+        // radius token. Sidebar material to match the dashboard it hangs beside.
+        (SIDEBAR_WINDOW, NSVisualEffectMaterial::Sidebar, Some(crate::tray::design_token("--radius-rail"))),
         (DASHBOARD_WINDOW, NSVisualEffectMaterial::Sidebar, Some(window_radius)),
         (ONBOARDING_WINDOW, NSVisualEffectMaterial::Popover, Some(window_radius)),
     ] {

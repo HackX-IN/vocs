@@ -1,10 +1,10 @@
 /**
  * SOURCE OF TRUTH KEYWORDS: Caption, CaptionBody, captionChanged, live-captions, preview-pill,
  *   caption-hud, heard-vs-fixed, tailOf
- * WHAT:  The caption HUD: a small dark panel that shows, while you speak, what Vocs
- *        HEARD and what it will WRITE — and, after you stop, the finished text for
- *        a moment before it is pasted, with a draining line and "Esc to keep it
- *        out".
+ * WHAT:  The caption HUD: gradient text that rises out of the pill while you speak,
+ *        showing what Vocs HEARD and what it will WRITE — and, after you stop, the
+ *        finished text for a moment before it is pasted, with a draining line and
+ *        "Esc to keep it out".
  * WHY:   One window for two features, because they are the same object at two
  *        moments of a dictation (types/caption.rs). It renders exactly the last
  *        caption Rust pushed and holds no domain state: there is no polling and no
@@ -25,9 +25,14 @@
  *        shown only when it differs from "fixed" — repeating identical text is
  *        noise.
  *
- *        Dark in both colour schemes, like the pill, for the same reason: it
- *        floats over arbitrary content. The window is a fixed size the text is
- *        laid out INTO (docs/04 §15), never one it is fitted to.
+ *        IT HAS NO BOX. The window stands directly above the pill and the text is
+ *        painted as a gradient — the accent where it leaves the pill, ink above,
+ *        dissolving into nothing at the top — so it reads as coming OUT of the
+ *        pill rather than as a second object beside it. A dark vignette behind
+ *        the words keeps them legible over any wallpaper or document, in both
+ *        colour schemes, because there is no panel to guarantee a background. The
+ *        window is a fixed size the text is laid out INTO (docs/04 §15), never one
+ *        it is fitted to.
  * WHERE: Mounted by src/entries/caption.tsx into the `caption` window. Sizes come
  *        from tokens.css, which src-tauri/src/tray.rs reads.
  */
@@ -36,7 +41,7 @@ import { useRef, useState } from "react";
 import { events, type Caption as CaptionState } from "@/lib/bindings";
 import { useTauriEvent } from "@/lib/use-event";
 import { cn } from "@/lib/utils";
-import { CountdownLine, Eyebrow } from "@/components/global";
+import { CountdownLine } from "@/components/global";
 
 /** How many characters of a live caption are shown — about two lines of the HUD. */
 const LIVE_TAIL_CHARS = 150;
@@ -72,15 +77,26 @@ export function Caption() {
     <div
       role="status"
       aria-live="polite"
-      className={cn(
-        "flex h-full w-full flex-col gap-2 overflow-hidden rounded-[var(--radius-caption)] bg-pill-surface px-5 py-4 text-pill-ink",
-        "border-[length:var(--pill-ring-width)] border-pill-ring",
-      )}
+      className="relative flex h-full w-full flex-col items-center justify-end px-8 pb-1 text-center"
     >
-      <CaptionBody caption={shown} previewId={previewId} />
+      {/* Legibility without a panel: a dark vignette rooted at the pill, and a
+          warm accent bloom on top of it where the words leave the pill. */}
+      <span
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0"
+        style={{
+          background:
+            "radial-gradient(ellipse 70% 90% at 50% 100%, color-mix(in srgb, var(--accent) 22%, transparent), transparent 70%), radial-gradient(ellipse 90% 110% at 50% 100%, color-mix(in srgb, var(--pill-surface) 85%, transparent), transparent 75%)",
+        }}
+      />
+      <div className="caption-fade relative flex w-full flex-col items-center justify-end gap-2 pt-[var(--caption-fade-size)]">
+        <CaptionBody caption={shown} previewId={previewId} />
+      </div>
     </div>
   );
 }
+
+const TEXT_CLASS = "caption-gradient text-[length:var(--caption-text-size)] leading-[var(--caption-text-line)] font-medium text-balance";
 
 function CaptionBody({ caption, previewId }: { caption: CaptionState; previewId: number }) {
   switch (caption.kind) {
@@ -88,38 +104,33 @@ function CaptionBody({ caption, previewId }: { caption: CaptionState; previewId:
       const differs = caption.heard.trim() !== caption.fixed.trim();
       return (
         <>
-          <header className="flex items-center gap-2">
-            <span aria-hidden="true" className="size-1.5 animate-breathe rounded-full bg-pill-signal" />
-            <Eyebrow className="text-pill-ink/60">Live</Eyebrow>
-          </header>
           {differs ? (
             <p className="text-label text-pill-ink/55">
               <span className="font-mono text-eyebrow uppercase tracking-[0.1em]">Heard </span>
               {tailOf(caption.heard, LIVE_TAIL_CHARS)}
             </p>
           ) : null}
-          <p className="text-body leading-snug text-pill-ink">{tailOf(caption.fixed, LIVE_TAIL_CHARS)}</p>
+          <p className={TEXT_CLASS}>{tailOf(caption.fixed, LIVE_TAIL_CHARS)}</p>
         </>
       );
     }
     case "PREVIEW":
       return (
         <>
-          <header className="flex items-center justify-between gap-3">
-            <Eyebrow className="text-pill-ink/60">Pasting in a moment</Eyebrow>
-            <span className="text-caption text-pill-ink/60">Esc to keep it out</span>
-          </header>
-          {/* Keyed so each preview's line is a fresh animation that starts full:
-              the line is created ONCE per preview and never restarted by a tick
-              (see CountdownLine). The duration is the hold time Rust chose. */}
-          <CountdownLine
-            key={previewId}
-            className="text-pill-signal"
-            remainingMs={caption.hold_ms}
-            state="draining"
-            label="Time left before pasting"
-          />
-          <p className="line-clamp-3 text-body leading-snug text-pill-ink">{caption.text}</p>
+          <p className={cn(TEXT_CLASS, "line-clamp-3")}>{caption.text}</p>
+          <div className="flex items-center gap-3 text-caption text-pill-ink/60">
+            {/* Keyed so each preview's line is a fresh animation that starts full:
+                the line is created ONCE per preview and never restarted by a tick
+                (see CountdownLine). The duration is the hold time Rust chose. */}
+            <CountdownLine
+              key={previewId}
+              className="w-24 text-pill-signal"
+              remainingMs={caption.hold_ms}
+              state="draining"
+              label="Time left before pasting"
+            />
+            <span>Pasting in a moment · Esc to keep it out</span>
+          </div>
         </>
       );
     default: {

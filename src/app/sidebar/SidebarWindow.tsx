@@ -5,11 +5,15 @@
  *        one icon per registry nav entry, sorted by NavDef.order.
  * WHY:   THE WINDOW IS THE RAIL, which is the same rule the pill lives under
  *        and it carries the same consequences. The window is transparent with
- *        native vibrancy cut to --radius-window, so this component fills it
- *        exactly and draws NO surface of its own — no rounding, no shadow, no
- *        glass panel. A CSS rounding here would leave the effect view's square
- *        corners outside a rounded page, and a CSS shadow has nowhere to fall
- *        because the window ends where the rail ends.
+ *        native vibrancy cut to --radius-rail (a full pill), and this nav fills
+ *        it exactly, painting the same curve in CSS. Both have to be the same
+ *        radius: a square web surface over a rounded effect view shows square
+ *        corners, which is what the rail used to look like. The system shadow is
+ *        off (tauri.conf.json) because it was drawn around the SQUARE window, and
+ *        a CSS shadow has nowhere to fall — the window ends where the rail ends.
+ *
+ *        Hovering an item shows its name as a native tooltip (the `title`): a
+ *        tooltip drawn in the page would be clipped by this window's edge.
  *
  *        IT HAS NO TRAFFIC-LIGHT SPACER, and that is the substantive difference
  *        from the rail this replaces. The embedded version reserved
@@ -50,7 +54,7 @@ export function SidebarWindow({ items, activeRoute, onSelect }: SidebarWindowPro
   return (
     <nav
       aria-label="Sections"
-      className="flex h-full w-full flex-col items-center gap-[var(--rail-item-gap)] p-[var(--rail-padding)]"
+      className="hairline flex h-full w-full flex-col items-center gap-[var(--rail-item-gap)] rounded-[var(--radius-rail)] bg-elevated p-[var(--rail-padding)]"
     >
       <span className="mb-[var(--rail-mark-gap)] flex h-[var(--rail-mark-height)] shrink-0 items-center text-text-primary">
         <Mark label="Vocs" />

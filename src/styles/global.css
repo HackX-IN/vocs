@@ -195,8 +195,10 @@
     background: var(--page-glow), var(--surface-glass);
   }
 
+  /* The rail's pill paints its own surface (SidebarWindow's nav) so the window
+   * corners outside the curve stay transparent instead of showing a square. */
   body[data-window="sidebar"] {
-    background: var(--surface-elevated);
+    background: transparent;
   }
 
   body {
@@ -314,6 +316,19 @@
 /** A single hairline rule, so no component improvises a 1px divider. */
 @utility hairline {
   border: var(--border-width-hairline) solid var(--border-hairline);
+}
+
+/** The live caption's text: accent where it leaves the pill, ink above, fading out. */
+@utility caption-gradient {
+  background-image: linear-gradient(to top, var(--accent) 0%, var(--pill-ink) 55%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/** Dissolves the top of the caption so older words recede into nothing. */
+@utility caption-fade {
+  mask-image: linear-gradient(to bottom, transparent, #000 var(--caption-fade-size));
 }
 
 @utility hairline-t {

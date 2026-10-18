@@ -3,7 +3,7 @@
  *   VisibleState, PillTone, pill-width, pill-width-failed, window-is-the-pill,
  *   capsule-pill, pill-ring
  * WHAT:  The overlay. Renders the current SessionState and nothing else — a dark
- *        vertical capsule holding the mark above three audio bars, a draining
+ *        horizontal capsule holding the mark beside three audio bars, a draining
  *        line while a cancel is armed, or (wider) the mark beside a failure
  *        sentence.
  * WHY:   THE WINDOW IS THE PILL. The NSPanel is sized to the pill's tokens and
@@ -32,7 +32,8 @@
  *        It is dark in both colour schemes: it floats over arbitrary content, and
  *        a near-black capsule with a lighter ring is legible over all of it. It
  *        has no timer — the capsule is the shape of "I am listening", and a
- *        number in it would make it a gauge.
+ *        number in it would make it a gauge. It lies on its side so the live
+ *        caption (a separate window) can rise straight out of its top edge.
  *
  *        It holds no domain state: get_session_state is called ONCE for first
  *        paint and every frame after that comes from session-state-changed, so
@@ -109,7 +110,7 @@ export function Pill() {
       className={cn(
         "relative flex h-full w-full items-center overflow-hidden rounded-pill bg-pill-surface text-pill-ink",
         "border-[length:var(--pill-ring-width)] border-pill-ring",
-        failed ? "gap-3 px-4" : "flex-col justify-center gap-[var(--pill-content-gap)]",
+        failed ? "gap-3 px-4" : "flex-row justify-center gap-[var(--pill-content-gap)] px-4",
       )}
     >
       {/* The wash is always rendered and transparent at rest, so a failure
@@ -130,7 +131,7 @@ export function Pill() {
 }
 
 /**
- * WHAT:  The slot under the mark — bars, the draining line, or the failure
+ * WHAT:  The slot beside the mark — bars, the draining line, or the failure
  *        sentence.
  * WHY:   Split out so the switch stays exhaustive over VisibleState["kind"]: a
  *        new variant in the Rust enum becomes a TypeScript error here rather
@@ -157,8 +158,7 @@ function PillBody({
     // mode — a line standing where they stood.
     return (
       <CountdownLine
-        orientation="vertical"
-        className="relative text-pill-ink"
+        className="relative w-[var(--countdown-line-length)] text-pill-ink"
         remainingMs={state.kind === "CANCEL_PENDING" ? state.remaining_ms : 0}
         state={refilling ? "refilling" : "draining"}
         label="Cancelling — press Escape again to keep the recording"

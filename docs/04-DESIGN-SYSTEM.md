@@ -120,7 +120,8 @@ Dark:   --surface-opaque: #13110F    --surface-opaque-elevated: #1F1D1A
 --space-1: 4px   --space-2: 8px   --space-3: 12px   --space-4: 16px
 --space-5: 24px  --space-6: 32px  --space-8: 48px
 
---rail-width:        56px     /* the icon-only rail window, §8 */
+--rail-width:        64px     /* the icon-only rail window, §8 */
+--radius-rail:       32px     /* half the rail width: the rail is a pill; read by src-tauri */
 --control-height:    32px     /* buttons, selects, segmented controls */
 --control-height-sm: 28px     /* a control inside a row, §11 */
 --card-padding:      20px
@@ -194,19 +195,16 @@ Framer needs numbers, and a component may not carry one. Every spring in the tab
 ## 7. The pill — exact specification
 
 ```
-      ╭────────╮
-      │   ◖"◗   │   the mark, 26px wide, pale ink; breathes while recording
-      │        │
-      │        │
-      │  ▏▎▍   │   three bars: short · tall · medium, signal green
-      ╰────────╯
-        52 × 104 pt      radius 26 (half the width), 2px ring
+      ╭────────────────╮
+      │   ◖"◗   ▏▎▍    │   the mark (pale ink, breathes while recording) · three bars (signal green)
+      ╰────────────────╯
+        104 × 52 pt      radius 26 (half the height), 2px ring
 ```
 
-- **A vertical capsule.** The operator's reference is a near-black pill with the app's mark above three green bars. It is **52 × 104 pt** (`--pill-width` / `--pill-height`, the reference's 1 : 2) with `--radius-pill` = half the width, so it is fully round; the surface is `--pill-surface` and it is outlined by a `--pill-ring-width` (2px) `--pill-ring` ring. It is dark in both colour schemes (§2).
+- **A horizontal capsule.** A near-black pill with the app's mark beside three green bars, lying on its side so the live caption can rise out of its top edge. It is **104 × 52 pt** (`--pill-width` / `--pill-height`, 2 : 1) with `--radius-pill` = half the height, so it is fully round; the surface is `--pill-surface` and it is outlined by a `--pill-ring-width` (2px) `--pill-ring` ring. It is dark in both colour schemes (§2).
 - **The window is the pill.** The NSPanel is sized to `--pill-width`/`--pill-height` exactly and its vibrancy carries `--radius-pill`, so every pixel of the window is the capsule. Two consequences bind everything else here: the pill fills the window and **never animates its own size or transform** (object motion — arriving, resizing, leaving — belongs to the window, in Rust; only motion *inside* the pill belongs to CSS), and the pill has **no CSS drop shadow**, because a shadow has nowhere to fall and is clipped by the window bounds. Its shadow is the native window shadow. `src-tauri/src/tray.rs` `include_str!`s `tokens.css` and parses these values at startup, so the window has no second copy of them to disagree with. **Change a token and the window follows — there is no Rust number to edit.** Delete a token the pill needs and it is a build-time panic naming it.
 - **Position:** bottom-centre, `--pill-offset-bottom` (96pt) above the bottom edge of the screen containing the cursor. Multi-monitor: follow the active screen. Position is decided **once per appearance** — enforced by an `is_visible()` gate in `set_pill_visible`, not by intent. State is emitted several times a second, so positioning unconditionally makes the pill chase the pointer between displays mid-sentence.
-- **The mark** (`Mark size="md"`, §12) sits above the bars in `--pill-ink`. While recording it breathes — a 2s opacity pulse (`--pill-pulse-*`), CSS only, so it costs the audio thread nothing. It is the one thing that tells you the app is alive while you speak.
+- **The mark** (`Mark size="md"`, §12) sits left of the bars in `--pill-ink`. While recording it breathes — a 2s opacity pulse (`--pill-pulse-*`), CSS only, so it costs the audio thread nothing. It is the one thing that tells you the app is alive while you speak.
 - **Three bars**, `--pill-bar-width` (5px) wide with `--pill-bar-gap` (6px) between, up to `--pill-bar-max` (26px) tall, in `--pill-signal`, growing from their centre. They are an **equaliser, not a scrolling history**: the centre bar follows the current level, the flanks trail it by one and two frames with their own weights, and each is floored at its resting height (short · tall · medium = 0.38 · 0.72 · 0.52 of full) so silence shows the signature shape rather than three dots. Driven by windowed RMS straight into `transform: scaleY` through a ref — no React render per audio frame.
 - **Waveform input scaling.** The RMS arriving from the audio thread is linear 0..1, and real speech sits between roughly 0.05 and 0.3 — so a bar drawn at `height = rms` is a flat line for the entire recording. Two values map the audio range onto the visual one:
 
@@ -216,9 +214,9 @@ Framer needs numbers, and a component may not carry one. Every spring in the tab
   ```
 
   `level = clamp((rms / ceiling) ^ gamma)`. The ceiling sits just above normal speech so the loud end has somewhere to go before it pins; the gamma is there because loudness is perceived logarithmically. Together they put 0.05 at roughly a third height and 0.3 near full. The same curve draws the Settings microphone check.
-- **No timer.** The capsule is the shape of "I am listening"; a number in it would make it a gauge, and the vertical shape has no room for one without crowding the bars.
+- **No timer.** The capsule is the shape of "I am listening"; a number in it would make it a gauge, and the capsule has no room for one without crowding the bars.
 - **Arming** draws *exactly* what recording draws — the mark and the bars at rest. It is normally under 100ms, and a distinct state for a tenth of a second is not information, it is a flicker. The capsule arrives already in its working shape and comes alive as sound reaches it. A genuine stall surfaces as Failed.
-- **Cancel armed:** the bars are replaced by a **vertical countdown line** in the same slot — `--countdown-line-height` (3px) thick, `--countdown-line-length` (26px) tall, starting full and draining toward the bottom. **There is no label.** A countdown the user armed with a keypress does not need a caption telling him he armed it. A second Escape refills the line with a spring and returns the bars.
+- **Cancel armed:** the bars are replaced by a **countdown line** in the same slot — `--countdown-line-height` (3px) thick, `--countdown-line-length` (27px) wide, starting full and draining toward the left. **There is no label.** A countdown the user armed with a keypress does not need a caption telling him he armed it. A second Escape refills the line with a spring and returns the bars.
 - **The line is driven by `remaining_ms`, never by a local timer, and the animation is created ONCE.** The old ring failed because its effect depended on `durationMs` — which *was* `remaining_ms`, a value Rust re-emits several times a second — so every tick cancelled the running animation and restarted a fresh full-to-empty drain. It never progressed and it flickered: two clocks disagreeing. Later ticks may only SEEK the running animation, and only when they disagree with it by more than 120ms. **Never read the countdown's duration as a constant** — it is configurable, and a skip-countdown setting exists.
 - **Failed:** the one WIDE state — **360 × 56 pt**, a horizontal capsule with the mark at the left and the reason beside it on **up to two lines, never truncated**. A `--pill-danger-wash` tints the surface and the sentence is `--pill-danger`. Failure is a sentence, not a status: the corpus it must seat runs to 100 characters (*"Vocs heard nothing at all. Check that the right input device is selected and that it is not muted."*), which at `--text-label` wraps to at most two lines at 340pt. The size is fixed rather than fitted to the line count, because only the webview can measure text and only Rust can size the window — a fitted height would need a round trip and would show a frame at the wrong size. It keeps `--radius-pill`, so it is visibly the same object.
 - **Not ready yet:** a failure with a transient code — currently `ENGINE_NOT_READY` — keeps `--pill-ink` and shows its reason plainly. Same layout as Failed, none of the alarm. See §2.
@@ -569,7 +567,7 @@ One floating window for two features, because they are one object at two moments
  ╰──────────────────────────────────────────────╯
 ```
 
-- **Same family as the pill.** A near-black `--pill-surface` panel with the `--pill-ring` outline, `--pill-ink` text, `--pill-signal` for the one live thing, cut to `--radius-caption` (24pt). It floats on every Space and over full-screen apps, is click-through (it can never take a click or focus from the app being dictated into), and is created once and only shown and hidden.
+- **It rises out of the pill.** No box: the window stands directly above the pill (`--caption-offset-bottom`) and the text is a gradient — `--accent` where it leaves the pill, `--pill-ink` above, dissolving at the top over `--caption-fade-size` — on a dark vignette rooted at the pill, so it stays legible over any content. Text is `--caption-text-size` / `--caption-text-line`. It floats on every Space and over full-screen apps, is click-through (it can never take a click or focus from the app being dictated into), and is created once and only shown and hidden.
 - **A fixed size the text is laid out into.** `--caption-width` × `--caption-height`, stood `--caption-offset-bottom` above the bottom edge — above the pill, which is `--pill-offset-bottom` + `--pill-height` + a gap. `src-tauri/src/tray.rs` reads these by name from `tokens.css`, exactly as it does for the pill, and places it **once per appearance** on the display under the cursor. It has no animated exit: the pill's exit carries the outcome ("committed" rises, "cancelled" drops) and a caption has no outcome to carry.
 - **Live** — a signal-green dot that breathes, the eyebrow "LIVE", then the text. It shows the **end** of a long transcript (the last ~150 characters, cut at a word, with a leading ellipsis): while you speak, the newest words are the ones that matter. **"Heard" is shown only when it differs from "fixed"** — repeating identical text is noise. The words are the committed transcript plus a snapshot of the open chunk, so they arrive within a couple of seconds, not in ten-second lumps; see `session/captions.rs` for why that costs a little extra work and is therefore opt-in.
 - **Preview** — the eyebrow "PASTING IN A MOMENT", "Esc to keep it out" at the right, a horizontal draining line (the same `CountdownLine`, created once per preview), and the **start** of the finished text on up to three lines — that is how you recognise a paragraph. It shows what will be pasted (after enhancement), not what was heard. Escape withholds the paste; the words are still saved in Dictations, marked "Not pasted".

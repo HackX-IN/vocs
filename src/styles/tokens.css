@@ -153,11 +153,14 @@
    */
   --rail-detach-gap: 12px;
 
-  --rail-width: 56px;
-  --rail-item-size: 36px;
-  --rail-item-gap: 4px;
-  --rail-padding: 12px;
-  --rail-mark-gap: 18px;
+  --rail-width: 64px;
+  --rail-item-size: 40px;
+  --rail-item-gap: 10px;
+  --rail-padding: 14px;
+  --rail-mark-gap: 20px;
+  /* Half the rail's width: the rail is a pill, not a rounded rectangle. Read by
+   * src-tauri/src/bootstrap.rs for the window's vibrancy cut. */
+  --radius-rail: 32px;
   /* The mark's drawn height at --mark-size-md: 26px wide x 91.2:75.5. The rail's
    * height formula adds this, and bootstrap.rs reads it by name. */
   --rail-mark-height: 22px;
@@ -280,12 +283,13 @@
   --pill-exit-duration-ms: 160;
   --pill-exit-travel: 8;
 
-  /* THE PILL IS A VERTICAL CAPSULE (docs/04 §7): the mark above, three bars
-   * below, in a dark rounded shape with a lighter ring. 52 x 104 is the 1 : 2
-   * proportion of the reference, and --radius-pill is half the width so every
-   * pixel of the window is the capsule. The window follows these numbers. */
-  --pill-width: 52px;
-  --pill-height: 104px;
+  /* THE PILL IS A HORIZONTAL CAPSULE (docs/04 §7): the mark on the left, three
+   * bars beside it, in a dark rounded shape with a lighter ring. 104 x 52 is a
+   * 2 : 1 capsule, and --radius-pill is half the HEIGHT so every pixel of the
+   * window is the capsule. It lies on its side so the live caption can rise out
+   * of its top edge. The window follows these numbers. */
+  --pill-width: 104px;
+  --pill-height: 52px;
 
   /* Failure is a sentence, not a status, so it is the one state that is WIDE: a
    * horizontal capsule, the mark beside the words. The corpus it has to seat
@@ -315,19 +319,26 @@
    * window is a size the text is laid out INTO, never one it is fitted to.
    * src-tauri/tray.rs reads these by name. --caption-offset-bottom stands it
    * above the pill: the pill's own offset, plus the pill's height, plus a gap. */
-  --caption-width: 520px;
-  --caption-height: 132px;
-  --caption-offset-bottom: 232px;
-  --radius-caption: 24px;
+  --caption-width: 560px;
+  --caption-height: 168px;
+  /* The pill's own offset, plus the pill's height, plus 8px: the caption's bottom
+   * edge sits just above the pill so the text reads as rising out of it. */
+  --caption-offset-bottom: 156px;
+  /* The caption has no box: its text is a gradient that starts in the accent at
+   * the pill and fades to ink and then to nothing as it rises. These are that
+   * text's size, and how far from the top it dissolves. */
+  --caption-text-size: 20px;
+  --caption-text-line: 28px;
+  --caption-fade-size: 64px;
 
   /* The countdown line of docs/04 §7 — the cancel-armed state. Starts full and
    * drains to zero. Height only; its width is whatever the middle slot gives it,
    * because a line that is always the same length as the waveform it replaces
    * is the thing that makes the swap read as one object changing mode. */
   --countdown-line-height: 3px;
-  /* The same line, standing up, inside the vertical pill: its length is the
-   * bar group's height and its thickness is the line's. */
-  --countdown-line-length: 26px;
+  /* The same line inside the pill: its length is the bar group's width and its
+   * thickness is the line's. */
+  --countdown-line-length: 27px;
 
   --pill-offset-bottom: 96px;
   --pill-pulse-duration: 2s;
