@@ -11,6 +11,7 @@
 
 pub mod assembler;
 pub mod chunker;
+pub mod diff;
 pub mod mic_monitor;
 pub mod vad;
 pub mod worker;

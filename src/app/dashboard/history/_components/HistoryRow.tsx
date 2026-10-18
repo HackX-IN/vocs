@@ -25,6 +25,7 @@
 import { cn } from "@/lib/utils";
 import { formatClock, formatCount, formatLanguage, formatRelativeTime } from "@/lib/format";
 import type { SessionOutcome, SessionSummary } from "@/lib/bindings";
+import { effectiveText } from "../session-text";
 
 const OUTCOME_TONE: Readonly<Record<SessionOutcome, string>> = {
   DELIVERED: "",
@@ -39,7 +40,7 @@ const OUTCOME_LABEL: Readonly<Record<SessionOutcome, string>> = {
 };
 
 function firstLine(session: SessionSummary): string | null {
-  const text = session.final_text ?? session.raw_text;
+  const text = effectiveText(session);
   if (text === null) return null;
   const line = text.trim().split("\n", 1)[0];
   return line.length > 0 ? line : null;
@@ -68,6 +69,7 @@ export function HistoryRow({ session }: { session: SessionSummary }) {
         <span className={cn("truncate text-body", line ? "text-text-primary" : "text-text-tertiary")}>
           {line ?? "No transcript"}
         </span>
+        {session.reverted ? <span className="shrink-0 text-caption text-text-tertiary">Original</span> : null}
         {session.outcome !== "DELIVERED" ? (
           <span className={cn("shrink-0 text-caption", OUTCOME_TONE[session.outcome])}>
             {OUTCOME_LABEL[session.outcome]}

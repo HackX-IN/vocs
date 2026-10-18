@@ -16,6 +16,26 @@ export const commands = {
 	searchHistory: (input: SearchHistoryInput) => typedError<SessionSummary[], AppError>(__TAURI_INVOKE("search_history", { input })),
 	getHistoryEntry: (input: SessionIdInput) => typedError<SessionSummary, AppError>(__TAURI_INVOKE("get_history_entry", { input })),
 	deleteHistoryEntry: (input: SessionIdInput) => typedError<null, AppError>(__TAURI_INVOKE("delete_history_entry", { input })),
+	/**
+	 * 
+	 *  * WHAT:  Records that the user chose a transcript's original wording (or
+	 *  *        changed their mind and went back to the fix).
+	 *  * WHY:   A flag, not an overwrite — see migration 003. Refuses a session that
+	 *  *        does not exist rather than reporting success for a write that changed
+	 *  *        nothing.
+	 *  * WHERE: The "Use original" button in the History detail panel.
+	 *  
+	 */
+	setHistoryReverted: (input: SetRevertedInput) => typedError<null, AppError>(__TAURI_INVOKE("set_history_reverted", { input })),
+	/**
+	 * 
+	 *  * WHAT:  Word-level said-vs-fixed comparison for one session.
+	 *  * WHY:   Computed on request, for the one row being looked at, rather than for
+	 *  *        every row of a page: 200 diffs to render a list that shows one.
+	 *  * WHERE: The History detail panel.
+	 *  
+	 */
+	diffHistoryEntry: (input: SessionIdInput) => typedError<DiffSegment[], AppError>(__TAURI_INVOKE("diff_history_entry", { input })),
 	/**  The privacy escape hatch. Deletes everything, immediately, with no tombstone. */
 	clearHistory: () => typedError<number, AppError>(__TAURI_INVOKE("clear_history")),
 	purgeHistory: (input: PurgeHistoryInput) => typedError<number, AppError>(__TAURI_INVOKE("purge_history", { input })),
@@ -278,6 +298,17 @@ export type DictionaryEntry = {
 };
 
 export type DictionaryId = number;
+
+export type DiffKind = "SAME" | 
+/**  In the original, gone from the fixed text. */
+"REMOVED" | 
+/**  In the fixed text, not in the original. */
+"ADDED";
+
+export type DiffSegment = {
+	kind: DiffKind,
+	text: string,
+};
 
 export type DownloadProgress = {
 	model_id: ModelId,
@@ -893,6 +924,16 @@ export type SessionSummary = {
 	 *  wording — see migration 002.
 	 */
 	error_message: string | null,
+	/**
+	 *  The user chose the original wording over the corrected text. Copy and
+	 *  export honour it; see migration 003.
+	 */
+	reverted: boolean,
+};
+
+export type SetRevertedInput = {
+	id: SessionId,
+	reverted: boolean,
 };
 
 export type SetSettingInput = {

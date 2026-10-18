@@ -11,14 +11,15 @@
 
 use tauri::State;
 
-use crate::error::AppError;
+use crate::error::{AppError, ErrorCode};
 use crate::ipc::context::AppState;
 use crate::ipc::factory::{execute, CommandSpec, Validate};
 use crate::registry::CapabilityKey;
 use crate::services::sessions;
 use crate::telemetry::now_ms;
 use crate::types::numeric::TsNumber;
-use crate::types::{SessionId, SessionSummary};
+use crate::pipeline::diff::word_diff;
+use crate::types::{DiffSegment, SessionId, SessionSummary};
 
 /// Bounded so a caller cannot ask for the whole table and stall the UI.
 const MAX_PAGE: i64 = 500;
@@ -90,6 +91,74 @@ pub async fn search_history(
         // error they cannot interpret.
         let escaped = format!("\"{}\"", input.query.trim().replace('"', "\"\""));
         sessions::search_sessions(ctx.db(), &escaped, input.limit)
+    })
+    .await
+}
+
+#[derive(Debug, serde::Deserialize, specta::Type)]
+pub struct SetRevertedInput {
+    pub id: SessionId,
+    pub reverted: bool,
+}
+
+impl Validate for SetRevertedInput {
+    fn validate(&self) -> Result<(), String> {
+        if self.id.as_str().trim().is_empty() {
+            return Err("A session id is required.".into());
+        }
+        Ok(())
+    }
+}
+
+const SET_REVERTED: CommandSpec =
+    CommandSpec::new("set_history_reverted", CapabilityKey::History).exclusive();
+
+/**
+ * WHAT:  Records that the user chose a transcript's original wording (or
+ *        changed their mind and went back to the fix).
+ * WHY:   A flag, not an overwrite — see migration 003. Refuses a session that
+ *        does not exist rather than reporting success for a write that changed
+ *        nothing.
+ * WHERE: The "Use original" button in the History detail panel.
+ */
+#[tauri::command]
+#[specta::specta]
+pub async fn set_history_reverted(
+    state: State<'_, AppState>,
+    input: SetRevertedInput,
+) -> Result<(), AppError> {
+    execute(&state, SET_REVERTED, input, |ctx, input| async move {
+        if sessions::set_reverted(ctx.db(), &input.id, input.reverted)? {
+            Ok(())
+        } else {
+            Err(AppError::new(ErrorCode::SessionNotFound, "That transcript no longer exists."))
+        }
+    })
+    .await
+}
+
+const DIFF: CommandSpec = CommandSpec::new("diff_history_entry", CapabilityKey::History);
+
+/**
+ * WHAT:  Word-level said-vs-fixed comparison for one session.
+ * WHY:   Computed on request, for the one row being looked at, rather than for
+ *        every row of a page: 200 diffs to render a list that shows one.
+ * WHERE: The History detail panel.
+ */
+#[tauri::command]
+#[specta::specta]
+pub async fn diff_history_entry(
+    state: State<'_, AppState>,
+    input: SessionIdInput,
+) -> Result<Vec<DiffSegment>, AppError> {
+    execute(&state, DIFF, input, |ctx, input| async move {
+        let session = sessions::get_session(ctx.db(), &input.id)?
+            .ok_or_else(|| AppError::new(ErrorCode::SessionNotFound, "That transcript no longer exists."))?;
+        Ok(match (session.raw_text.as_deref(), session.final_text.as_deref()) {
+            (Some(raw), Some(fixed)) => word_diff(raw, fixed),
+            // Nothing to compare against; the panel shows the one text it has.
+            _ => Vec::new(),
+        })
     })
     .await
 }
@@ -260,7 +329,7 @@ fn to_markdown(sessions: &[SessionSummary]) -> String {
             format_timestamp(session.started_at_ms),
             session.language.as_deref().unwrap_or("unknown"),
             session.word_count.unwrap_or(0),
-            session.final_text.as_deref().unwrap_or("(no transcript)")
+            session.effective_text().unwrap_or("(no transcript)")
         ));
     }
     out
@@ -269,7 +338,7 @@ fn to_markdown(sessions: &[SessionSummary]) -> String {
 fn to_plaintext(sessions: &[SessionSummary]) -> String {
     sessions
         .iter()
-        .filter_map(|session| session.final_text.as_deref())
+        .filter_map(SessionSummary::effective_text)
         .collect::<Vec<_>>()
         .join("\n\n")
 }
@@ -311,6 +380,7 @@ mod export_tests {
             delivery: DeliveryKind::Pasted,
             error_code: None,
             error_message: None,
+            reverted: false,
         }
     }
 
@@ -330,9 +400,23 @@ mod export_tests {
     }
 
     #[test]
+    fn a_reverted_session_exports_the_original_and_a_failed_one_exports_what_was_heard() {
+        let mut reverted = summary("Hello there.");
+        reverted.raw_text = Some("um hello there".into());
+        reverted.reverted = true;
+        assert_eq!(to_plaintext(&[reverted]), "um hello there");
+
+        let mut recovered = summary("x");
+        recovered.final_text = None;
+        recovered.raw_text = Some("what the model heard".into());
+        assert_eq!(to_plaintext(&[recovered]), "what the model heard");
+    }
+
+    #[test]
     fn a_session_with_no_transcript_does_not_break_an_export() {
         let mut empty = summary("x");
         empty.final_text = None;
+        empty.raw_text = None;
         assert!(to_markdown(&[empty.clone()]).contains("(no transcript)"));
         assert_eq!(to_plaintext(&[empty]), "");
     }

@@ -35,6 +35,8 @@ export interface HistoryFeed {
   refresh: () => void;
   /** Drops one row locally after a confirmed delete, without refetching. */
   forget: (id: string) => void;
+  /** Applies a confirmed change to one row without refetching the page. */
+  patch: (id: string, change: Partial<SessionSummary>) => void;
 }
 
 export function useHistory(query: string): HistoryFeed {
@@ -100,5 +102,9 @@ export function useHistory(query: string): HistoryFeed {
     setItems((previous) => previous.filter((item) => item.id !== id));
   }, []);
 
-  return { items, error, loading, exhausted, loaded, loadMore, refresh, forget };
+  const patch = useCallback((id: string, change: Partial<SessionSummary>) => {
+    setItems((previous) => previous.map((item) => (item.id === id ? { ...item, ...change } : item)));
+  }, []);
+
+  return { items, error, loading, exhausted, loaded, loadMore, refresh, forget, patch };
 }

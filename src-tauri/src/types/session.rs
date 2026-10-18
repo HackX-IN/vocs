@@ -237,4 +237,25 @@ pub struct SessionSummary {
     /// History renders this verbatim rather than mapping the code to its own
     /// wording — see migration 002.
     pub error_message: Option<String>,
+    /// The user chose the original wording over the corrected text. Copy and
+    /// export honour it; see migration 003.
+    pub reverted: bool,
+}
+
+impl SessionSummary {
+    /**
+     * SOURCE OF TRUTH KEYWORDS: effective_text
+     * WHAT:  The text this session stands for: the original if the user chose
+     *        it, otherwise the corrected text, otherwise whatever exists.
+     * WHY:   One answer for copy, export and the row preview, so a reverted
+     *        session cannot show one text and export another.
+     * WHERE: History copy / export in ipc/commands/history.rs.
+     */
+    pub fn effective_text(&self) -> Option<&str> {
+        if self.reverted {
+            self.raw_text.as_deref().or(self.final_text.as_deref())
+        } else {
+            self.final_text.as_deref().or(self.raw_text.as_deref())
+        }
+    }
 }

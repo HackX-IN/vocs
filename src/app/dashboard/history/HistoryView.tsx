@@ -28,7 +28,9 @@ import type { HotkeyBinding } from "@/lib/bindings";
 import type { DictationMode } from "@/lib/dictation-mode";
 import { NoTranscriptionsYet } from "../_components/NoTranscriptionsYet";
 import { ExportAction } from "./_components/ExportAction";
+import { HistoryDetail } from "./_components/HistoryDetail";
 import { HistoryRow } from "./_components/HistoryRow";
+import { effectiveText, wasCorrected } from "./session-text";
 import { useHistory } from "./use-history";
 
 export interface HistoryViewProps {
@@ -37,16 +39,17 @@ export interface HistoryViewProps {
   mode: DictationMode;
 }
 
-function textOf(session: SessionSummary): string {
-  return session.final_text ?? session.raw_text ?? "";
-}
 
 export function HistoryView({ hotkey, mode }: HistoryViewProps) {
   const [input, setInput] = useState("");
   const [query, setQuery] = useState("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [exportError, setExportError] = useState<AppError | null>(null);
+  const [activeId, setActiveId] = useState<string | null>(null);
   const feed = useHistory(query);
+  // Derived from the feed, not held: a "use original" patches the row, and the
+  // panel must read the patched row rather than the object it was first handed.
+  const active = feed.items.find((item) => item.id === activeId) ?? null;
   const copyTimer = useRef(0);
 
   useEffect(() => {
@@ -57,7 +60,7 @@ export function HistoryView({ hotkey, mode }: HistoryViewProps) {
   useEffect(() => () => window.clearTimeout(copyTimer.current), []);
 
   const copy = useCallback((session: SessionSummary) => {
-    const text = textOf(session);
+    const text = effectiveText(session) ?? "";
     if (text.length === 0) return;
     void unwrapCommand(() => commands.copyText({ text })).then((result) => {
       if (result.status !== "ok") return;
@@ -96,6 +99,7 @@ export function HistoryView({ hotkey, mode }: HistoryViewProps) {
         items={feed.items}
         getKey={(session) => session.id}
         onActivate={copy}
+        onActiveChange={(item) => setActiveId(item?.id ?? null)}
         onReachEnd={feed.loadMore}
         renderRow={({ item }) => <HistoryRow session={item} />}
         renderRowActions={({ item }) => (
@@ -138,6 +142,12 @@ export function HistoryView({ hotkey, mode }: HistoryViewProps) {
           ) : null
         }
       />
+      {active && wasCorrected(active) ? (
+        <HistoryDetail
+          session={active}
+          onRevertedChange={(id, reverted) => feed.patch(id, { reverted })}
+        />
+      ) : null}
     </section>
   );
 }

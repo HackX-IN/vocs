@@ -164,6 +164,18 @@ pub fn delete_all_sessions(db: &Database) -> AppResult<u64> {
 }
 
 /// Sessions that were never finalized — the process died mid-recording.
+/// Records whether the user chose the original wording. Returns false when no
+/// such session exists, so the caller can say so instead of pretending.
+pub fn set_reverted(db: &Database, id: &SessionId, reverted: bool) -> AppResult<bool> {
+    db.with_connection(|conn| {
+        let changed = conn.execute(
+            "UPDATE sessions SET reverted = ?2 WHERE id = ?1",
+            params![id.as_str(), reverted],
+        )?;
+        Ok(changed > 0)
+    })
+}
+
 pub fn find_orphans(db: &Database) -> AppResult<Vec<SessionSummary>> {
     db.with_connection(|conn| {
         let mut stmt = conn.prepare(&format!(
@@ -209,7 +221,7 @@ pub fn count_sessions(db: &Database) -> AppResult<i64> {
 /// Column order here is the contract `row_to_summary` reads by index.
 const SELECT_COLUMNS: &str = "SELECT id, started_at, ended_at, outcome, duration_ms, language, \
      engine_id, model_id, raw_text, final_text, word_count, app_bundle_id, delivery, error_code, \
-     error_message FROM sessions";
+     error_message, reverted FROM sessions";
 
 fn row_to_summary(row: &Row<'_>) -> rusqlite::Result<SessionSummary> {
     let outcome: String = row.get(3)?;
@@ -233,6 +245,7 @@ fn row_to_summary(row: &Row<'_>) -> rusqlite::Result<SessionSummary> {
         delivery: DeliveryKind::from_stored(&delivery).unwrap_or(DeliveryKind::None),
         error_code: row.get(13)?,
         error_message: row.get(14)?,
+        reverted: row.get(15)?,
     })
 }
 
@@ -354,6 +367,48 @@ mod tests {
 
         assert_eq!(purge_older_than(&db, 5_000)?, 1);
         assert_eq!(count_sessions(&db)?, 1);
+        Ok(())
+    }
+
+    #[test]
+    fn choosing_the_original_is_a_reversible_flag_that_leaves_both_texts_alone() -> AppResult<()> {
+        let db = Database::open_in_memory()?;
+        let id = seed(&db, "s1", 1_000)?;
+        finalize_session(
+            &db,
+            &id,
+            &SessionResult {
+                ended_at: 2_000,
+                outcome: SessionOutcome::Delivered,
+                duration_ms: 1_000,
+                language: Some("en".into()),
+                raw_text: Some("um hello there".into()),
+                final_text: Some("Hello there.".into()),
+                word_count: Some(2),
+                delivery: DeliveryKind::Pasted,
+                error_code: None,
+                error_message: None,
+            },
+        )?;
+
+        let before = get_session(&db, &id)?.expect("exists");
+        assert!(!before.reverted);
+        assert_eq!(before.effective_text(), Some("Hello there."));
+
+        assert!(set_reverted(&db, &id, true)?);
+        let reverted = get_session(&db, &id)?.expect("exists");
+        assert_eq!(reverted.effective_text(), Some("um hello there"));
+        assert_eq!(reverted.final_text.as_deref(), Some("Hello there."), "the delivered text is kept");
+
+        assert!(set_reverted(&db, &id, false)?);
+        assert_eq!(get_session(&db, &id)?.expect("exists").effective_text(), Some("Hello there."));
+        Ok(())
+    }
+
+    #[test]
+    fn reverting_a_session_that_does_not_exist_reports_it() -> AppResult<()> {
+        let db = Database::open_in_memory()?;
+        assert!(!set_reverted(&db, &SessionId("nope".into()), true)?);
         Ok(())
     }
 }
