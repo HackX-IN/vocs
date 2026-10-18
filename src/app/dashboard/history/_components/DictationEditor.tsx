@@ -20,6 +20,10 @@
  *        toggle remounts it with the new effective text instead of fighting the
  *        user's caret with an effect.
  *
+ *        It behaves like a notepad: ⌘F finds in the text (⌘G / ⇧⌘G for the next and
+ *        previous match), ⌘S saves now, and undo, redo, cut, copy, paste and select
+ *        all come from the application menu's Edit items.
+ *
  *        It draws its OWN header (the shell is told not to): back, save status
  *        and actions sit in the traffic-light row, because on this page the
  *        dictation's title is the heading and a second "Dictations" above it
@@ -29,17 +33,19 @@
  *        update_history_entry.
  */
 
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Calendar, Check, Clock, Copy, Globe, TextCursorInput, Trash2 } from "lucide-react";
 import { commands, type AppError, type SessionSummary } from "@/lib/bindings";
 import { unwrapCommand, useCommand } from "@/lib/ipc";
 import { useAutosave, type AutosaveStatus } from "@/lib/use-autosave";
 import { formatClock, formatCount, formatDateTime, formatLanguage } from "@/lib/format";
 import { readDurationMs } from "@/lib/motion";
+import { findMatches, offsetTopOf } from "@/lib/textarea-find";
 import { cn } from "@/lib/utils";
 import { Button, Chip, ErrorSurface, ScrollArea, Skeleton, WindowBar } from "@/components/global";
 import { effectiveText, wasCorrected } from "../session-text";
 import { CorrectionsDock } from "./CorrectionsDock";
+import { FindBar } from "./FindBar";
 
 const STATUS_LABEL: Readonly<Record<AutosaveStatus, string>> = {
   saved: "Saved",
@@ -132,6 +138,9 @@ function DictationBody({
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [actionError, setActionError] = useState<AppError | null>(null);
   const copyTimer = useRef(0);
+  const [finding, setFinding] = useState(false);
+  const [findQuery, setFindQuery] = useState("");
+  const [findIndex, setFindIndex] = useState(0);
 
   const autosave = useAutosave<Draft>({
     value: draft,
@@ -157,16 +166,56 @@ function DictationBody({
     onBack();
   }, [autosave, onBack]);
 
+  const matches = useMemo(() => findMatches(draft.text, findQuery), [draft.text, findQuery]);
+
+  /** Selects match `index` in the text and scrolls the page to it. */
+  const goToMatch = useCallback(
+    (index: number) => {
+      const textarea = bodyRef.current;
+      const start = matches[index];
+      if (!textarea || start === undefined) return;
+      setFindIndex(index);
+      const scroller = textarea.closest<HTMLElement>("[data-scroll-area]");
+      const top = textarea.offsetTop + offsetTopOf(textarea, start);
+      if (scroller) scroller.scrollTo({ top: Math.max(top - scroller.clientHeight / 3, 0), behavior: "smooth" });
+      // Focus is moved to the text so the match shows as a selection.
+      textarea.focus({ preventScroll: true });
+      textarea.setSelectionRange(start, start + findQuery.trim().length);
+    },
+    [bodyRef, findQuery, matches],
+  );
+
+  const stepMatch = useCallback(
+    (delta: 1 | -1) => {
+      if (matches.length === 0) return;
+      goToMatch((findIndex + delta + matches.length) % matches.length);
+    },
+    [findIndex, goToMatch, matches.length],
+  );
+
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
+      const command = event.metaKey || event.ctrlKey;
       if (event.key === "Escape") {
         event.preventDefault();
-        void goBack();
+        // Escape peels one layer: the find bar first, then the page.
+        if (finding) setFinding(false);
+        else void goBack();
+      } else if (command && event.key.toLowerCase() === "f") {
+        event.preventDefault();
+        setFinding(true);
+      } else if (command && event.key.toLowerCase() === "g") {
+        event.preventDefault();
+        stepMatch(event.shiftKey ? -1 : 1);
+      } else if (command && event.key.toLowerCase() === "s") {
+        // Everything already saves itself; ⌘S just does it now and says so.
+        event.preventDefault();
+        void autosave.flush();
       }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [goBack]);
+  }, [autosave, finding, goBack, stepMatch]);
 
   const copy = async () => {
     const result = await unwrapCommand(() => commands.copyText({ text: draft.text }));
@@ -229,6 +278,21 @@ function DictationBody({
           </>
         }
       />
+
+      {finding ? (
+        <FindBar
+          query={findQuery}
+          onQueryChange={(query) => {
+            setFindQuery(query);
+            setFindIndex(0);
+          }}
+          current={matches.length === 0 ? null : Math.min(findIndex, matches.length - 1)}
+          total={matches.length}
+          onNext={() => stepMatch(1)}
+          onPrevious={() => stepMatch(-1)}
+          onClose={() => setFinding(false)}
+        />
+      ) : null}
 
       <ScrollArea contentClassName="px-[var(--page-padding-x)] pb-24">
         <article className="mx-auto flex w-full max-w-[var(--content-max-width)] flex-col gap-5 pt-4">
