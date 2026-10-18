@@ -7,8 +7,8 @@
  *        which is why it is drawn over the real calendar, zero days included,
  *        and not over the sparse rows the backend sends.
  *        It is drawn by the shared DotColumns primitive, so it inherits every
- *        chart rule of docs/04 §11 — no axes, gridlines, frame, legend, tooltip,
- *        load animation or chart library — and this file holds only what is
+ *        chart rule of docs/04 §11 — no axes, gridlines, frame, legend, load
+ *        animation or chart library — and this file holds only what is
  *        specific to activity: the range windows and the date labels.
  *
  *        Counts are plotted raw. A trailing mean would draw a prettier shape
@@ -21,8 +21,8 @@
  */
 
 import { useMemo, useState } from "react";
-import { DotColumns, SegmentedControl, type SegmentOption } from "@/components/global";
-import { formatChartDate } from "@/lib/format";
+import { DotColumns, Eyebrow, SegmentedControl, type SegmentOption } from "@/components/global";
+import { formatChartDate, formatCount } from "@/lib/format";
 import { fillCalendar } from "@/lib/calendar-window";
 import type { ActivityDay } from "@/lib/bindings";
 
@@ -48,6 +48,24 @@ export function useActivityRange() {
   return { range, picker };
 }
 
+/** The tooltip body for one day: its date, then what was done on it. */
+export function DayReadout({ day }: { day: ActivityDay | undefined }) {
+  if (!day) return null;
+  return (
+    <div className="flex flex-col gap-0.5">
+      <Eyebrow>{formatChartDate(day.date)}</Eyebrow>
+      <p className="text-label tabular-nums text-text-primary">
+        {day.session_count === 0
+          ? "No dictations"
+          : `${formatCount(day.session_count)} ${day.session_count === 1 ? "dictation" : "dictations"}`}
+      </p>
+      {day.word_count > 0 ? (
+        <p className="text-caption tabular-nums text-text-secondary">{formatCount(day.word_count)} words</p>
+      ) : null}
+    </div>
+  );
+}
+
 export function ActivityChart({ days, range }: { days: readonly ActivityDay[]; range: ActivityRange }) {
   // The backend sends only the days that had a session; the chart needs every
   // day in the window, quiet ones included.
@@ -61,6 +79,7 @@ export function ActivityChart({ days, range }: { days: readonly ActivityDay[]; r
       <DotColumns
         values={visible.map((day) => day.session_count)}
         label={`Sessions per day, ${first} to ${last}`}
+        tooltip={(index) => <DayReadout day={visible[index]} />}
       />
       <div className="flex items-center justify-between text-caption tabular-nums text-text-tertiary">
         <span>{first}</span>

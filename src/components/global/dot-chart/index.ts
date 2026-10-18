@@ -7,3 +7,4 @@
 
 export { DotColumns, type DotColumnsProps } from "./DotColumns";
 export { DotMeter, type DotMeterProps } from "./DotMeter";
+export { ChartTooltip, type ChartTooltipProps } from "./ChartTooltip";

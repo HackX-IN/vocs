@@ -401,9 +401,9 @@
   /* THE WINDOW BAR (components/global/window-bar). One height for the lights, the
    * centred title and the toolbar buttons, so they share a centre line. The
    * lights are placed by tauri.conf.json's trafficLightPosition
-   * (x 24, y 38) so their centre lands at half of this. Tauri sizes the title-bar
-   * container to the button height plus `y` and centres the buttons in it, so
-   * y = --titlebar-height − 14; change the two together. --titlebar-safe-inset is
+   * (x 24, y 28) so their centre lands at half of this. Measured on macOS, the
+   * buttons' centre sits at `y` − 2, so y = --titlebar-height ÷ 2 + 2; change
+   * the two together. --titlebar-safe-inset is
    * how far the left slot starts from the window edge: the lights' right edge
    * (inset + 3 buttons) plus a gap. */
   --titlebar-height: 52px;
@@ -422,6 +422,8 @@
    * ones), and --dot-size is the fixed diameter of a DotMeter dot. */
   --dot-row-pitch: 11px;
   --dot-radius: 3px;
+  /* Half the widest a chart tooltip may be; it is clamped this far inside its chart. */
+  --chart-tooltip-half-width: 88px;
   --dot-size: 5px;
   --chart-row-height: 36px;
   --chart-label-gutter: 72px;
@@ -451,7 +453,7 @@
   --settings-nav-width: 188px;
   --history-summary-height: 112px;
   /* The period and status pickers under the summary strip. */
-  --history-filters-height: 56px;
+  --history-filters-height: 48px;
   --row-overscan: 6;
   /* The said-vs-fixed panel under the history list. Capped so a long
    * transcript scrolls inside it instead of squeezing the list to nothing. */

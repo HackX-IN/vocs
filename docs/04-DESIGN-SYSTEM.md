@@ -400,7 +400,7 @@ Colour is `--accent` (§10). Offset rather than inset, so the ring never sits on
 --dock-max-width:    560px
 --content-max-width: 720px   /* the reading column */
 --history-summary-height: 112px  /* the summary strip plus the gap under it */
---history-filters-height: 56px   /* the period + status pickers under it */
+--history-filters-height: 48px   /* the period + status pickers under it */
 ```
 
 A uniform row height is a constraint, not a limitation: it is what lets a list of tens of thousands of rows resolve its scroll position by arithmetic instead of by measurement. A day header is therefore a **row like any other** — it fills one 64pt slot with its label at the bottom, which reads as spacing — and the list steps over it (`isSelectable`) for the keyboard and gives it no hover. A list that needs genuinely variable-height rows needs a different component and a reason. Content above the rows that scrolls with them (the summary strip) is a `lead` of known `leadHeight`; the virtualiser reads the scroll position past it.

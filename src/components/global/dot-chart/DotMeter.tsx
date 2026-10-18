@@ -10,7 +10,9 @@
  * WHERE: The Stats view's language card; the model download readout.
  */
 
+import { useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import { ChartTooltip } from "./ChartTooltip";
 
 export interface DotMeterProps {
   /** 0..1 — the share of the dots to light. */
@@ -18,12 +20,15 @@ export interface DotMeterProps {
   dots?: number;
   /** Names the meter for assistive tech. */
   label: string;
+  /** What to say while the meter is hovered. Omit for no tooltip. */
+  tooltip?: ReactNode;
   className?: string;
 }
 
 const DEFAULT_DOTS = 20;
 
-export function DotMeter({ value, dots = DEFAULT_DOTS, label, className }: DotMeterProps) {
+export function DotMeter({ value, dots = DEFAULT_DOTS, label, tooltip, className }: DotMeterProps) {
+  const [pointer, setPointer] = useState<{ x: number; width: number } | null>(null);
   const clamped = Math.min(1, Math.max(0, value));
   const lit = clamped === 0 ? 0 : Math.max(1, Math.round(clamped * dots));
 
@@ -35,7 +40,16 @@ export function DotMeter({ value, dots = DEFAULT_DOTS, label, className }: DotMe
       aria-valuemax={1}
       aria-valuenow={clamped}
       style={{ gridTemplateColumns: `repeat(${dots}, minmax(0, 1fr))` }}
-      className={cn("grid w-full items-center justify-items-center", className)}
+      className={cn("relative grid w-full items-center justify-items-center", className)}
+      onPointerMove={
+        tooltip
+          ? (event) => {
+              const rect = event.currentTarget.getBoundingClientRect();
+              setPointer({ x: event.clientX - rect.left, width: rect.width });
+            }
+          : undefined
+      }
+      onPointerLeave={() => setPointer(null)}
     >
       {Array.from({ length: dots }, (_, index) => (
         <span
@@ -46,6 +60,11 @@ export function DotMeter({ value, dots = DEFAULT_DOTS, label, className }: DotMe
           )}
         />
       ))}
+      {tooltip && pointer ? (
+        <ChartTooltip x={pointer.x} containerWidth={pointer.width}>
+          {tooltip}
+        </ChartTooltip>
+      ) : null}
     </span>
   );
 }

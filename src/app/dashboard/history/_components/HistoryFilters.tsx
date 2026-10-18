@@ -23,7 +23,7 @@ export interface HistoryFiltersProps {
 
 export function HistoryFilters({ period, status, onPeriodChange, onStatusChange }: HistoryFiltersProps) {
   return (
-    <div className="mx-auto flex w-full max-w-[var(--content-max-width)] flex-wrap items-center justify-between gap-3 px-3 py-3">
+    <div className="mx-auto flex w-full max-w-[var(--content-max-width)] flex-wrap items-center justify-between gap-3 px-3 py-2">
       <SegmentedControl label="Period" options={PERIOD_OPTIONS} value={period} onChange={onPeriodChange} />
       <SegmentedControl label="Status" options={STATUS_OPTIONS} value={status} onChange={onStatusChange} />
     </div>

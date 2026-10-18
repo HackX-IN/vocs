@@ -21,17 +21,14 @@
 import { commands, type HotkeyBinding, type MetricDef } from "@/lib/bindings";
 import { useCommand } from "@/lib/ipc";
 import { formatCompactDuration, formatCount } from "@/lib/format";
-import { fillCalendar } from "@/lib/calendar-window";
-import { Card, DotColumns, ScrollArea, StatCard } from "@/components/global";
+import { Card, ScrollArea, StatCard } from "@/components/global";
 import type { DictationMode } from "@/lib/dictation-mode";
 import { NoTranscriptionsYet } from "../_components/NoTranscriptionsYet";
 import { ViewState } from "../_components/ViewState";
 import { ActivityChart, useActivityRange } from "./_components/ActivityChart";
 import { LatencyPanel } from "./_components/LatencyPanel";
+import { StreakChart } from "./_components/StreakChart";
 import { LanguageBreakdown } from "./_components/LanguageBreakdown";
-
-/** The streak card draws the last week, which is a calendar fact, not a design value. */
-const STREAK_DAYS = 7;
 
 export interface StatsViewProps {
   /** Registry metric declarations — they decide what the latency panel shows. */
@@ -75,12 +72,7 @@ export function StatsView({ metrics, hotkey, mode }: StatsViewProps) {
                 value={formatCount(data.current_streak_days)}
                 unit={data.current_streak_days === 1 ? "day" : "days"}
                 caption={`${formatCount(data.sessions_this_week)} sessions this week`}
-                chart={
-                  <DotColumns
-                    values={fillCalendar(data.activity, STREAK_DAYS).map((day) => day.session_count)}
-                    label="Sessions in the last seven days"
-                  />
-                }
+                chart={<StreakChart days={data.activity} />}
               />
 
               <StatCard index="03" label="Transcriptions" value={formatCount(data.total_sessions)} />
