@@ -993,6 +993,23 @@ mod scripted {
         );
     }
 
+    /// A recording that heard no words leaves no trace: no row in History, no
+    /// dictation in Stats, nothing pasted.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn a_recording_with_no_words_is_not_stored() {
+        let Some(samples) = speech("scripted-nothing-said") else {
+            eprintln!("skipped: could not synthesise speech");
+            return;
+        };
+        let engine = ScriptedEngine::saying("");
+        let (harness, rx) = build(samples, Arc::clone(&engine) as Arc<dyn TranscriptionEngine>).expect("harness");
+
+        run_session(&harness, rx, Duration::from_secs(3)).await;
+
+        let stored = services::sessions::list_sessions(&harness.db, 10, 0).expect("list");
+        assert!(stored.is_empty(), "an empty recording must not be stored, found {stored:?}");
+    }
+
     /// Off by default: no snapshot is ever decoded and the HUD is never shown.
     #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
     async fn captions_do_nothing_unless_they_are_switched_on() {

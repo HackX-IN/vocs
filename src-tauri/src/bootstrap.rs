@@ -437,7 +437,15 @@ fn recover_orphans(db: &Database) {
         Ok(orphans) => {
             tracing::warn!(count = orphans.len(), "recovering interrupted sessions");
             for orphan in orphans {
-                if let Err(err) = services::sessions::mark_orphaned(db, &orphan.id, now_ms()) {
+                // An interrupted recording with no words saved has nothing to
+                // show or recover; keep only the ones that left text behind.
+                let has_words = orphan.raw_text.as_deref().is_some_and(|text| !text.trim().is_empty());
+                let result = if has_words {
+                    services::sessions::mark_orphaned(db, &orphan.id, now_ms())
+                } else {
+                    services::sessions::delete_session(db, &orphan.id)
+                };
+                if let Err(err) = result {
                     tracing::error!(error = %err, "could not close an interrupted session");
                 }
             }

@@ -146,14 +146,8 @@ async fn deliver(ctx: &SessionContext, pending: PendingDelivery) {
             return;
         }
 
-        persist(
-            ctx,
-            &session_id,
-            &latency,
-            Outcome::nothing_said(),
-            started_at,
-            None,
-        );
+        // Saying nothing is not a dictation: no row, no metrics, no toast.
+        discard_empty(ctx, &session_id);
         return;
     }
 
@@ -326,15 +320,6 @@ impl Outcome {
         }
     }
 
-    fn nothing_said() -> Self {
-        Self {
-            outcome: SessionOutcome::Delivered,
-            delivery: DeliveryKind::None,
-            error_code: None,
-            error_message: None,
-        }
-    }
-
     fn failed(err: AppError) -> Self {
         Self {
             outcome: SessionOutcome::Failed,
@@ -342,6 +327,22 @@ impl Outcome {
             error_code: Some(format!("{:?}", err.code)),
             error_message: Some(err.message),
         }
+    }
+}
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: discard_empty, nothing_said, empty_dictation
+ * WHAT:  Removes the row of a recording that produced no words.
+ * WHY:   A hotkey tap, a mic that was open while nobody spoke: these were stored
+ *        as blank "delivered" rows, which History listed as empty entries and
+ *        Stats counted as dictations. Deleting the in-flight row (rather than
+ *        never writing it) keeps the crash-recovery guarantee for real
+ *        recordings, which need the row to exist from the first sample.
+ * WHERE: Called from `deliver` when the assembled transcript is empty.
+ */
+fn discard_empty(ctx: &SessionContext, session_id: &SessionId) {
+    if let Err(err) = services::sessions::delete_session(&ctx.db, session_id) {
+        tracing::warn!(error = %err, "could not discard an empty session");
     }
 }
 
