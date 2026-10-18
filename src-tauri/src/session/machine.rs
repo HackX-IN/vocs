@@ -466,13 +466,20 @@ impl SessionMachine {
             }
         };
 
-        tracing::info!(
-            from = state_name(&from),
-            to = state_name(&to),
-            event = event_name(&event),
-            session_id = self.session_id.as_ref().map(|id| id.as_str()),
-            "session transition"
-        );
+        // The clock tick arrives ten times a second for the whole recording and
+        // changes nothing but the elapsed time; at info level it buried every
+        // real transition under a wall of identical lines.
+        if matches!(event, SessionEvent::Tick { .. }) {
+            tracing::trace!(from = state_name(&from), to = state_name(&to), "session tick");
+        } else {
+            tracing::info!(
+                from = state_name(&from),
+                to = state_name(&to),
+                event = event_name(&event),
+                session_id = self.session_id.as_ref().map(|id| id.as_str()),
+                "session transition"
+            );
+        }
 
         self.state = to.clone();
         Ok(Transition { from, to, effects })
