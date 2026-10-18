@@ -1,6 +1,6 @@
 /*!
  * SOURCE OF TRUTH KEYWORDS: list_languages, get_engine_capabilities,
- *   copy_text, CopyTextInput
+ *   copy_text, CopyTextInput, write_clipboard
  * WHAT:  What the selected engine can do, the language picker's contents, and
  *        a clipboard write the frontend can call.
  * WHY:   `get_engine_capabilities` is what makes `SettingDef::requires_engine`
@@ -77,26 +77,37 @@ impl Validate for CopyTextInput {
     }
 }
 
+/**
+ * SOURCE OF TRUTH KEYWORDS: write_clipboard
+ * WHAT:  Puts text on the system clipboard, with the two failures worded.
+ * WHY:   Shared by the copy_text command and the menu bar's "Copy last
+ *        transcript", so both fail with the same sentence instead of two.
+ * WHERE: copy_text below and tray.rs.
+ */
+pub fn write_clipboard(text: String) -> Result<(), AppError> {
+    let mut clipboard = arboard::Clipboard::new().map_err(|err| {
+        AppError::new(
+            ErrorCode::ClipboardUnavailable,
+            "Vocs could not reach the clipboard.",
+        )
+        .with_detail(err)
+    })?;
+    clipboard.set_text(text).map_err(|err| {
+        AppError::new(
+            ErrorCode::ClipboardUnavailable,
+            "Vocs could not copy that.",
+        )
+        .with_detail(err)
+    })
+}
+
 const COPY: CommandSpec = CommandSpec::new("copy_text", CapabilityKey::History);
 
 #[tauri::command]
 #[specta::specta]
 pub async fn copy_text(state: State<'_, AppState>, input: CopyTextInput) -> Result<(), AppError> {
     execute(&state, COPY, input, |_ctx, input| async move {
-        let mut clipboard = arboard::Clipboard::new().map_err(|err| {
-            AppError::new(
-                ErrorCode::ClipboardUnavailable,
-                "Vocs could not reach the clipboard.",
-            )
-            .with_detail(err)
-        })?;
-        clipboard.set_text(input.text).map_err(|err| {
-            AppError::new(
-                ErrorCode::ClipboardUnavailable,
-                "Vocs could not copy that.",
-            )
-            .with_detail(err)
-        })
+        write_clipboard(input.text)
     })
     .await
 }

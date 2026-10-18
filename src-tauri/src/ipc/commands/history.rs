@@ -95,6 +95,22 @@ pub async fn search_history(
     .await
 }
 
+/**
+ * SOURCE OF TRUTH KEYWORDS: last_transcript_text, copy_last_transcript
+ * WHAT:  The text of the most recent session that heard anything, honouring a
+ *        "use original" choice. None when nothing has ever been dictated.
+ * WHY:   The way back from a paste that went nowhere. Clipboard-only delivery
+ *        and a focused app that swallowed the paste both leave the words
+ *        nowhere the user can reach once they have copied something else; the
+ *        words are still in History, and this is the one-step route to them.
+ *        A function rather than an IPC command because its only caller is the
+ *        menu bar, which has no webview to invoke one.
+ * WHERE: tray.rs, "Copy last transcript".
+ */
+pub fn last_transcript_text(db: &crate::db::Database) -> crate::error::AppResult<Option<String>> {
+    Ok(sessions::latest_with_text(db)?.and_then(|session| session.effective_text().map(str::to_owned)))
+}
+
 #[derive(Debug, serde::Deserialize, specta::Type)]
 pub struct SetRevertedInput {
     pub id: SessionId,

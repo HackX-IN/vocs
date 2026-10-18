@@ -164,6 +164,20 @@ pub fn delete_all_sessions(db: &Database) -> AppResult<u64> {
 }
 
 /// Sessions that were never finalized — the process died mid-recording.
+/// The most recent session that has any words to give back, whatever its
+/// outcome: a recovered or failed session still heard something, and "copy the
+/// last thing I said" should not skip it. None when nothing has ever been heard.
+pub fn latest_with_text(db: &Database) -> AppResult<Option<SessionSummary>> {
+    db.with_connection(|conn| {
+        let mut stmt = conn.prepare(&format!(
+            "{SELECT_COLUMNS} WHERE length(trim(coalesce(final_text, raw_text, ''))) > 0 \
+             ORDER BY started_at DESC LIMIT 1"
+        ))?;
+        let mut rows = stmt.query_map([], row_to_summary)?;
+        rows.next().transpose().map_err(Into::into)
+    })
+}
+
 /// Records whether the user chose the original wording. Returns false when no
 /// such session exists, so the caller can say so instead of pretending.
 pub fn set_reverted(db: &Database, id: &SessionId, reverted: bool) -> AppResult<bool> {
@@ -409,6 +423,33 @@ mod tests {
     fn reverting_a_session_that_does_not_exist_reports_it() -> AppResult<()> {
         let db = Database::open_in_memory()?;
         assert!(!set_reverted(&db, &SessionId("nope".into()), true)?);
+        Ok(())
+    }
+
+    #[test]
+    fn the_latest_transcript_is_the_newest_one_that_heard_something() -> AppResult<()> {
+        let db = Database::open_in_memory()?;
+        assert!(latest_with_text(&db)?.is_none(), "an empty history has nothing to copy");
+
+        let older = seed(&db, "older", 1_000)?;
+        let newer = seed(&db, "newer-but-silent", 2_000)?;
+        let result = |text: Option<&str>| SessionResult {
+            ended_at: 3_000,
+            outcome: SessionOutcome::Delivered,
+            duration_ms: 1_000,
+            language: None,
+            raw_text: text.map(Into::into),
+            final_text: text.map(Into::into),
+            word_count: Some(1),
+            delivery: DeliveryKind::Pasted,
+            error_code: None,
+            error_message: None,
+        };
+        finalize_session(&db, &older, &result(Some("hello")))?;
+        finalize_session(&db, &newer, &result(Some("   ")))?;
+
+        let found = latest_with_text(&db)?.expect("the older session has words");
+        assert_eq!(found.id, older, "a blank newer session is skipped");
         Ok(())
     }
 }

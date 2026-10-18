@@ -1,6 +1,6 @@
 /*!
  * SOURCE OF TRUTH KEYWORDS: install_tray, TrayMenu, MENU_DASHBOARD,
- *   MENU_QUIT, show_dashboard, toggle_pill_window
+ *   MENU_QUIT, MENU_COPY_LAST, show_dashboard, toggle_pill_window
  * WHAT:  The menu bar item: the only permanently visible part of Vocs, and
  *        the only way to reach the dashboard.
  * WHY:   The app has no Dock icon and no window on launch — it is invisible
@@ -27,6 +27,7 @@ use crate::error::{AppError, AppResult};
 
 const MENU_DASHBOARD: &str = "dashboard";
 const MENU_QUIT: &str = "quit";
+const MENU_COPY_LAST: &str = "copy_last";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: install_tray
@@ -36,11 +37,14 @@ const MENU_QUIT: &str = "quit";
 pub fn install_tray(app: &AppHandle) -> AppResult<()> {
     let dashboard = MenuItem::with_id(app, MENU_DASHBOARD, "Open Vocs", true, None::<&str>)
         .map_err(menu_error)?;
+    let copy_last =
+        MenuItem::with_id(app, MENU_COPY_LAST, "Copy Last Transcript", true, None::<&str>)
+            .map_err(menu_error)?;
     let separator = PredefinedMenuItem::separator(app).map_err(menu_error)?;
     let quit = MenuItem::with_id(app, MENU_QUIT, "Quit Vocs", true, Some("Cmd+Q"))
         .map_err(menu_error)?;
 
-    let menu = Menu::with_items(app, &[&dashboard, &separator, &quit]).map_err(menu_error)?;
+    let menu = Menu::with_items(app, &[&dashboard, &copy_last, &separator, &quit]).map_err(menu_error)?;
 
     TrayIconBuilder::with_id("vocs")
         // The identity mark (docs/04 §12), not the app icon. A menu-bar glyph
@@ -59,6 +63,7 @@ pub fn install_tray(app: &AppHandle) -> AppResult<()> {
         .show_menu_on_left_click(true)
         .on_menu_event(|app, event| match event.id().as_ref() {
             MENU_DASHBOARD => show_dashboard(app),
+            MENU_COPY_LAST => copy_last_transcript(app),
             MENU_QUIT => app.exit(0),
             other => tracing::debug!(id = other, "unhandled tray menu item"),
         })
@@ -71,6 +76,37 @@ pub fn install_tray(app: &AppHandle) -> AppResult<()> {
         .map_err(menu_error)?;
 
     Ok(())
+}
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: copy_last_transcript, MENU_COPY_LAST
+ * WHAT:  Copies the most recent transcript to the clipboard from the menu bar.
+ * WHY:   A failed paste must have a fast way back (X9). The menu has no UI to
+ *        report into, so the outcome is the only feedback macOS menus give: the
+ *        failure sound when there was nothing to copy or the clipboard refused,
+ *        and silence on success — exactly what a native Copy does.
+ * WHERE: The tray menu's "Copy Last Transcript" item.
+ */
+fn copy_last_transcript(app: &AppHandle) {
+    let Some(state) = app.try_state::<crate::ipc::context::AppState>() else {
+        tracing::warn!("copy-last was chosen before the app finished starting");
+        return;
+    };
+
+    let outcome = crate::ipc::commands::history::last_transcript_text(&state.db).and_then(|text| {
+        match text {
+            Some(text) => crate::ipc::commands::engine::write_clipboard(text),
+            None => Err(AppError::new(
+                crate::error::ErrorCode::SessionNotFound,
+                "There is no transcript to copy yet.",
+            )),
+        }
+    });
+
+    if let Err(err) = outcome {
+        tracing::info!(error = %err, "could not copy the last transcript");
+        crate::adapters::macos::play_feedback(crate::adapters::macos::FeedbackSound::Failed);
+    }
 }
 
 /**
