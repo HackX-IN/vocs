@@ -677,6 +677,44 @@ static DICTATION_SHORTCUT: parking_lot::Mutex<Option<Shortcut>> = parking_lot::M
 static MODIFIER_TAP: parking_lot::Mutex<Option<crate::adapters::macos::ModifierTap>> =
     parking_lot::Mutex::new(None);
 
+/**
+ * SOURCE OF TRUTH KEYWORDS: HOTKEYS_PAUSED, pause_hotkeys, hotkey_capture
+ * WHAT:  Whether the global shortcuts are deliberately released.
+ * WHY:   While Settings is listening for a new shortcut, the key the user is
+ *        about to press is — by definition — often the one that is bound right
+ *        now. With the binding live, recording a new dictation shortcut started
+ *        a dictation instead, so a shortcut could never be changed to anything
+ *        that overlapped the old one. Held here because the rebind and copy-last
+ *        listeners must also stay quiet while it is set, or they would register
+ *        the key again the moment the new value is saved.
+ * WHERE: Written by `pause_hotkeys`; read by `rebind_dictation_hotkey` and
+ *        copy_last_hotkey::apply through `hotkeys_paused`.
+ */
+static HOTKEYS_PAUSED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
+
+pub fn hotkeys_paused() -> bool {
+    HOTKEYS_PAUSED.load(std::sync::atomic::Ordering::SeqCst)
+}
+
+/**
+ * WHAT:  Releases (`true`) or re-registers (`false`) every global shortcut the
+ *        user can rebind.
+ * WHY:   Resuming re-applies from the database rather than remembering what was
+ *        released, so a shortcut changed while paused takes effect exactly once,
+ *        on resume. Idempotent in both directions.
+ * WHERE: The `pause_hotkeys` command, called by the Settings shortcut recorder.
+ */
+pub fn pause_hotkeys(app: &AppHandle, paused: bool) {
+    HOTKEYS_PAUSED.store(paused, std::sync::atomic::Ordering::SeqCst);
+    if paused {
+        release_dictation_binding(app);
+        crate::copy_last_hotkey::release(app);
+    } else {
+        rebind_dictation_hotkey(app);
+        crate::copy_last_hotkey::apply(app);
+    }
+}
+
 /// Stops whichever mechanism is currently registered. Idempotent.
 fn release_dictation_binding(app: &AppHandle) {
     // Dropping the tap stops its thread.
@@ -831,6 +869,10 @@ fn rebind_dictation_hotkey(app: &AppHandle) {
     let Some(state) = app.try_state::<AppState>() else {
         return;
     };
+
+    if hotkeys_paused() {
+        return;
+    }
 
     let binding = dictation_binding(&state.db);
     if let Err(err) = binding.bindable() {

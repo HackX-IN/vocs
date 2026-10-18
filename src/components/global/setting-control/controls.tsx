@@ -14,6 +14,7 @@
 import { useEffect, useRef, useState } from "react";
 import { cn } from "@/lib/utils";
 import { isModifierCode } from "@/lib/hotkey";
+import { useHotkeyCapture } from "@/lib/use-hotkey-capture";
 import { Keycap } from "@/components/global/keycap";
 import type {
   HotkeyCapture,
@@ -238,6 +239,8 @@ export function HotkeyControl({ setting }: { setting: HotkeySetting }) {
    *  but before the listeners are torn down. */
   const committed = useRef(false);
 
+  useHotkeyCapture(armed);
+
   useEffect(() => {
     if (!armed) return;
     sawKey.current = false;
@@ -307,7 +310,11 @@ export function HotkeyControl({ setting }: { setting: HotkeySetting }) {
     window.addEventListener("keydown", onKeyDown, true);
     window.addEventListener("keyup", onKeyUp, true);
     window.addEventListener("pointerdown", onPointerDown, true);
+    // Switching away leaves the recorder armed in a window nobody is typing
+    // into, with the app's shortcuts released — disarm so they come back.
+    window.addEventListener("blur", onPointerDown);
     return () => {
+      window.removeEventListener("blur", onPointerDown);
       window.removeEventListener("keydown", onKeyDown, true);
       window.removeEventListener("keyup", onKeyUp, true);
       window.removeEventListener("pointerdown", onPointerDown, true);

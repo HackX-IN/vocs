@@ -64,6 +64,7 @@ export const commands = {
 	getSettings: () => typedError<{ [key in string]: SettingValue }, AppError>(__TAURI_INVOKE("get_settings")),
 	setSetting: (input: SetSettingInput) => typedError<null, AppError>(__TAURI_INVOKE("set_setting", { input })),
 	resetSetting: (input: ResetSettingInput) => typedError<null, AppError>(__TAURI_INVOKE("reset_setting", { input })),
+	pauseHotkeys: (input: PauseHotkeysInput) => typedError<null, AppError>(__TAURI_INVOKE("pause_hotkeys", { input })),
 	getRegistry: () => typedError<RegistrySnapshot, AppError>(__TAURI_INVOKE("get_registry")),
 	listAppProfiles: () => typedError<AppProfile[], AppError>(__TAURI_INVOKE("list_app_profiles")),
 	saveAppProfile: (input: SaveProfileInput) => typedError<null, AppError>(__TAURI_INVOKE("save_app_profile", { input })),
@@ -815,6 +816,10 @@ export type OsPermission = "MICROPHONE" |
  *  clipboard-only; it never blocks recording.
  */
 "ACCESSIBILITY";
+
+export type PauseHotkeysInput = {
+	paused: boolean,
+};
 
 export type PermissionInput = {
 	permission: OsPermission,

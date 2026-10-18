@@ -47,6 +47,11 @@ static COPY_LAST_SHORTCUT: parking_lot::Mutex<Option<Shortcut>> = parking_lot::M
 pub fn apply(app: &AppHandle) {
     release(app);
 
+    // The shortcut recorder in Settings has every global shortcut released.
+    if crate::bootstrap::hotkeys_paused() {
+        return;
+    }
+
     let Some(state) = app.try_state::<AppState>() else {
         return;
     };
@@ -67,7 +72,7 @@ pub fn apply(app: &AppHandle) {
     }
 }
 
-fn release(app: &AppHandle) {
+pub fn release(app: &AppHandle) {
     let Some(previous) = COPY_LAST_SHORTCUT.lock().take() else {
         return;
     };

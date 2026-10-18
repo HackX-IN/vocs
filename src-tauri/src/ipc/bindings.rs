@@ -58,6 +58,7 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             commands::settings::get_settings,
             commands::settings::set_setting,
             commands::settings::reset_setting,
+            commands::settings::pause_hotkeys,
             commands::settings::get_registry,
             commands::profiles::list_app_profiles,
             commands::profiles::save_app_profile,

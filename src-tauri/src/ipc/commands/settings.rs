@@ -90,6 +90,41 @@ pub async fn set_setting(
     .await
 }
 
+#[derive(Debug, serde::Deserialize, specta::Type)]
+pub struct PauseHotkeysInput {
+    pub paused: bool,
+}
+
+impl Validate for PauseHotkeysInput {
+    fn validate(&self) -> Result<(), String> {
+        Ok(())
+    }
+}
+
+/**
+ * WHAT:  Releases or restores every global shortcut while Settings is listening
+ *        for a new one.
+ * WHY:   Without it the key being recorded runs the binding that is about to be
+ *        replaced — recording a dictation shortcut started a dictation. See
+ *        bootstrap::HOTKEYS_PAUSED.
+ * WHERE: The shortcut recorder in the Settings view.
+ */
+const PAUSE_HOTKEYS: CommandSpec = CommandSpec::new("pause_hotkeys", CapabilityKey::Settings);
+
+#[tauri::command]
+#[specta::specta]
+pub async fn pause_hotkeys(
+    state: State<'_, AppState>,
+    input: PauseHotkeysInput,
+) -> Result<(), AppError> {
+    let app = state.app.clone();
+    execute(&state, PAUSE_HOTKEYS, input, |_ctx, input| async move {
+        crate::bootstrap::pause_hotkeys(&app, input.paused);
+        Ok(())
+    })
+    .await
+}
+
 /**
  * WHAT:  Tells every window a setting changed.
  * WHY:   Three separate documents read settings and none of them share memory,
