@@ -1,9 +1,11 @@
 /*!
  * SOURCE OF TRUTH KEYWORDS: http_models_adapter, HttpModelStore, MODEL_CATALOG,
- *   DEFAULT_MODEL_ID, FALLBACK_MODEL_ID, hash_file, download_resumable
+ *   DEFAULT_MODEL_ID, FALLBACK_MODEL_ID, hash_file, download_resumable,
+ *   check_space, free_bytes
  * WHAT:  Barrel for the ModelStore implementation over Hugging Face.
- * WHY:   Three files because the catalog is data, the transfer is I/O, and the
- *        state machine over them is policy — and only the middle one needs a
+ * WHY:   Four files because the catalog is data, the transfer is I/O, the disk
+ *        check asks the OS one question, and the state machine over them is
+ *        policy — and only the middle one needs a
  *        network to test. Keeping them apart is what lets the catalog and the
  *        hashing be covered without a 574MB download.
  * WHERE: Constructed by adapters/mod.rs::build_model_store; consumed through
@@ -11,6 +13,7 @@
  */
 
 pub mod catalog;
+pub mod disk;
 pub mod download;
 pub mod store;
 

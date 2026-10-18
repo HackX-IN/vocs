@@ -42,6 +42,7 @@ use crate::ports::{EventSink, ModelStatus, ModelStore};
 use crate::types::{DownloadProgress, ModelDescriptor, ModelId, ModelState};
 
 use super::catalog::{descriptor_for, CatalogEntry, MODEL_CATALOG};
+use super::disk::{check_space, free_bytes, megabytes, DiskSpaceCheck};
 use super::download::{download_resumable, hash_file, resume_offset};
 
 /// Long enough for a slow handshake, short enough that an unreachable host
@@ -479,6 +480,39 @@ fn state_from_evidence(
     ModelState::NotDownloaded
 }
 
+impl HttpModelStore {
+    /**
+     * WHAT:  Refuses a download the disk cannot hold, with the numbers.
+     * WHY:   See disk.rs. Sized to what is still to fetch (the part file already
+     *        holds the rest), and measured on the models directory because that
+     *        is the volume the file lands on — which need not be the system
+     *        volume.
+     * WHERE: ensure, immediately before any bytes are requested.
+     */
+    async fn ensure_room(&self, entry: &CatalogEntry, part: &std::path::Path) -> AppResult<()> {
+        let remaining = entry.size_bytes.saturating_sub(resume_offset(part).await);
+        let directory = part.parent().unwrap_or(part).to_path_buf();
+        let available = tokio::task::spawn_blocking(move || free_bytes(&directory))
+            .await
+            .ok()
+            .flatten();
+
+        match check_space(remaining, available) {
+            DiskSpaceCheck::Enough | DiskSpaceCheck::Unknown => Ok(()),
+            DiskSpaceCheck::Short { needed, available } => Err(AppError::new(
+                ErrorCode::ModelDownloadFailed,
+                format!(
+                    "Vocs needs about {} MB free to download this model, and only {} MB is available. Free up some space and try again.",
+                    megabytes(needed),
+                    megabytes(available)
+                ),
+            )
+            .recoverable()
+            .with_action(ErrorAction::Retry)),
+        }
+    }
+}
+
 #[async_trait]
 impl ModelStore for HttpModelStore {
     async fn list(&self) -> AppResult<Vec<ModelStatus>> {
@@ -524,6 +558,7 @@ impl ModelStore for HttpModelStore {
         }
 
         let part = self.part_file(entry);
+        self.ensure_room(entry, &part).await?;
         let emit = |received: u64, total: u64, rate: u64| {
             self.emit(&descriptor, received, total, rate);
         };
