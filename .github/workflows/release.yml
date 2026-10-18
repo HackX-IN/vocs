@@ -256,7 +256,7 @@ jobs:
           fi
           echo "checking $APP"
           codesign --verify --deep --strict --verbose=2 "$APP"
-          codesign -dv "$APP" 2>&1 | grep -qE "^Identifier=com\.hackx\.vocs" \
+          codesign -dv "$APP" 2>&1 | grep -qE "^Identifier=in\.hackx\.vocs" \
             || { echo "::error::wrong bundle identifier — TCC grants will not persist"; exit 1; }
           codesign -d --entitlements :- "$APP" 2>/dev/null | grep -q "audio-input" \
             || { echo "::error::microphone entitlement missing"; exit 1; }
