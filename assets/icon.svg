@@ -40,6 +40,12 @@
         <use href="#quote" transform="translate(44.3 43.2) rotate(-4) scale(0.126)"/>
         <use href="#quote" transform="translate(60.9 42) rotate(-4) scale(0.126)"/>
       </g>
+      <!-- three small sound bars rising from the crown: what it whispers -->
+      <g fill="#171717">
+        <rect x="75" y="18" width="3.4" height="8" rx="1.7"/>
+        <rect x="81.4" y="13" width="3.4" height="17" rx="1.7"/>
+        <rect x="87.8" y="17" width="3.4" height="10" rx="1.7"/>
+      </g>
     </g>
   </g>
 </svg>
