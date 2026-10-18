@@ -249,6 +249,7 @@ fn strip_line(line: &str, protected: &[String], strength: FillerStrength) -> Str
     let mut out: Vec<String> = Vec::with_capacity(tokens.len());
     // A dropped token that began a sentence passes its capital to the next word.
     let mut carry_capital = false;
+    let mut dropped_the_tail = false;
     let mut at = 0;
 
     while at < tokens.len() {
@@ -265,6 +266,7 @@ fn strip_line(line: &str, protected: &[String], strength: FillerStrength) -> Str
         };
 
         let Some(width) = dropped else {
+            dropped_the_tail = false;
             let word = text_of(&tokens[at]);
             out.push(if std::mem::take(&mut carry_capital) { capitalise_first(&word) } else { word });
             at += 1;
@@ -291,6 +293,17 @@ fn strip_line(line: &str, protected: &[String], strength: FillerStrength) -> Str
             carry_capital = true;
         }
         at += width;
+        dropped_the_tail = at == tokens.len();
+    }
+
+    // "it is done, uh" must not end on the comma the "uh" leaves behind: a line
+    // never ends on one, and the terminal stop is added later only if no mark
+    // is there.
+    if dropped_the_tail {
+        if let Some(last) = out.last_mut() {
+            let trimmed = last.trim_end_matches(',').len();
+            last.truncate(trimmed);
+        }
     }
 
     out.join(" ")
@@ -461,6 +474,14 @@ mod tests {
         let hindi = LanguageCode("hi".into());
         assert_eq!(strip_fillers("um like, you know", Some(&hindi), &[], FillerStrength::Strict), "um like, you know");
         assert_eq!(strip_fillers("um like", None, &[], FillerStrength::Strict), "um like");
+    }
+
+    #[test]
+    fn a_dropped_last_word_does_not_leave_its_comma_behind() {
+        assert_eq!(strip("it is done, uh"), "it is done");
+        assert_eq!(strip("we shipped it, you know"), "we shipped it");
+        // A comma that something else still follows is untouched.
+        assert_eq!(strip("first, uh second"), "first, second");
     }
 
     #[test]

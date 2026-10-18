@@ -1,7 +1,6 @@
 /*!
  * SOURCE OF TRUTH KEYWORDS: normalise_whitespace, expand_spoken_commands,
- *   apply_dictionary, dedupe_stutters, normalise_punctuation,
- *   capitalise_sentences, ensure_terminal_punctuation, SPOKEN_COMMANDS
+ *   apply_dictionary, normalise_punctuation, SPOKEN_COMMANDS
  * WHAT:  The individual enhancement rules. Each is a pure function from string
  *        to string.
  * WHY:   Pure because that makes them table-testable, and the table tests are
@@ -44,7 +43,11 @@ fn is_english(language: Option<&LanguageCode>) -> bool {
 /**
  * WHAT:  Collapses runs of whitespace and trims the ends, preserving newlines.
  * WHY:   Runs first so every later rule can assume single spaces. Newlines
- *        survive because spoken-command expansion produces them deliberately.
+ *        survive because spoken-command expansion produces them deliberately —
+ *        including a TRAILING one: someone who says "first item, new line"
+ *        asked for the cursor to be on the next line, and trimming it would
+ *        undo the one thing they said. Only spaces at the ends go, and spaces
+ *        that sit against a newline.
  */
 pub fn normalise_whitespace(text: &str) -> String {
     let mut out = String::with_capacity(text.len());
@@ -54,8 +57,12 @@ pub fn normalise_whitespace(text: &str) -> String {
     for ch in text.chars() {
         match ch {
             '\n' => {
-                // Two newlines is a paragraph; more than that is noise.
+                // Two newlines is a paragraph; more than that is noise. A space
+                // left hanging before the break is invisible and unwanted.
                 if newline_run < 2 {
+                    if out.ends_with(' ') {
+                        out.pop();
+                    }
                     out.push('\n');
                     newline_run += 1;
                 }
@@ -75,7 +82,9 @@ pub fn normalise_whitespace(text: &str) -> String {
         }
     }
 
-    out.trim().to_string()
+    out.trim_start()
+        .trim_end_matches(|c: char| c.is_whitespace() && c != '\n')
+        .to_string()
 }
 
 /**
@@ -121,16 +130,6 @@ pub fn apply_dictionary(text: &str, entries: &[DictionaryEntry]) -> String {
     out
 }
 
-/**
- * SOURCE OF TRUTH KEYWORDS: dedupe_stutters
- * WHAT:  Collapses an immediately repeated word or short phrase.
- * WHY:   Chunk boundaries overlap by design, so a word spoken across a seam can
- *        be decoded twice. This catches that, and genuine spoken stutters with
- *        it. Limited to repeats of at most three words and only when they are
- *        ADJACENT — beyond that, repetition is usually real speech ("very very
- *        good" is a thing people say, but "the the" is not).
- * WHERE: Runs after the seam join in the assembler.
- */
 /**
  * SOURCE OF TRUTH KEYWORDS: CORRECTION_CUES, apply_spoken_corrections,
  *   alignment, restart, MAX_ALIGN_WORDS
@@ -407,59 +406,6 @@ fn cue_run_len(bares: &[String], words: &[Word<'_>], index: usize) -> Option<usi
     None
 }
 
-pub fn dedupe_stutters(text: &str) -> String {
-    let words: Vec<&str> = text.split(' ').filter(|w| !w.is_empty()).collect();
-    if words.len() < 2 {
-        return text.to_string();
-    }
-
-    let mut out: Vec<&str> = Vec::with_capacity(words.len());
-    let mut index = 0usize;
-
-    while index < words.len() {
-        let mut matched = false;
-
-        // Try the longest phrase first, so "how do you how do you" collapses as
-        // a phrase rather than leaving fragments behind.
-        for span in (1..=3).rev() {
-            if index + span * 2 > words.len() {
-                continue;
-            }
-            let first = &words[index..index + span];
-            let second = &words[index + span..index + span * 2];
-
-            if phrases_match(first, second) {
-                out.extend_from_slice(first);
-                index += span * 2;
-                matched = true;
-                break;
-            }
-        }
-
-        if !matched {
-            out.push(words[index]);
-            index += 1;
-        }
-    }
-
-    out.join(" ")
-}
-
-fn phrases_match(a: &[&str], b: &[&str]) -> bool {
-    a.len() == b.len()
-        && a.iter().zip(b).all(|(x, y)| {
-            // Compare on letters only, so "the" and "the," count as a repeat.
-            let strip = |s: &str| {
-                s.chars()
-                    .filter(|c| c.is_alphanumeric())
-                    .flat_map(|c| c.to_lowercase())
-                    .collect::<String>()
-            };
-            let (x, y) = (strip(x), strip(y));
-            !x.is_empty() && x == y
-        })
-}
-
 /**
  * WHAT:  Tidies spacing around punctuation and normalises quote characters.
  * WHY:   Whisper occasionally emits a space before a comma or doubles a full
@@ -477,8 +423,13 @@ pub fn normalise_punctuation(text: &str) -> String {
             '\u{201C}' | '\u{201D}' => out.push('"'),
             '\u{2013}' | '\u{2014}' => out.push('-'),
             ' ' => {
-                // Drop a space that sits before closing punctuation.
-                if matches!(chars.peek(), Some(&next) if matches!(next, ',' | '.' | '!' | '?' | ';' | ':')) {
+                // Drop a space that sits before closing punctuation or a
+                // closing bracket, and one that follows an opening bracket:
+                // "( later )" is what a spoken "open paren … close paren"
+                // expands to, and it should read "(later)".
+                if matches!(chars.peek(), Some(&next) if matches!(next, ',' | '.' | '!' | '?' | ';' | ':' | ')'))
+                    || out.ends_with('(')
+                {
                     continue;
                 }
                 out.push(' ');
@@ -498,57 +449,6 @@ pub fn normalise_punctuation(text: &str) -> String {
     }
 
     out
-}
-
-/**
- * WHAT:  Capitalises the first letter of the text and of each new sentence.
- * WHY:   Whisper is trained on punctuated text and usually gets this right, so
- *        this is a repair pass rather than the primary mechanism. It only ever
- *        upper-cases a leading letter — it never lower-cases anything, because
- *        that would destroy proper nouns and acronyms the model got right.
- */
-pub fn capitalise_sentences(text: &str) -> String {
-    let mut out = String::with_capacity(text.len());
-    let mut capitalise_next = true;
-
-    for ch in text.chars() {
-        if capitalise_next && ch.is_alphabetic() {
-            out.extend(ch.to_uppercase());
-            capitalise_next = false;
-        } else {
-            out.push(ch);
-            if matches!(ch, '.' | '!' | '?' | '\n') {
-                capitalise_next = true;
-            }
-        }
-    }
-
-    out
-}
-
-/**
- * WHAT:  Adds a full stop if the text does not already end in punctuation.
- * WHY:   Skipped when the text ends in a newline from an explicit "new
- *        paragraph" command — the user was structuring, not finishing a
- *        sentence, and appending a stray period there is visibly wrong.
- */
-pub fn ensure_terminal_punctuation(text: &str) -> String {
-    let trimmed = text.trim_end();
-    if trimmed.is_empty() {
-        return text.to_string();
-    }
-
-    let ends_cleanly = trimmed
-        .chars()
-        .last()
-        .map(|c| matches!(c, '.' | '!' | '?' | ':' | ';' | ',' | '"' | ')'))
-        .unwrap_or(false);
-
-    if ends_cleanly || text.ends_with('\n') {
-        return text.to_string();
-    }
-
-    format!("{trimmed}.")
 }
 
 /**
@@ -670,6 +570,16 @@ mod tests {
         assert_eq!(normalise_whitespace("a\nb"), "a\nb");
     }
 
+    #[test]
+    fn a_trailing_spoken_newline_survives_but_stray_space_around_it_does_not() {
+        assert_eq!(normalise_whitespace("first item\n"), "first item\n");
+        assert_eq!(normalise_whitespace("first item \n  "), "first item\n");
+        assert_eq!(normalise_whitespace("a\n\n\n"), "a\n\n");
+        assert_eq!(normalise_whitespace("\n\n  a"), "a");
+        assert_eq!(normalise_whitespace("\n"), "");
+        assert_eq!(normalise_whitespace("a \n b"), "a\nb");
+    }
+
     // ── spoken commands ──────────────────────────────────────────────────
 
     #[test]
@@ -726,34 +636,6 @@ mod tests {
         assert_eq!(apply_dictionary("clod code", &[e]), "clod code");
     }
 
-    // ── stutters and seams ───────────────────────────────────────────────
-
-    #[test]
-    fn an_immediately_repeated_word_is_collapsed() {
-        assert_eq!(dedupe_stutters("the the cat sat"), "the cat sat");
-    }
-
-    #[test]
-    fn a_repeated_phrase_across_a_seam_is_collapsed_as_a_phrase() {
-        // Exactly the chunk-overlap case: the last words of one chunk repeated
-        // as the first words of the next.
-        assert_eq!(
-            dedupe_stutters("i want to i want to go home"),
-            "i want to go home"
-        );
-    }
-
-    #[test]
-    fn repetition_that_is_real_speech_is_preserved() {
-        // Not adjacent duplicates of the same span — this is how people talk.
-        assert_eq!(dedupe_stutters("very good and very bad"), "very good and very bad");
-    }
-
-    #[test]
-    fn punctuation_does_not_hide_a_duplicate() {
-        assert_eq!(dedupe_stutters("hello, hello there"), "hello, there");
-    }
-
     // ── punctuation and casing ───────────────────────────────────────────
 
     #[test]
@@ -770,31 +652,15 @@ mod tests {
     }
 
     #[test]
+    fn brackets_hug_what_they_enclose() {
+        assert_eq!(normalise_punctuation("call me ( later )"), "call me (later)");
+        assert_eq!(normalise_punctuation("a ( b ) c"), "a (b) c");
+    }
+
+    #[test]
     fn an_ellipsis_survives_but_a_doubled_bang_does_not() {
         assert_eq!(normalise_punctuation("wait..."), "wait...");
         assert_eq!(normalise_punctuation("stop!!"), "stop!");
-    }
-
-    #[test]
-    fn sentences_are_capitalised_without_lowercasing_anything() {
-        assert_eq!(
-            capitalise_sentences("hello there. how are you?"),
-            "Hello there. How are you?"
-        );
-        // Acronyms and proper nouns the model got right must survive.
-        assert_eq!(capitalise_sentences("the API is fine"), "The API is fine");
-    }
-
-    #[test]
-    fn terminal_punctuation_is_added_only_when_missing() {
-        assert_eq!(ensure_terminal_punctuation("hello"), "hello.");
-        assert_eq!(ensure_terminal_punctuation("hello."), "hello.");
-        assert_eq!(ensure_terminal_punctuation("really?"), "really?");
-    }
-
-    #[test]
-    fn a_deliberate_trailing_newline_does_not_get_a_full_stop() {
-        assert_eq!(ensure_terminal_punctuation("a list\n\n"), "a list\n\n");
     }
 
     /**
@@ -817,9 +683,6 @@ mod tests {
     #[test]
     fn empty_input_stays_empty_through_every_rule() {
         assert_eq!(normalise_whitespace(""), "");
-        assert_eq!(dedupe_stutters(""), "");
-        assert_eq!(capitalise_sentences(""), "");
-        assert_eq!(ensure_terminal_punctuation(""), "");
     }
 }
 

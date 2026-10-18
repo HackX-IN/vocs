@@ -1,5 +1,6 @@
 /*!
- * SOURCE OF TRUTH KEYWORDS: RuleEnhancer, enhance, RULE_ORDER, text
+ * SOURCE OF TRUTH KEYWORDS: RuleEnhancer, enhance, RULE_ORDER, text, fillers,
+ *   repeats, sentences
  * WHAT:  The deterministic TextEnhancer: applies the rules in text.rs in a
  *        fixed order.
  * WHY:   The ORDER is the design, and it is not arbitrary:
@@ -24,7 +25,12 @@
  */
 
 pub mod fillers;
+pub mod repeats;
+pub mod sentences;
 pub mod text;
+
+#[cfg(test)]
+mod corpus;
 
 use crate::error::AppResult;
 use crate::ports::enhancer::{EnhanceContext, TextEnhancer};
@@ -86,7 +92,7 @@ impl TextEnhancer for RuleEnhancer {
 
         // 5. Chunk seams and genuine stutters. Always on: a doubled word at a
         //    seam is an artefact of our own chunking, not something the user said.
-        out = text::dedupe_stutters(&out);
+        out = repeats::dedupe_stutters(&out);
 
         // 6. Spacing and quote characters.
         if context.normalise_punctuation {
@@ -95,12 +101,12 @@ impl TextEnhancer for RuleEnhancer {
 
         // 7. Casing, which needs sentence boundaries to already exist.
         if context.capitalise_sentences {
-            out = text::capitalise_sentences(&out);
+            out = sentences::capitalise_sentences(&out);
         }
 
         // 8. The terminal stop, last, so nothing capitalises after it.
         if context.normalise_punctuation {
-            out = text::ensure_terminal_punctuation(&out);
+            out = sentences::ensure_terminal_punctuation(&out);
         }
 
         Ok(text::normalise_whitespace(&out))
