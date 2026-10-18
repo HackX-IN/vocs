@@ -41,6 +41,7 @@ pub mod session;
 pub mod bootstrap;
 pub mod copy_last_hotkey;
 pub mod ipc;
+pub mod menu;
 pub mod tray;
 
 use tauri::Manager;
@@ -132,6 +133,11 @@ pub fn run() {
                 // The app is still usable by hotkey without a tray icon, so
                 // this is logged rather than fatal.
                 tracing::error!(error = %err, "could not install the menu bar item");
+            }
+
+            if let Err(err) = menu::install_menu(&handle) {
+                // Same reasoning: the stock menu stays, so Quit and copy/paste work.
+                tracing::error!(error = %err, "could not install the application menu");
             }
 
             Ok(())

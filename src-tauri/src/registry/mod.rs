@@ -275,7 +275,7 @@ fn build_capabilities() -> Vec<Capability> {
                 choice(
                     keys::CAPTURE_MODE,
                     "Microphone",
-                    "Instant keeps the microphone open so the first syllable is never clipped — macOS will show the orange microphone indicator at all times.",
+                    "When Vocs opens the microphone. Opening it when you press the key keeps the orange indicator off except while you record. Keeping it warm never clips your first word, but macOS shows the indicator all the time.",
                     SettingSection::Recording,
                     &[
                         ("on_demand", "Open when I press the key", "Indicator only shows while recording"),
@@ -353,7 +353,7 @@ fn build_capabilities() -> Vec<Capability> {
                 SettingDef {
                     key: text(keys::LANGUAGE),
                     label: text("Language"),
-                    description: text("Pin your language for a little more speed and accuracy, or let Vocs detect it."),
+                    description: text("Pick your language to skip detection: each dictation finishes about a quarter of a second sooner and is a little more accurate. Leave it on Auto if you switch between languages."),
                     section: SettingSection::Transcription,
                     kind: SettingKind::DynamicChoice {
                         source: ChoiceSource::Languages,
@@ -608,14 +608,19 @@ fn build_capabilities() -> Vec<Capability> {
             hotkey: None,
             metrics: vec![],
             settings: vec![
-                number(
+                choice(
                     keys::RETENTION_DAYS,
                     "Keep history for",
-                    "Older transcripts are deleted automatically. Set to 0 to keep everything forever.",
+                    "How long your dictations stay on this Mac. Anything older is deleted automatically in the background. Your dictionary and settings are never deleted.",
                     SettingSection::Privacy,
-                    (0.0, 365.0, 1.0),
-                    Some("days"),
-                    0.0,
+                    &[
+                        ("0", "Forever", "Nothing is deleted until you delete it"),
+                        ("7", "1 week", "Dictations older than a week are deleted"),
+                        ("30", "1 month", "Dictations older than 30 days are deleted"),
+                        ("90", "3 months", "Dictations older than 90 days are deleted"),
+                        ("365", "1 year", "Dictations older than a year are deleted"),
+                    ],
+                    "0",
                 ),
             ],
         },

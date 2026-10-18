@@ -62,7 +62,7 @@ export function SelectControl({ setting }: { setting: SelectSetting }) {
       value={setting.value}
       disabled={setting.disabled}
       onChange={(event) => setting.onChange(event.target.value)}
-      className={cn(CONTROL_CLASS, "max-w-56")}
+      className={cn(CONTROL_CLASS, "max-w-[min(22rem,100%)] text-ellipsis")}
     >
       {setting.options.map((option) => (
         <option key={option.value} value={option.value} title={option.description} disabled={option.disabled}>
@@ -97,6 +97,11 @@ export function NumberControl({ setting }: { setting: NumberSetting }) {
 
 /** Past this many characters a field is a sentence, not a word, and wraps. */
 const MULTILINE_FROM_CHARS = 80;
+
+/** Whether a text setting is a paragraph-sized field that wants the full row. */
+export function isLongText(setting: TextSetting): boolean {
+  return (setting.maxLength ?? 0) > MULTILINE_FROM_CHARS;
+}
 
 /**
  * WHAT:  A text field that saves when you leave it, not on every keystroke.
@@ -135,13 +140,13 @@ export function TextControl({ setting }: { setting: TextSetting }) {
     className: cn(CONTROL_CLASS, "w-56 placeholder:text-text-tertiary"),
   };
 
-  if ((setting.maxLength ?? 0) > MULTILINE_FROM_CHARS) {
+  if (isLongText(setting)) {
     return (
       <textarea
         {...shared}
-        rows={3}
+        rows={4}
         onChange={(event) => setDraft(event.target.value)}
-        className={cn(shared.className, "h-auto resize-none py-1.5")}
+        className={cn(shared.className, "h-auto w-full resize-none py-2")}
       />
     );
   }

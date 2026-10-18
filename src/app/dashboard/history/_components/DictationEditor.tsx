@@ -37,9 +37,9 @@ import { useAutosave, type AutosaveStatus } from "@/lib/use-autosave";
 import { formatClock, formatCount, formatDateTime, formatLanguage } from "@/lib/format";
 import { readDurationMs } from "@/lib/motion";
 import { cn } from "@/lib/utils";
-import { Button, Chip, ErrorSurface, ScrollArea, Skeleton } from "@/components/global";
+import { Button, Chip, ErrorSurface, ScrollArea, Skeleton, WindowBar } from "@/components/global";
 import { effectiveText, wasCorrected } from "../session-text";
-import { HistoryDetail } from "./HistoryDetail";
+import { CorrectionsDock } from "./CorrectionsDock";
 
 const STATUS_LABEL: Readonly<Record<AutosaveStatus, string>> = {
   saved: "Saved",
@@ -197,42 +197,38 @@ function DictationBody({
 
   return (
     <div className="relative flex min-h-0 flex-1 flex-col">
-      <header
-        data-tauri-drag-region
-        className="absolute inset-x-0 top-0 z-10 flex h-[var(--traffic-light-band)] items-center justify-between gap-4 pr-[var(--page-padding-x)] pl-[var(--titlebar-safe-inset)]"
-      >
-        <Button
-          data-tauri-drag-region={false}
-          variant="ghost"
-          aria-label="Back to dictations"
-          onClick={() => void goBack()}
-          className="size-7 px-0"
-        >
-          <ArrowLeft className="size-4" />
-        </Button>
-
-        <div data-tauri-drag-region={false} className="flex items-center gap-2">
+      <WindowBar
+        leading={
+          <Button variant="ghost" aria-label="Back to dictations" onClick={() => void goBack()} className="size-8 px-0">
+            <ArrowLeft className="size-4" />
+          </Button>
+        }
+        title={
           <span
             role="status"
-            className={cn("pr-1 text-caption", autosave.status === "error" ? "text-danger" : "text-text-tertiary")}
+            className={cn("text-caption", autosave.status === "error" ? "text-danger" : "text-text-tertiary")}
           >
             {STATUS_LABEL[autosave.status]}
           </span>
-          <Button variant="ghost" onClick={() => void copy()} aria-label="Copy text">
-            {copied ? <Check className="size-4 text-success" /> : <Copy className="size-4" />}
-            {copied ? "Copied" : "Copy"}
-          </Button>
-          <Button
-            variant={confirmingDelete ? "danger" : "ghost"}
-            onClick={() => void remove()}
-            onBlur={() => setConfirmingDelete(false)}
-            aria-label="Delete dictation"
-          >
-            <Trash2 className="size-4" />
-            {confirmingDelete ? "Delete it" : null}
-          </Button>
-        </div>
-      </header>
+        }
+        trailing={
+          <>
+            <Button variant="ghost" onClick={() => void copy()} aria-label="Copy text">
+              {copied ? <Check className="size-4 text-success" /> : <Copy className="size-4" />}
+              {copied ? "Copied" : "Copy"}
+            </Button>
+            <Button
+              variant={confirmingDelete ? "danger" : "ghost"}
+              onClick={() => void remove()}
+              onBlur={() => setConfirmingDelete(false)}
+              aria-label="Delete dictation"
+            >
+              <Trash2 className="size-4" />
+              {confirmingDelete ? "Delete it" : null}
+            </Button>
+          </>
+        }
+      />
 
       <ScrollArea contentClassName="px-[var(--page-padding-x)] pb-24">
         <article className="mx-auto flex w-full max-w-[var(--content-max-width)] flex-col gap-5 pt-4">
@@ -251,7 +247,7 @@ function DictationBody({
                 bodyRef.current?.focus();
               }
             }}
-            className="font-display text-title w-full resize-none bg-transparent text-text-primary placeholder:text-text-tertiary"
+            className="font-display text-title w-full resize-none bg-transparent text-text-primary outline-none placeholder:text-text-tertiary focus-visible:outline-none"
           />
 
           <div className="flex flex-wrap items-center gap-2">
@@ -274,21 +270,22 @@ function DictationBody({
             aria-label="Dictation text"
             spellCheck
             onChange={(event) => setDraft((value) => ({ ...value, text: event.target.value }))}
-            className="min-h-48 w-full resize-none bg-transparent text-[length:var(--text-reading-size)] leading-[var(--text-reading-line)] text-text-primary placeholder:text-text-tertiary"
+            className="min-h-48 w-full resize-none bg-transparent text-[length:var(--text-reading-size)] leading-[var(--text-reading-line)] text-text-primary outline-none placeholder:text-text-tertiary focus-visible:outline-none"
           />
 
           {autosave.error ? <ErrorSurface size="compact" error={autosave.error} onRetry={() => void autosave.flush()} /> : null}
           {actionError ? <ErrorSurface size="compact" error={actionError} /> : null}
 
-          {wasCorrected(session) ? (
-            <HistoryDetail
-              session={session}
-              beforeToggle={autosave.flush}
-              onRevertedChange={(_, reverted) => onRevertedChange(reverted)}
-            />
-          ) : null}
         </article>
       </ScrollArea>
+
+      {wasCorrected(session) ? (
+        <CorrectionsDock
+          session={session}
+          beforeToggle={autosave.flush}
+          onRevertedChange={(_, reverted) => onRevertedChange(reverted)}
+        />
+      ) : null}
     </div>
   );
 }

@@ -366,7 +366,7 @@
    * a grey slab sitting on the glass. A mask makes the content itself fade to
    * nothing, which is what the operator described and the only version that
    * survives a translucent background. */
-  --page-header-height: 92px;
+  --page-header-height: 68px;
 
   /* How far page content sits from the window's edge. 32px, up from 24: the
    * window's corners are now --radius-window (26px), and content padded less
@@ -382,7 +382,7 @@
    * buttons. The header's left padding has to become this instead. Unused
    * until the rail detaches; applying it while the rail is still in the window
    * would inset the title twice. */
-  --titlebar-safe-inset: 80px;
+  --titlebar-safe-inset: 92px;
 
   /* THE BAND macOS DRAWS THE TRAFFIC LIGHTS INTO, and the only thing the page
    * title is allowed to align itself to. The lights are placed by the system at
@@ -397,6 +397,13 @@
    * title still sits off the lights on device, THIS is the one number to
    * change. */
   --traffic-light-band: 28px;
+
+  /* THE WINDOW BAR (components/global/window-bar). One height for the lights, the
+   * centred title and the toolbar buttons, so they share a centre line. The
+   * lights are placed by tauri.conf.json's trafficLightPosition
+   * (x 24, y 19) so their centre lands at half of this; change the two together. --titlebar-safe-inset above is how far the left slot starts from the
+   * window edge: the lights' right edge (inset + 3 buttons) plus a gap. */
+  --titlebar-height: 52px;
   --scroll-fade-size: 52px;
 
   /* ── Dashboard (docs/04 §8) ───────────────────────────────────────── */

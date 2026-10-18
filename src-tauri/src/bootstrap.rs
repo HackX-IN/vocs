@@ -635,7 +635,9 @@ fn retention_days(db: &Database) -> i64 {
     });
 
     match value {
-        Some(SettingValue::Number(days)) => days as i64,
+        // The registry declares preset windows as choices whose value is the
+        // number of days ("0" is forever).
+        Some(SettingValue::Choice(days)) => days.parse::<i64>().unwrap_or(0),
         _ => 0,
     }
 }
@@ -1904,18 +1906,18 @@ mod tests {
     fn the_retention_window_falls_back_to_the_registry() -> AppResult<()> {
         let db = Database::open_in_memory()?;
         let declared = match registry::setting_def(keys::RETENTION_DAYS).map(|d| d.default.clone()) {
-            Some(SettingValue::Number(days)) => days as i64,
-            other => panic!("retention_days must be declared as a Number, got {other:?}"),
+            Some(SettingValue::Choice(days)) => days.parse::<i64>().expect("a day count"),
+            other => panic!("retention_days must be declared as a Choice, got {other:?}"),
         };
         assert_eq!(retention_days(&db), declared);
 
         services::settings::set_setting(
             &db,
             keys::RETENTION_DAYS,
-            &SettingValue::Number(14.0),
+            &SettingValue::Choice("30".to_string()),
             1,
         )?;
-        assert_eq!(retention_days(&db), 14);
+        assert_eq!(retention_days(&db), 30);
         Ok(())
     }
 
