@@ -753,6 +753,20 @@ mod tests {
     }
 
     #[test]
+    fn validate_value_enforces_range_length_and_shape_for_every_path() {
+        let delay = setting_def(keys::PASTE_DELAY_MS).expect("declared");
+        assert!(delay.validate_value(&SettingValue::Number(40.0)).is_ok());
+        assert!(delay.validate_value(&SettingValue::Number(501.0)).is_err());
+        assert!(delay.validate_value(&SettingValue::Number(f64::NAN)).is_err());
+        assert!(delay.validate_value(&SettingValue::Bool(true)).is_err());
+
+        let context = setting_def(keys::CONTEXT_PROMPT).expect("declared");
+        let limit = CONTEXT_PROMPT_MAX_LEN as usize;
+        assert!(context.validate_value(&SettingValue::Text("a".repeat(limit))).is_ok());
+        assert!(context.validate_value(&SettingValue::Text("a".repeat(limit + 1))).is_err());
+    }
+
+    #[test]
     fn nav_items_are_ordered() {
         let orders: Vec<u32> = nav_items().iter().map(|n| n.order).collect();
         let mut sorted = orders.clone();

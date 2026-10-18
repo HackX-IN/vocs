@@ -10,11 +10,13 @@
  */
 
 pub mod audio;
+pub mod backup;
 pub mod dictionary;
 pub mod engine;
 pub mod language;
 pub mod metrics;
 pub mod numeric;
+pub mod profile;
 pub mod session;
 pub mod settings;
 pub mod transcript;
@@ -23,7 +25,9 @@ pub use audio::{
     AudioChunk, AudioLevel, CaptureMode, ChunkKind, DeviceInfo, MicTestStopReason, MicTestUpdate,
     TARGET_SAMPLE_RATE,
 };
+pub use backup::{BackupDictionaryEntry, BackupFile, ImportSummary, BACKUP_FORMAT, BACKUP_VERSION};
 pub use dictionary::{DictionaryEntry, DictionaryId, MatchKind};
+pub use profile::AppProfile;
 pub use language::{language_label, language_options, LanguageOption, AUTO_LANGUAGE};
 pub use engine::{
     DownloadProgress, EngineCapabilities, EngineFeature, EngineId, LanguageSupport,

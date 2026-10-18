@@ -53,6 +53,19 @@ export const commands = {
 	requestPermission: (input: PermissionInput) => typedError<PermissionState, AppError>(__TAURI_INVOKE("request_permission", { input })),
 	openPrivacyPane: (input: PermissionInput) => typedError<null, AppError>(__TAURI_INVOKE("open_privacy_pane", { input })),
 	listInputDevices: () => typedError<DeviceInfo[], AppError>(__TAURI_INVOKE("list_input_devices")),
+	exportBackup: () => typedError<string, AppError>(__TAURI_INVOKE("export_backup")),
+	importBackup: (input: ImportBackupInput) => typedError<ImportSummary, AppError>(__TAURI_INVOKE("import_backup", { input })),
+	/**
+	 * 
+	 *  * WHAT:  Shows an open dialog and returns the picked file's text, or None when
+	 *  *        the user cancelled.
+	 *  * WHY:   Cancelling is not an error, for the same reason as the save dialog.
+	 *  *        The file must be UTF-8 text: a binary file picked by mistake gets a
+	 *  *        sentence saying so, not a stack of replacement characters downstream.
+	 *  * WHERE: The Settings backup panel's Import action.
+	 *  
+	 */
+	openTextFile: (input: OpenTextFileInput) => typedError<string | null, AppError>(__TAURI_INVOKE("open_text_file", { input })),
 	startMicTest: () => typedError<null, AppError>(__TAURI_INVOKE("start_mic_test")),
 	stopMicTest: () => typedError<null, AppError>(__TAURI_INVOKE("stop_mic_test")),
 	checkForUpdate: () => typedError<UpdateCheck, AppError>(__TAURI_INVOKE("check_for_update")),
@@ -106,13 +119,6 @@ export type AppError = {
 	detail: string | null,
 };
 
-/**
- * 
- *  * SOURCE OF TRUTH KEYWORDS: AppProfile
- *  * WHAT:  One application's overrides.
- *  * WHERE: Rendered in Settings; applied at session start.
- *  
- */
 export type AppProfile = {
 	/**  e.g. "com.apple.Terminal". Matched against the frontmost app. */
 	bundle_id: string,
@@ -421,6 +427,24 @@ export type HotkeyDef = {
 	setting_key: string | null,
 };
 
+export type ImportBackupInput = {
+	json: string,
+};
+
+/**
+ *  What an import changed and what it declined to. `skipped` counts entries
+ *  that were present but unusable (empty, over-long, invalid), so the user
+ *  learns the difference between "nothing to do" and "something was dropped".
+ */
+export type ImportSummary = {
+	dictionary_added: number,
+	dictionary_updated: number,
+	dictionary_skipped: number,
+	profiles_added: number,
+	profiles_updated: number,
+	profiles_skipped: number,
+};
+
 export type KeyModifier = "COMMAND" | "CONTROL" | "OPTION" | "SHIFT";
 
 /**  A BCP-47-ish code as Whisper uses it: "en", "hi", "ar", "zh". */
@@ -668,6 +692,13 @@ export type OnboardingProgress = {
 	message: string,
 	/**  0.0 to 1.0, or None when genuinely unknowable. */
 	fraction: number | null,
+};
+
+export type OpenTextFileInput = {
+	/**  Shown in the dialog's file-type dropdown, e.g. "Vocs backup". */
+	filter_name: string,
+	/**  Without the dot, e.g. ["json"]. */
+	extensions: string[],
 };
 
 /**

@@ -1,6 +1,6 @@
 /*!
  * SOURCE OF TRUTH KEYWORDS: list_profiles, get_profile, upsert_profile,
- *   delete_profile, AppProfile, settings_json
+ *   delete_profile, settings_json
  * WHAT:  Pure SQLite access to per-application setting overrides.
  * WHY:   Stored as a sparse JSON map rather than a full settings row, so a
  *        profile says only what it CHANGES. A profile that carried every
@@ -17,22 +17,7 @@ use rusqlite::{params, Row};
 
 use crate::db::Database;
 use crate::error::AppResult;
-use crate::types::SettingValue;
-
-/**
- * SOURCE OF TRUTH KEYWORDS: AppProfile
- * WHAT:  One application's overrides.
- * WHERE: Rendered in Settings; applied at session start.
- */
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, specta::Type)]
-pub struct AppProfile {
-    /// e.g. "com.apple.Terminal". Matched against the frontmost app.
-    pub bundle_id: String,
-    pub display_name: String,
-    /// Sparse: only the settings this profile changes.
-    pub overrides: HashMap<String, SettingValue>,
-    pub enabled: bool,
-}
+use crate::types::{AppProfile, SettingValue};
 
 pub fn list_profiles(db: &Database) -> AppResult<Vec<AppProfile>> {
     db.with_connection(|conn| {

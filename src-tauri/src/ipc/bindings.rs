@@ -80,6 +80,10 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             commands::system::request_permission,
             commands::system::open_privacy_pane,
             commands::system::list_input_devices,
+            // Backup and restore
+            commands::backup::export_backup,
+            commands::backup::import_backup,
+            commands::files::open_text_file,
             // Microphone check
             commands::mic_test::start_mic_test,
             commands::mic_test::stop_mic_test,

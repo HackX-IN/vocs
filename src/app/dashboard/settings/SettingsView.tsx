@@ -39,6 +39,7 @@ import { cn } from "@/lib/utils";
 import { ErrorSurface, ScrollArea, SettingControl, Skeleton } from "@/components/global";
 import type { SettingOption } from "@/components/global";
 import { PermissionNotice } from "./_components/PermissionNotice";
+import { BackupPanel } from "./_components/BackupPanel";
 import { MicTestPanel } from "./_components/MicTestPanel";
 import { ModelManager } from "./_components/ModelManager";
 import { DictionaryManager } from "./_components/DictionaryManager";
@@ -82,6 +83,10 @@ export function SettingsView({ registry, section }: SettingsViewProps) {
   // another app, and comes back expecting these controls to have noticed.
   const permissions = usePermissions();
   const [writeError, setWriteError] = useState<AppError | null>(null);
+  // Bumped by a backup import: the dictionary and profile lists fetch once on
+  // mount, so a new key is how they are told what they show has changed.
+  const [dataVersion, setDataVersion] = useState(0);
+  const onDataImported = useCallback(() => setDataVersion((version) => version + 1), []);
 
   const dynamic = useMemo<DynamicOptions>(() => {
     const deviceOptions: SettingOption[] = (devices.data ?? []).map((device) => ({
@@ -167,6 +172,8 @@ export function SettingsView({ registry, section }: SettingsViewProps) {
               permissions={permissions.data}
               onWrite={write}
               extra={extra}
+              dataVersion={dataVersion}
+              onDataImported={onDataImported}
             />
           );
         })}
@@ -181,6 +188,7 @@ export function SettingsView({ registry, section }: SettingsViewProps) {
             following the global setting.
           </p>
           <AppProfiles
+            key={dataVersion}
             defs={allDefs}
             globals={settings.data}
             dynamic={dynamic}
@@ -193,13 +201,14 @@ export function SettingsView({ registry, section }: SettingsViewProps) {
 }
 
 /** Panels that are not settings but belong inside a section. */
-type SectionPanel = "MIC_TEST_PANEL" | "MODELS_PANEL" | "DICTIONARY_PANEL" | "PRIVACY_PANEL";
+type SectionPanel = "MIC_TEST_PANEL" | "MODELS_PANEL" | "DICTIONARY_PANEL" | "PRIVACY_PANEL" | "BACKUP_PANEL";
 
 const EXTRAS: Partial<Record<SettingSection, SectionPanel>> = {
   RECORDING: "MIC_TEST_PANEL",
   TRANSCRIPTION: "MODELS_PANEL",
   VOCABULARY: "DICTIONARY_PANEL",
   PRIVACY: "PRIVACY_PANEL",
+  GENERAL: "BACKUP_PANEL",
 };
 
 function SettingsSection({
@@ -212,6 +221,8 @@ function SettingsSection({
   permissions,
   onWrite,
   extra,
+  dataVersion,
+  onDataImported,
 }: {
   title: string;
   highlighted: boolean;
@@ -222,6 +233,9 @@ function SettingsSection({
   permissions: readonly PermissionReport[] | null;
   onWrite: (key: string, value: SettingValue) => void;
   extra: SectionPanel | undefined;
+  /** Changes when an import has rewritten data some panels display. */
+  dataVersion: number;
+  onDataImported: () => void;
 }) {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const plain = defs.filter((def) => !def.advanced);
@@ -251,8 +265,9 @@ function SettingsSection({
 
       {extra === "MIC_TEST_PANEL" ? <MicTestPanel /> : null}
       {extra === "MODELS_PANEL" ? <ModelManager /> : null}
-      {extra === "DICTIONARY_PANEL" ? <DictionaryManager /> : null}
+      {extra === "DICTIONARY_PANEL" ? <DictionaryManager key={dataVersion} /> : null}
       {extra === "PRIVACY_PANEL" ? <ClearHistoryControl /> : null}
+      {extra === "BACKUP_PANEL" ? <BackupPanel onImported={onDataImported} /> : null}
 
       {advanced.length > 0 ? (
         <>

@@ -23,6 +23,27 @@ use crate::types::{DictionaryEntry, DictionaryId, MatchKind};
 /// Long enough for a product name, short enough that it cannot be a paragraph.
 const MAX_TERM_LEN: usize = 120;
 
+/**
+ * SOURCE OF TRUTH KEYWORDS: check_entry_text
+ * WHAT:  Whether a pattern and replacement are usable as a dictionary entry.
+ * WHY:   One rule for typed entries and imported ones. An empty pattern matches
+ *        everywhere and corrupts every transcript, so a backup must not be able
+ *        to smuggle one in past the form that forbids it.
+ * WHERE: CreateDictionaryEntryInput::validate and ipc/commands/backup.rs.
+ */
+pub fn check_entry_text(pattern: &str, replacement: &str) -> Result<(), String> {
+    if pattern.trim().is_empty() {
+        return Err("Enter the word Vocs keeps getting wrong.".into());
+    }
+    if replacement.trim().is_empty() {
+        return Err("Enter what it should say instead.".into());
+    }
+    if pattern.len() > MAX_TERM_LEN || replacement.len() > MAX_TERM_LEN {
+        return Err(format!("Keep entries under {MAX_TERM_LEN} characters."));
+    }
+    Ok(())
+}
+
 const LIST: CommandSpec = CommandSpec::new("list_dictionary", CapabilityKey::Dictionary);
 
 #[tauri::command]
@@ -45,16 +66,7 @@ pub struct CreateDictionaryEntryInput {
 
 impl Validate for CreateDictionaryEntryInput {
     fn validate(&self) -> Result<(), String> {
-        if self.pattern.trim().is_empty() {
-            return Err("Enter the word Vocs keeps getting wrong.".into());
-        }
-        if self.replacement.trim().is_empty() {
-            return Err("Enter what it should say instead.".into());
-        }
-        if self.pattern.len() > MAX_TERM_LEN || self.replacement.len() > MAX_TERM_LEN {
-            return Err(format!("Keep entries under {MAX_TERM_LEN} characters."));
-        }
-        Ok(())
+        check_entry_text(&self.pattern, &self.replacement)
     }
 }
 

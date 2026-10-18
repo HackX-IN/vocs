@@ -69,34 +69,7 @@ impl Validate for SetSettingInput {
         let Some(def) = registry::setting_def(&self.key) else {
             return Err(format!("`{}` is not a setting.", self.key));
         };
-        if !self.value.matches_kind(&def.kind) {
-            return Err(format!("That is not a valid value for {}.", def.label));
-        }
-        // A hotkey that cannot be registered must be refused HERE, not accepted
-        // and then quietly dropped at registration. Saving one writes the row,
-        // and Settings and the pill both re-read it and draw the new keycap
-        // while the OS holds nothing — the app ends up displaying a key that
-        // does nothing. See HotkeyBinding::bindable for both ways that happens.
-        if let SettingValue::Hotkey(binding) = &self.value {
-            binding.bindable()?;
-        }
-
-        if let (SettingValue::Number(value), crate::types::SettingKind::Number { min, max, .. }) =
-            (&self.value, &def.kind)
-        {
-            if value < min || value > max {
-                return Err(format!("{} must be between {min} and {max}.", def.label));
-            }
-        }
-
-        if let (SettingValue::Text(value), crate::types::SettingKind::Text { max_len: Some(max), .. }) =
-            (&self.value, &def.kind)
-        {
-            if value.chars().count() > *max as usize {
-                return Err(format!("{} must be at most {max} characters.", def.label));
-            }
-        }
-        Ok(())
+        def.validate_value(&self.value)
     }
 }
 

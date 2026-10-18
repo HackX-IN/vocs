@@ -122,6 +122,49 @@ pub struct SettingDef {
     pub advanced: bool,
 }
 
+impl SettingDef {
+    /**
+     * SOURCE OF TRUTH KEYWORDS: validate_value, check_setting_value
+     * WHAT:  Whether `value` is acceptable for this setting: the right shape for
+     *        its control, inside its numeric range, within its text limit, and a
+     *        hotkey the OS can actually bind.
+     * WHY:   One check for every way a value can arrive. It used to live inside
+     *        the set_setting validator alone, so a per-app profile override or a
+     *        restored backup could carry an out-of-range number or an over-long
+     *        text straight past it — the rules were enforced on the path that
+     *        was tested and skipped on the ones that were not.
+     * WHERE: set_setting, save_app_profile, and the backup import.
+     */
+    pub fn validate_value(&self, value: &SettingValue) -> Result<(), String> {
+        if !value.matches_kind(&self.kind) {
+            return Err(format!("That is not a valid value for {}.", self.label));
+        }
+        // A hotkey that cannot be registered must be refused HERE, not accepted
+        // and then quietly dropped at registration. Saving one writes the row,
+        // and Settings and the pill both re-read it and draw the new keycap
+        // while the OS holds nothing — the app ends up displaying a key that
+        // does nothing. See HotkeyBinding::bindable for both ways that happens.
+        if let SettingValue::Hotkey(binding) = value {
+            binding.bindable()?;
+        }
+        match (value, &self.kind) {
+            (SettingValue::Number(number), SettingKind::Number { min, max, .. }) => {
+                // NaN fails both comparisons, so test the positive form.
+                if !(number >= min && number <= max) {
+                    return Err(format!("{} must be between {min} and {max}.", self.label));
+                }
+            }
+            (SettingValue::Text(text), SettingKind::Text { max_len: Some(max), .. })
+                if text.chars().count() > *max as usize =>
+            {
+                return Err(format!("{} must be at most {max} characters.", self.label));
+            }
+            _ => {}
+        }
+        Ok(())
+    }
+}
+
 /**
  * SOURCE OF TRUTH KEYWORDS: NavDef
  * WHAT:  A capability's placement in the dashboard sidebar.

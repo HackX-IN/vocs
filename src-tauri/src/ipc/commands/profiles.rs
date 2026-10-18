@@ -16,7 +16,8 @@ use crate::error::AppError;
 use crate::ipc::context::AppState;
 use crate::ipc::factory::{execute, CommandSpec, Validate};
 use crate::registry::{self, CapabilityKey};
-use crate::services::profiles::{self, AppProfile};
+use crate::services::profiles;
+use crate::types::AppProfile;
 
 const LIST: CommandSpec = CommandSpec::new("list_app_profiles", CapabilityKey::Settings);
 
@@ -44,9 +45,7 @@ impl Validate for SaveProfileInput {
             let Some(def) = registry::setting_def(key) else {
                 return Err(format!("`{key}` is not a setting."));
             };
-            if !value.matches_kind(&def.kind) {
-                return Err(format!("That is not a valid value for {}.", def.label));
-            }
+            def.validate_value(value)?;
         }
         Ok(())
     }

@@ -9,6 +9,7 @@
  * WHERE: Collected into the specta builder in lib.rs.
  */
 
+pub mod backup;
 pub mod dictionary;
 pub mod engine;
 pub mod files;
