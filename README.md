@@ -26,6 +26,11 @@ and no audio ever leaves your machine.
   turn it on), is the way back from a paste that went nowhere.
 - **Filler removal that does not eat real words**, at three strengths. "I like
   pizza" is never touched; "it was, like, fine" loses the "like".
+- **Optional grammar fixes** for slips that are wrong every time — "a idea",
+  "she don't", "we was", "could of been" — with the rest of your sentence left
+  exactly as you said it. Off by default; quoted speech and your dictionary are
+  never touched. It is a rule set, not a language model: it fixes less, and it
+  cannot make a mistake you would not have spotted.
 - **A context line for the model** — jargon, product names, the topic — that it
   listens for ahead of your dictionary.
 - **A live microphone meter** in Settings → Recording, on the device dictation

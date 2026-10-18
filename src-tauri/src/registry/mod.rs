@@ -491,6 +491,13 @@ fn build_capabilities() -> Vec<Capability> {
                     false,
                 ),
                 toggle(
+                    keys::FIX_GRAMMAR,
+                    "Fix common grammar slips",
+                    "Corrects a small set of slips that are wrong every time \u{2014} \u{201c}a idea\u{201d} to \u{201c}an idea\u{201d}, \u{201c}she don\u{2019}t\u{201d} to \u{201c}she doesn\u{2019}t\u{201d}, \u{201c}we was\u{201d} to \u{201c}we were\u{201d}. It never rewrites your sentences, skips quoted speech and your dictionary words, and History shows every change. English only.",
+                    SettingSection::Output,
+                    false,
+                ),
+                toggle(
                     keys::LAUNCH_AT_LOGIN,
                     "Launch at login",
                     "Start Vocs automatically when you log in.",
@@ -780,6 +787,7 @@ mod tests {
             keys::FILLER_STRENGTH,
             keys::SPOKEN_COMMANDS,
             keys::APPLY_CORRECTIONS,
+            keys::FIX_GRAMMAR,
             keys::RETENTION_DAYS,
             keys::LAUNCH_AT_LOGIN,
             keys::BASELINE_WPM,

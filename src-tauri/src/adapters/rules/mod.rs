@@ -12,7 +12,9 @@
  *             straight after them so a stray "um" cannot separate a slip from
  *             the correction that replaces it;
  *          4. the dictionary before stutter removal, so a corrected term is
- *             what gets compared for repetition;
+ *             what gets compared for repetition, and grammar straight after the
+ *             dictionary so a user's spelling is already final when the grammar
+ *             rules decide what to leave alone;
  *          5. punctuation, then casing, then the terminal stop — casing depends
  *             on sentence boundaries existing, and the terminal stop must come
  *             last or it would be capitalised as a new sentence.
@@ -25,6 +27,7 @@
  */
 
 pub mod fillers;
+pub mod grammar;
 pub mod repeats;
 pub mod sentences;
 pub mod text;
@@ -90,6 +93,11 @@ impl TextEnhancer for RuleEnhancer {
             out = text::apply_dictionary(&out, &context.dictionary);
         }
 
+        // 4b. A handful of unambiguous grammar slips. Opt-in; see grammar.rs.
+        if context.fix_grammar {
+            out = grammar::fix_grammar(&out, language, &context.dictionary);
+        }
+
         // 5. Chunk seams and genuine stutters. Always on: a doubled word at a
         //    seam is an artefact of our own chunking, not something the user said.
         out = repeats::dedupe_stutters(&out);
@@ -128,6 +136,7 @@ mod tests {
             normalise_punctuation: true,
             capitalise_sentences: true,
             apply_corrections: true,
+            fix_grammar: false,
         }
     }
 
@@ -172,6 +181,7 @@ mod tests {
             normalise_punctuation: false,
             capitalise_sentences: false,
             apply_corrections: false,
+            fix_grammar: false,
         };
 
         let raw = "um hello comma world";

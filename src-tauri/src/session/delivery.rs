@@ -173,6 +173,7 @@ async fn deliver(ctx: &SessionContext, pending: PendingDelivery) {
         normalise_punctuation: settings.normalise_punctuation,
         capitalise_sentences: settings.capitalise_sentences,
         apply_corrections: settings.apply_corrections,
+        fix_grammar: settings.fix_grammar,
     };
 
     let final_text = {

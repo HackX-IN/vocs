@@ -60,6 +60,7 @@ fn context(language: &str) -> EnhanceContext {
         normalise_punctuation: true,
         capitalise_sentences: true,
         apply_corrections: true,
+        fix_grammar: true,
     }
 }
 
@@ -123,6 +124,18 @@ const SAFETY_CORPUS: &[(&str, &str)] = &[
     ("the sign reads \"uh oh\" in red", "The sign reads \"uh oh\" in red."),
     ("they chanted \"we we we\" all night", "They chanted \"we we we\" all night."),
     ("the quote was \"i mean, really\" word for word", "The quote was \"i mean, really\" word for word."),
+    // ── grammar: patterns that look like an error and are not ──
+    ("between a and b the gap is small", "Between a and b the gap is small."),
+    ("choose plan a or plan b", "Choose plan a or plan b."),
+    ("we wait an hour for a university bus", "We wait an hour for a university bus."),
+    ("it is an MBA programme", "It is an MBA programme."),
+    ("world war I has a long history", "World war I has a long history."),
+    ("that could of course be true", "That could of course be true."),
+    ("the dog wagged its tail", "The dog wagged its tail."),
+    ("their going rate is high", "Their going rate is high."),
+    ("he said \"she don't care\" and left", "He said \"she don't care\" and left."),
+    ("the sign read \"a idea\" in red", "The sign read \"a idea\" in red."),
+    ("a one time fee and a european trip", "A one time fee and a european trip."),
     // ── another language is never run through English rules ──
     ("um like you know", "Um like you know."),
     ("hello um world comma again", "Hello um world comma again."),
@@ -315,6 +328,17 @@ const CORPUS: &[(&str, &str)] = &[
     ("okay okay let us go", "Okay let us go."),
     ("um okay", "Okay."),
     ("er um uh hello", "Hello."),
+    // ── grammar slips that are wrong every time ──
+    ("i have a idea about the layout", "I have an idea about the layout."),
+    ("she don't like the new design", "She doesn't like the new design."),
+    ("we was discussing the roadmap", "We were discussing the roadmap."),
+    ("they has finished the review", "They have finished the review."),
+    ("its a good plan and we agree", "It's a good plan and we agree."),
+    ("we could of been faster", "We could have been faster."),
+    ("their going to ship it tomorrow", "They're going to ship it tomorrow."),
+    ("i need an book from the shelf", "I need a book from the shelf."),
+    ("um she don't know a answer", "She doesn't know an answer."),
+    ("it was a honest mistake", "It was an honest mistake."),
 ];
 
 /// One mismatch, formatted as a bug report.

@@ -42,6 +42,7 @@ pub const STRIP_FILLERS: &str = "enhance.strip_fillers";
 pub const FILLER_STRENGTH: &str = "enhance.filler_strength";
 pub const SPOKEN_COMMANDS: &str = "enhance.spoken_commands";
 pub const APPLY_CORRECTIONS: &str = "enhance.apply_corrections";
+pub const FIX_GRAMMAR: &str = "enhance.fix_grammar";
 
 // ── Privacy ──────────────────────────────────────────────────────────────
 pub const RETENTION_DAYS: &str = "privacy.retention_days";

@@ -101,7 +101,7 @@ vocs/
         │   ├── cpal/                #   source (realtime callback) + resample
         │   ├── macos/               #   injector, permissions, sound
         │   ├── rules/               #   text.rs (commands, dictionary, punctuation),
-        │   │                        #   fillers.rs, repeats.rs, sentences.rs,
+        │   │                        #   fillers.rs, grammar.rs, repeats.rs, sentences.rs,
         │   │                        #   corpus.rs (the 150+ sentence acceptance test)
         │   └── http_models/         #   catalog, download, store, disk (free space)
         │

@@ -46,6 +46,10 @@ pub struct EnhanceContext {
      *        is silent, and a silent failure should be opt-in.
      */
     pub apply_corrections: bool,
+    /// Fix a small set of unambiguous grammar slips ("a idea", "she don't").
+    /// Off by default for the same reason as `apply_corrections`: it can change
+    /// words, so it is a choice.
+    pub fix_grammar: bool,
 }
 
 pub trait TextEnhancer: Send + Sync {

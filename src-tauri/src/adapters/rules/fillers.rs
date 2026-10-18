@@ -58,19 +58,19 @@ const CLAUSE_PUNCTUATION: [char; 5] = [',', ';', ':', '-', '\u{2014}'];
 const SENTENCE_END: [char; 3] = ['.', '!', '?'];
 
 /// One whitespace-delimited token split into the word and its trailing marks.
-struct Token<'a> {
+pub(super) struct Token<'a> {
     /// The word with trailing punctuation removed; empty for pure punctuation.
-    core: &'a str,
+    pub(super) core: &'a str,
     /// Trailing punctuation, e.g. "," or ".".
-    tail: &'a str,
+    pub(super) tail: &'a str,
     /// True when the token begins with punctuation (a quote, a bracket, a dash).
-    opens_with_mark: bool,
+    pub(super) opens_with_mark: bool,
     /// True when the token sits inside, or opens or closes, a double-quoted run.
     /// Quoted speech is somebody's exact words and is never edited.
-    quoted: bool,
+    pub(super) quoted: bool,
 }
 
-fn tokenise(text: &str) -> Vec<Token<'_>> {
+pub(super) fn tokenise(text: &str) -> Vec<Token<'_>> {
     let mut inside_quote = false;
     text.split_whitespace()
         .map(|raw| {
@@ -112,7 +112,7 @@ fn is_hesitation(core: &str) -> bool {
 }
 
 /// Lower-cased words of every enabled dictionary pattern and replacement.
-fn protected_words(dictionary: &[DictionaryEntry]) -> Vec<String> {
+pub(super) fn protected_words(dictionary: &[DictionaryEntry]) -> Vec<String> {
     dictionary
         .iter()
         .filter(|entry| entry.enabled)
@@ -123,7 +123,7 @@ fn protected_words(dictionary: &[DictionaryEntry]) -> Vec<String> {
         .collect()
 }
 
-fn is_english(language: Option<&LanguageCode>) -> bool {
+pub(super) fn is_english(language: Option<&LanguageCode>) -> bool {
     language.is_some_and(|l| l.as_str().starts_with("en"))
 }
 
