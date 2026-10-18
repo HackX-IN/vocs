@@ -213,6 +213,11 @@ pub struct MetricDef {
     pub label: String,
     /// Shown on the dashboard latency panel rather than kept for diagnostics.
     pub user_facing: bool,
+    /// Where the stage falls in the pipeline, earliest first. Derived from
+    /// LatencyStage's declaration order, which IS pipeline order: the panel
+    /// cannot take it from registry order, because Paste belongs to a different
+    /// capability than the stages around it.
+    pub order: u32,
 }
 
 /**

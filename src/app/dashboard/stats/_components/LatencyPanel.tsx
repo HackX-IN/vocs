@@ -3,7 +3,9 @@
  *   p50, p95
  * WHAT:  The p50/p95 table — the honest engineering metric, per stage.
  * WHY:   Which stages appear and what they are called both come from the
- *        registry's MetricDefs, filtered on `user_facing`. That flag exists so a
+ *        registry's MetricDefs, filtered on `user_facing`; the order comes from
+ *        each MetricDef's `order`, which is pipeline order. Capture, recognition,
+ *        correction and output each get a row, plus the total. That flag exists so a
  *        diagnostic stage can be recorded without being shown, and re-deciding
  *        that here would put a second opinion next to the declaration. A stage
  *        with no samples renders an em dash rather than a zero: zero latency is
@@ -29,7 +31,9 @@ export interface LatencyPanelProps {
 
 export function LatencyPanel({ metrics, latency }: LatencyPanelProps) {
   const byStage = new Map(latency.map((entry) => [entry.stage, entry]));
-  const rows = metrics.filter((metric) => metric.user_facing);
+  // `order` is pipeline order, which registry order is not: Paste is declared
+  // by a different capability than the stages around it.
+  const rows = metrics.filter((metric) => metric.user_facing).sort((a, b) => a.order - b.order);
   if (rows.length === 0) return null;
 
   const measured = rows.some((metric) => (byStage.get(metric.stage)?.sample_count ?? 0) > 0);

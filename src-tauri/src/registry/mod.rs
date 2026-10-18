@@ -203,6 +203,7 @@ fn metric(stage: LatencyStage, label: &str, user_facing: bool) -> MetricDef {
         stage,
         label: text(label),
         user_facing,
+        order: stage as u32,
     }
 }
 
@@ -233,11 +234,11 @@ fn build_capabilities() -> Vec<Capability> {
             }),
             metrics: vec![
                 metric(LatencyStage::HotkeyDispatch, "Hotkey", false),
-                metric(LatencyStage::DeviceOpen, "Microphone open", false),
+                metric(LatencyStage::DeviceOpen, "Capture (microphone open)", true),
                 metric(LatencyStage::ChunkDecode, "Background decode", false),
-                metric(LatencyStage::TailDecode, "Final decode", true),
+                metric(LatencyStage::TailDecode, "Recognition (final decode)", true),
                 metric(LatencyStage::Assemble, "Assemble", false),
-                metric(LatencyStage::Enhance, "Enhance", false),
+                metric(LatencyStage::Enhance, "Correction", true),
                 metric(LatencyStage::TotalFinalize, "Stop to pasted", true),
             ],
             settings: vec![
@@ -376,7 +377,7 @@ fn build_capabilities() -> Vec<Capability> {
             hotkey: None,
             metrics: vec![
                 metric(LatencyStage::ClipboardWrite, "Clipboard", false),
-                metric(LatencyStage::Inject, "Paste", false),
+                metric(LatencyStage::Inject, "Output (paste)", true),
             ],
             settings: vec![
                 needs_permission(
@@ -777,6 +778,28 @@ mod tests {
         let limit = CONTEXT_PROMPT_MAX_LEN as usize;
         assert!(context.validate_value(&SettingValue::Text("a".repeat(limit))).is_ok());
         assert!(context.validate_value(&SettingValue::Text("a".repeat(limit + 1))).is_err());
+    }
+
+    #[test]
+    fn the_user_facing_stages_run_in_pipeline_order() {
+        let mut shown: Vec<(u32, &str)> = CAPABILITIES
+            .iter()
+            .flat_map(|c| c.metrics.iter())
+            .filter(|m| m.user_facing)
+            .map(|m| (m.order, m.label.as_str()))
+            .collect();
+        shown.sort_unstable();
+        let labels: Vec<&str> = shown.into_iter().map(|(_, label)| label).collect();
+        assert_eq!(
+            labels,
+            [
+                "Capture (microphone open)",
+                "Recognition (final decode)",
+                "Correction",
+                "Output (paste)",
+                "Stop to pasted",
+            ]
+        );
     }
 
     #[test]
