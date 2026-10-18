@@ -200,6 +200,29 @@ pub fn find_orphans(db: &Database) -> AppResult<Vec<SessionSummary>> {
     })
 }
 
+/**
+ * SOURCE OF TRUTH KEYWORDS: checkpoint_transcript, crash_safe_recording
+ * WHAT:  Saves the words heard so far onto a session that is still recording.
+ * WHY:   The transcript used to exist only in memory until the recording ended,
+ *        so a crash or a force-quit lost everything said since the start —
+ *        which, on a long dictation, is the whole thing. Interior chunks are
+ *        decoded while the user is still talking; writing each one's result
+ *        here means an interrupted session keeps all but the last few seconds.
+ *        Guarded by `ended_at IS NULL` so a late checkpoint can never overwrite
+ *        a session that has already been finalised or recovered.
+ * WHERE: Called by session/actor.rs after each chunk is assembled; read back by
+ *        History through find_orphans / mark_orphaned.
+ */
+pub fn checkpoint_transcript(db: &Database, id: &SessionId, raw_text: &str) -> AppResult<()> {
+    db.with_connection(|conn| {
+        conn.execute(
+            "UPDATE sessions SET raw_text = ?2 WHERE id = ?1 AND ended_at IS NULL",
+            params![id.as_str(), raw_text],
+        )?;
+        Ok(())
+    })
+}
+
 /// Closes out an orphan that cannot be recovered, so it stops being reported.
 pub fn mark_orphaned(db: &Database, id: &SessionId, ended_at: i64) -> AppResult<()> {
     db.with_connection(|conn| {
@@ -450,6 +473,56 @@ mod tests {
 
         let found = latest_with_text(&db)?.expect("the older session has words");
         assert_eq!(found.id, older, "a blank newer session is skipped");
+        Ok(())
+    }
+
+    #[test]
+    fn an_interrupted_session_keeps_the_words_checkpointed_before_it_died() -> AppResult<()> {
+        let db = Database::open_in_memory()?;
+        let id = seed(&db, "crashed", 1_000)?;
+
+        checkpoint_transcript(&db, &id, "first part")?;
+        checkpoint_transcript(&db, &id, "first part and the second part")?;
+
+        // What launch-time recovery does to a row with no ended_at.
+        let orphan = find_orphans(&db)?.into_iter().next().expect("still open");
+        assert_eq!(orphan.raw_text.as_deref(), Some("first part and the second part"));
+        mark_orphaned(&db, &id, 5_000)?;
+
+        let recovered = get_session(&db, &id)?.expect("exists");
+        assert_eq!(recovered.outcome, SessionOutcome::Orphaned);
+        assert_eq!(recovered.effective_text(), Some("first part and the second part"));
+        assert_eq!(latest_with_text(&db)?.map(|s| s.id), Some(id));
+        Ok(())
+    }
+
+    #[test]
+    fn a_late_checkpoint_cannot_overwrite_a_finished_session() -> AppResult<()> {
+        let db = Database::open_in_memory()?;
+        let id = seed(&db, "done", 1_000)?;
+        finalize_session(
+            &db,
+            &id,
+            &SessionResult {
+                ended_at: 2_000,
+                outcome: SessionOutcome::Delivered,
+                duration_ms: 1_000,
+                language: None,
+                raw_text: Some("the real transcript".into()),
+                final_text: Some("The real transcript.".into()),
+                word_count: Some(3),
+                delivery: DeliveryKind::Pasted,
+                error_code: None,
+                error_message: None,
+            },
+        )?;
+
+        checkpoint_transcript(&db, &id, "stale partial")?;
+
+        assert_eq!(
+            get_session(&db, &id)?.expect("exists").raw_text.as_deref(),
+            Some("the real transcript")
+        );
         Ok(())
     }
 }

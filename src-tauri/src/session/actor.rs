@@ -554,10 +554,12 @@ impl SessionActor {
             Some(pending) => {
                 let _timer = pending.latency.stage_timer(LatencyStage::Assemble);
                 pending.assembler.push_segments(&decode.segments);
+                checkpoint(&self.ctx.db, &decode.session_id, &pending.assembler.finish());
             }
             None if Some(&decode.session_id) == self.machine.session_id() => {
                 let _timer = self.latency.stage_timer(LatencyStage::Assemble);
                 self.assembler.push_segments(&decode.segments);
+                checkpoint(&self.ctx.db, &decode.session_id, &self.assembler.finish());
             }
             None => {
                 // Belongs to a recording that was cancelled, or one already
@@ -835,6 +837,22 @@ impl SessionActor {
     fn prompt(&self) -> Option<String> {
         let terms = services::dictionary::recent_terms(&self.ctx.db, 64).unwrap_or_default();
         super::prompt::build_prompt(self.settings.context_prompt.as_deref(), &terms)
+    }
+}
+
+/**
+ * WHAT:  Persists the transcript assembled so far; never fails the recording.
+ * WHY:   See services::sessions::checkpoint_transcript. A failed checkpoint is
+ *        logged and dropped: the words are still in memory and will be saved at
+ *        the end, and aborting a live dictation to report that the safety net
+ *        had a hole would be the safety net causing the loss.
+ */
+fn checkpoint(db: &crate::db::Database, session_id: &SessionId, transcript: &str) {
+    if transcript.is_empty() {
+        return;
+    }
+    if let Err(err) = services::sessions::checkpoint_transcript(db, session_id, transcript) {
+        tracing::warn!(error = %err, "could not checkpoint the transcript");
     }
 }
 
