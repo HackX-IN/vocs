@@ -95,7 +95,7 @@ fn tokenise(text: &str) -> Vec<Token<'_>> {
 fn collapse_repeats(word: &str) -> String {
     let mut out = String::with_capacity(word.len());
     for ch in word.chars().flat_map(char::to_lowercase) {
-        if out.chars().next_back() != Some(ch) {
+        if !out.ends_with(ch) {
             out.push(ch);
         }
     }
