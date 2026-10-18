@@ -1,0 +1,45 @@
+<!--
+  SOURCE OF TRUTH KEYWORDS: icon.svg, app-icon, bundle-icon, identity-icon, whisper-head, quote-marks
+  WHAT:  The Vocs app icon — a black, head-shaped blob on a pale squircle with two
+         white quote marks "whispered" from its crown. 1024x1024, Apple icon grid
+         (824pt squircle, 100pt margin, soft shadow).
+  WHY:   Authored as a vector so every size is rendered from one drawing instead of
+         being scaled down from a bitmap. The head, quotes and squircle are written
+         in a normalised 0..100 space and scaled by one transform, which is the same
+         space assets/mark.svg uses — so the in-app mark and the app icon are one
+         object, not two drawings that drift.
+  WHERE: Rendered to src-tauri/icons/* (icon.png -> .icns/.ico via `tauri icon`).
+         The monochrome version for the menu bar and the pill is assets/mark.svg.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="paper" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f7f7f6"/>
+      <stop offset="1" stop-color="#e7e7e5"/>
+    </linearGradient>
+    <linearGradient id="ink" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#232323"/>
+      <stop offset="1" stop-color="#090909"/>
+    </linearGradient>
+    <clipPath id="squircle">
+      <rect x="100" y="100" width="824" height="824" rx="184"/>
+    </clipPath>
+    <filter id="lift" x="-10%" y="-10%" width="120%" height="125%">
+      <feDropShadow dx="0" dy="14" stdDeviation="14" flood-color="#000" flood-opacity="0.28"/>
+    </filter>
+    <path id="quote" d="M0 0H38C72 0 100 28 100 64V120H6V62H30C52 62 52 38 30 38H2Z"/>
+  </defs>
+
+  <rect x="100" y="100" width="824" height="824" rx="184" fill="url(#paper)" filter="url(#lift)"/>
+
+  <g clip-path="url(#squircle)">
+    <g transform="translate(100 100) scale(8.24)">
+      <path fill="url(#ink)"
+        d="M-6 46.5L0 45.5C12 39.5 30 26.5 47 26C63 25.5 82 36 87.4 52.5C90 60 90.8 75 91 105H-6Z"/>
+      <g fill="#fff">
+        <use href="#quote" transform="translate(44.3 43.2) rotate(-4) scale(0.126)"/>
+        <use href="#quote" transform="translate(60.9 42) rotate(-4) scale(0.126)"/>
+      </g>
+    </g>
+  </g>
+</svg>
