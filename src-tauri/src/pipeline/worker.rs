@@ -119,7 +119,9 @@ impl AsrWorker {
                     // are recorded separately so one cannot mask the other.
                     let stage = match kind {
                         ChunkKind::Tail => LatencyStage::TailDecode,
-                        ChunkKind::Interior => LatencyStage::ChunkDecode,
+                        // An interim snapshot is speculative work for the captions;
+                        // the actor discards its timing, so the label is nominal.
+                        ChunkKind::Interior | ChunkKind::Interim => LatencyStage::ChunkDecode,
                     };
 
                     let started = Instant::now();

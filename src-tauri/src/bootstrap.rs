@@ -142,6 +142,9 @@ fn apply_window_vibrancy(app: &AppHandle) {
     let window_radius = crate::tray::design_token("--radius-window");
     for (label, material, radius) in [
         (PILL_WINDOW, NSVisualEffectMaterial::HudWindow, Some(crate::tray::pill_radius())),
+        // The caption HUD is the pill's sibling: the same dark HUD material cut
+        // to its own rounder-rectangle radius.
+        (CAPTION_WINDOW, NSVisualEffectMaterial::HudWindow, Some(crate::tray::design_token("--radius-caption"))),
         // The rail is its own floating object, so it carries the window radius
         // rather than the pill's. Sidebar material to match the dashboard it
         // hangs beside.
@@ -165,6 +168,7 @@ fn apply_window_vibrancy(app: &AppHandle) {
 /// Window labels, matching tauri.conf.json. Typos here fail at runtime.
 pub const DASHBOARD_WINDOW: &str = "dashboard";
 pub const PILL_WINDOW: &str = "pill";
+pub const CAPTION_WINDOW: &str = "caption";
 pub const SIDEBAR_WINDOW: &str = "sidebar";
 pub const ONBOARDING_WINDOW: &str = "onboarding";
 
@@ -1142,6 +1146,13 @@ fn on_escape(app: &AppHandle) {
     };
     let state = state.inner().clone();
 
+    // A paste preview owns Escape ONLY while no recording is live. A user who has
+    // already started the next dictation means "cancel that one", and the preview
+    // just runs its course (see session/preview.rs).
+    if matches!(state.current_state(), crate::types::SessionState::Idle) && state.preview.cancel() {
+        return;
+    }
+
     tauri::async_runtime::spawn(async move {
         let event = match state.current_state() {
             crate::types::SessionState::CancelPending { .. } => SessionEvent::CancelAborted,
@@ -1192,33 +1203,38 @@ fn let_the_pill_float_over_everything(app: &AppHandle) {
         use objc2::rc::Retained;
         use objc2_app_kit::{NSWindow, NSWindowCollectionBehavior};
 
-        let Some(pill) = app.get_webview_window(PILL_WINDOW) else {
-            return;
-        };
-        let Ok(handle) = pill.ns_window() else {
-            return;
-        };
-
-        // SAFETY: the handle is Tauri's NSWindow for a window that exists, and
-        // this runs on the main thread during setup.
-        unsafe {
-            let Some(window) = Retained::retain(handle as *mut NSWindow) else {
-                return;
+        // The caption HUD floats exactly like the pill: it is shown over the
+        // same full-screen editors and meetings, and a caption that vanished
+        // there would be absent precisely where live captions are wanted.
+        for label in [PILL_WINDOW, CAPTION_WINDOW] {
+            let Some(overlay) = app.get_webview_window(label) else {
+                continue;
+            };
+            let Ok(handle) = overlay.ns_window() else {
+                continue;
             };
 
-            window.setCollectionBehavior(
-                NSWindowCollectionBehavior::CanJoinAllSpaces
-                    | NSWindowCollectionBehavior::FullScreenAuxiliary
-                    | NSWindowCollectionBehavior::Stationary
-                    | NSWindowCollectionBehavior::IgnoresCycle,
-            );
+            // SAFETY: the handle is Tauri's NSWindow for a window that exists,
+            // and this runs on the main thread during setup.
+            unsafe {
+                let Some(window) = Retained::retain(handle as *mut NSWindow) else {
+                    continue;
+                };
 
-            // NSStatusWindowLevel. Named by value because objc2-app-kit does
-            // not re-export the constant; 25 is the level menu-bar extras use.
-            window.setLevel(25);
+                window.setCollectionBehavior(
+                    NSWindowCollectionBehavior::CanJoinAllSpaces
+                        | NSWindowCollectionBehavior::FullScreenAuxiliary
+                        | NSWindowCollectionBehavior::Stationary
+                        | NSWindowCollectionBehavior::IgnoresCycle,
+                );
+
+                // NSStatusWindowLevel. Named by value because objc2-app-kit does
+                // not re-export the constant; 25 is the level menu-bar extras use.
+                window.setLevel(25);
+            }
+
+            tracing::info!(window = label, "the overlay will follow the user into full-screen apps");
         }
-
-        tracing::info!("the pill will follow the user into full-screen apps");
     }
 
     #[cfg(not(target_os = "macos"))]
@@ -2014,7 +2030,7 @@ mod tests {
     fn window_labels_match_the_configuration() {
         // A typo here fails at runtime, when a window silently does not appear.
         let config = include_str!("../tauri.conf.json");
-        for label in [DASHBOARD_WINDOW, PILL_WINDOW, ONBOARDING_WINDOW] {
+        for label in [DASHBOARD_WINDOW, PILL_WINDOW, CAPTION_WINDOW, ONBOARDING_WINDOW] {
             assert!(
                 config.contains(&format!("\"label\": \"{label}\"")),
                 "window `{label}` is not declared in tauri.conf.json"

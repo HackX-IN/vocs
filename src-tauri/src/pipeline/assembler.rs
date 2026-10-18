@@ -34,7 +34,7 @@ const MAX_SEAM_WORDS: usize = 6;
  *        which is exactly when it is hardest to notice.
  * WHERE: One per session, owned by the session actor.
  */
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub struct Assembler {
     /// (start_ms, text), kept sorted by start_ms.
     parts: Vec<(u64, String)>,

@@ -549,3 +549,29 @@ Settings                                  (display face)
 - **A missing OS permission is announced once per page**, above the cards, with the button that opens the right System Settings pane — not once per blocked row.
 - **An ON switch is the accent**; an OFF one is a sunken track with a quiet knob. A settings screen is a wall of switches and the lit ones are the ones doing something.
 
+---
+
+## 15. The caption HUD
+
+One floating window for two features, because they are one object at two moments of a dictation: the panel that shows what Vocs is **hearing** while you speak is the one that shows what it is about to **write** when you stop.
+
+```
+ ╭──────────────────────────────────────────────╮
+ │ ● LIVE                                       │   520 × 132 pt, above the pill
+ │ HEARD um so we should ship it comma today    │   dark in both colour schemes
+ │ So we should ship it, today.                 │
+ ╰──────────────────────────────────────────────╯
+ ╭──────────────────────────────────────────────╮
+ │ PASTING IN A MOMENT              Esc to keep it out │
+ │ ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━  │   a line, draining
+ │ So we should ship it, today.                 │
+ ╰──────────────────────────────────────────────╯
+```
+
+- **Same family as the pill.** A near-black `--pill-surface` panel with the `--pill-ring` outline, `--pill-ink` text, `--pill-signal` for the one live thing, cut to `--radius-caption` (24pt). It floats on every Space and over full-screen apps, is click-through (it can never take a click or focus from the app being dictated into), and is created once and only shown and hidden.
+- **A fixed size the text is laid out into.** `--caption-width` × `--caption-height`, stood `--caption-offset-bottom` above the bottom edge — above the pill, which is `--pill-offset-bottom` + `--pill-height` + a gap. `src-tauri/src/tray.rs` reads these by name from `tokens.css`, exactly as it does for the pill, and places it **once per appearance** on the display under the cursor. It has no animated exit: the pill's exit carries the outcome ("committed" rises, "cancelled" drops) and a caption has no outcome to carry.
+- **Live** — a signal-green dot that breathes, the eyebrow "LIVE", then the text. It shows the **end** of a long transcript (the last ~150 characters, cut at a word, with a leading ellipsis): while you speak, the newest words are the ones that matter. **"Heard" is shown only when it differs from "fixed"** — repeating identical text is noise. The words are the committed transcript plus a snapshot of the open chunk, so they arrive within a couple of seconds, not in ten-second lumps; see `session/captions.rs` for why that costs a little extra work and is therefore opt-in.
+- **Preview** — the eyebrow "PASTING IN A MOMENT", "Esc to keep it out" at the right, a horizontal draining line (the same `CountdownLine`, created once per preview), and the **start** of the finished text on up to three lines — that is how you recognise a paragraph. It shows what will be pasted (after enhancement), not what was heard. Escape withholds the paste; the words are still saved in Dictations, marked "Not pasted".
+- **It never blanks itself.** Rust hides the window and the same news reaches the webview over IPC on a different frame; a view that cleared on `null` would flash an empty panel at the end of every caption. It keeps the last caption and lets the window be taken away.
+- **Escape belongs to a live recording first.** While a preview is up Escape means "keep this out"; the moment a new recording is live, Escape cancels *that* and the preview runs its course.
+

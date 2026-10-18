@@ -35,8 +35,8 @@ use crate::error::AppError;
 use crate::ipc::context::SessionContext;
 use crate::pipeline::assembler::Assembler;
 use crate::ports::injector::InjectionRequest;
-use crate::ports::enhancer::EnhanceContext;
 use crate::services;
+use crate::session::enhance_context::enhance_context;
 use crate::session::machine::SessionEvent;
 use crate::session::settings_view::SessionSettings;
 use crate::telemetry::latency::{now_ms, LatencyRecorder};
@@ -164,18 +164,7 @@ async fn deliver(ctx: &SessionContext, pending: PendingDelivery) {
 
     let dictionary = services::dictionary::enabled_entries(&ctx.db).unwrap_or_default();
 
-    let context = EnhanceContext {
-        language: language.clone(),
-        dictionary,
-        strip_fillers: settings.strip_fillers,
-        filler_strength: settings.filler_strength,
-        expand_spoken_commands: settings.spoken_commands,
-        normalise_punctuation: settings.normalise_punctuation,
-        capitalise_sentences: settings.capitalise_sentences,
-        apply_corrections: settings.apply_corrections,
-        fix_grammar: settings.fix_grammar,
-        tone: settings.tone,
-    };
+    let context = enhance_context(&settings, language.clone(), dictionary);
 
     let final_text = {
         let _timer = latency.stage_timer(LatencyStage::Enhance);
@@ -190,6 +179,29 @@ async fn deliver(ctx: &SessionContext, pending: PendingDelivery) {
                 raw.clone()
             })
     };
+
+    /*
+     * Opt-in preview: the finished text is shown for a moment and Escape keeps it
+     * out of the document. Placed AFTER enhancement — it shows what WILL be
+     * pasted, not what was heard — and BEFORE the injection timer, so the pause
+     * the user chose is not billed to the app's "output" latency. Withheld text
+     * is still saved to Dictations: previewing must never be a way to lose words.
+     */
+    if settings.preview_before_paste
+        && super::preview::hold(ctx, &final_text, settings.preview_ms).await
+            == super::preview::PreviewOutcome::Withheld
+    {
+        tracing::info!("the user withheld the paste at the preview");
+        persist(
+            ctx,
+            &session_id,
+            &latency,
+            Outcome::delivered(DeliveryKind::None),
+            started_at,
+            Some((raw, final_text, language)),
+        );
+        return;
+    }
 
     let outcome = {
         let _timer = latency.stage_timer(LatencyStage::Inject);

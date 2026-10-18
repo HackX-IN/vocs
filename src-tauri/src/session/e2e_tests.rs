@@ -156,6 +156,8 @@ struct RecordingEventSink {
     deliveries: Mutex<Vec<(u32, crate::types::DeliveryKind)>>,
     states: Mutex<Vec<SessionState>>,
     pill_visible: Mutex<Vec<bool>>,
+    /// Every caption pushed to the HUD, in order; `None` is "hide it".
+    captions: Mutex<Vec<Option<crate::types::Caption>>>,
 }
 
 impl EventSink for RecordingEventSink {
@@ -170,6 +172,9 @@ impl EventSink for RecordingEventSink {
     fn mic_test_update(&self, _update: crate::types::MicTestUpdate) {}
     fn set_pill_visible(&self, visible: bool) {
         self.pill_visible.lock().push(visible);
+    }
+    fn caption_changed(&self, caption: Option<&crate::types::Caption>) {
+        self.captions.lock().push(caption.cloned());
     }
     fn download_progress(&self, _progress: DownloadProgress) {}
     fn set_cancel_key_active(&self, _active: bool) {}
@@ -880,6 +885,129 @@ mod scripted {
             Some("So we should ship it, today."),
             "filler removal, spoken formatting and casing must all have run"
         );
+    }
+
+    /**
+     * WHAT:  With the preview on, the finished text is put on the HUD for the
+     *        chosen time and then pasted as normal.
+     * WHY:   The preview must be a pause, never a loss: asserted on the caption
+     *        the HUD was given (the enhanced text, not the heard text — it shows
+     *        what WILL be pasted) and on the paste still happening.
+     */
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn a_preview_holds_the_finished_text_then_pastes_it() {
+        let Some(samples) = speech("scripted-preview-confirm") else {
+            eprintln!("skipped: could not synthesise speech");
+            return;
+        };
+        let (harness, rx) = build(samples, ScriptedEngine::saying("um hello there")).expect("harness");
+        set(&harness.db, crate::registry::keys::STRIP_FILLERS, SettingValue::Bool(true));
+        set(&harness.db, crate::registry::keys::PREVIEW_BEFORE_PASTE, SettingValue::Bool(true));
+        set(&harness.db, crate::registry::keys::PREVIEW_MS, SettingValue::Number(500.0));
+
+        run_session(&harness, rx, Duration::from_secs(3)).await;
+
+        assert_eq!(harness.injector.delivered.lock().clone().as_deref(), Some("Hello there."));
+
+        let captions = harness.events.captions.lock().clone();
+        assert_eq!(
+            captions.first(),
+            Some(&Some(crate::types::Caption::Preview { text: "Hello there.".into(), hold_ms: 500 })),
+            "the HUD is shown what will be pasted"
+        );
+        assert_eq!(captions.last(), Some(&None), "and put away afterwards");
+        assert!(!harness.ctx.preview.is_active(), "nothing is left armed");
+    }
+
+    /**
+     * WHAT:  Escape during the preview keeps the text out of the document and
+     *        still saves it.
+     * WHY:   The two halves of "withheld, not deleted": nothing reaches the
+     *        injector, and History still has the words — previewing must never be
+     *        a way to lose a dictation.
+     */
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn escape_at_the_preview_withholds_the_paste_but_keeps_the_words() {
+        let Some(samples) = speech("scripted-preview-withhold") else {
+            eprintln!("skipped: could not synthesise speech");
+            return;
+        };
+        let (harness, rx) = build(samples, ScriptedEngine::saying("hello there")).expect("harness");
+        set(&harness.db, crate::registry::keys::PREVIEW_BEFORE_PASTE, SettingValue::Bool(true));
+        // Long enough that only Escape can end it inside the test.
+        set(&harness.db, crate::registry::keys::PREVIEW_MS, SettingValue::Number(5_000.0));
+
+        // Escape, as the global-shortcut handler delivers it.
+        let gate = harness.ctx.preview.clone();
+        tokio::spawn(async move {
+            for _ in 0..400 {
+                if gate.cancel() {
+                    return;
+                }
+                tokio::time::sleep(Duration::from_millis(20)).await;
+            }
+        });
+
+        run_session(&harness, rx, Duration::from_secs(3)).await;
+
+        assert!(harness.injector.delivered.lock().is_none(), "the paste was withheld");
+        let session = services::sessions::list_sessions(&harness.db, 1, 0).expect("list").remove(0);
+        assert_eq!(session.final_text.as_deref(), Some("Hello there."), "the words are still saved");
+        assert_eq!(session.delivery, crate::types::DeliveryKind::None);
+    }
+
+    /**
+     * WHAT:  Live captions show what was HEARD and what will be WRITTEN while the
+     *        user is still speaking, and clear when capture ends — without
+     *        changing what is delivered.
+     * WHY:   The last clause is the one that matters: a speculative decode must
+     *        not leak into the transcript, so the paste is asserted to be exactly
+     *        what it is with captions off, not that text twice.
+     */
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn live_captions_show_heard_and_fixed_and_leave_the_transcript_alone() {
+        let Some(samples) = speech("scripted-live-captions") else {
+            eprintln!("skipped: could not synthesise speech");
+            return;
+        };
+        let (harness, rx) = build(samples, ScriptedEngine::saying("um hello there")).expect("harness");
+        set(&harness.db, crate::registry::keys::STRIP_FILLERS, SettingValue::Bool(true));
+        set(&harness.db, crate::registry::keys::LIVE_CAPTIONS, SettingValue::Bool(true));
+
+        run_session(&harness, rx, Duration::from_secs(4)).await;
+
+        let captions = harness.events.captions.lock().clone();
+        assert!(
+            captions.iter().any(|caption| matches!(
+                caption,
+                Some(crate::types::Caption::Live { heard, fixed })
+                    if heard == "um hello there" && fixed == "Hello there."
+            )),
+            "no live caption carried both texts: {captions:?}"
+        );
+        assert_eq!(captions.last(), Some(&None), "the HUD is cleared when capture ends");
+        assert_eq!(
+            harness.injector.delivered.lock().clone().as_deref(),
+            Some("Hello there."),
+            "a speculative snapshot must never reach the transcript"
+        );
+    }
+
+    /// Off by default: no snapshot is ever decoded and the HUD is never shown.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn captions_do_nothing_unless_they_are_switched_on() {
+        let Some(samples) = speech("scripted-captions-off") else {
+            eprintln!("skipped: could not synthesise speech");
+            return;
+        };
+        let engine = ScriptedEngine::saying("hello there");
+        let (harness, rx) = build(samples, Arc::clone(&engine) as Arc<dyn TranscriptionEngine>).expect("harness");
+
+        run_session(&harness, rx, Duration::from_secs(3)).await;
+
+        assert!(harness.events.captions.lock().is_empty(), "the HUD must stay away");
+        // Only the tail was decoded: no extra work was spent on captions.
+        assert_eq!(engine.requests.lock().len(), 1, "no snapshot may be decoded with captions off");
     }
 
     /// What was heard is in the row, beside what was delivered.

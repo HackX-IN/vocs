@@ -18,12 +18,12 @@ use tauri::AppHandle;
 use tauri_specta::Event;
 
 use crate::ipc::events::{
-    AudioLevelChanged, MicTestChanged, ModelDownloadProgress, ModelStateChanged,
+    AudioLevelChanged, CaptionChanged, MicTestChanged, ModelDownloadProgress, ModelStateChanged,
     SessionStateChanged, TranscriptDelivered,
 };
 use crate::ports::events::EventSink;
 use crate::types::{
-    AudioLevel, DownloadProgress, MicTestUpdate, ModelId, ModelState, SessionState,
+    AudioLevel, Caption, DownloadProgress, MicTestUpdate, ModelId, ModelState, SessionState,
 };
 
 pub struct TauriEventSink {
@@ -78,6 +78,27 @@ impl EventSink for TauriEventSink {
 
     fn set_pill_visible(&self, visible: bool) {
         crate::tray::set_pill_visible(&self.app, visible);
+    }
+
+    fn caption_changed(&self, caption: Option<&Caption>) {
+        // Window first, event second: the webview is told what to draw into a
+        // window that is already on its way up, rather than the other way round.
+        crate::tray::set_caption_visible(&self.app, caption.is_some());
+
+        // A preview is the one caption the user can ACT on, and the action is
+        // Escape — which belongs to whatever app they are in, so it is grabbed
+        // only while a preview is up and released with it (see
+        // set_escape_registered). It is not released if a recording is live: the
+        // actor owns Escape then, to cancel that recording.
+        match caption {
+            Some(Caption::Preview { .. }) => crate::bootstrap::set_escape_registered(&self.app, true),
+            None if crate::tray::is_idle(&self.app) => crate::bootstrap::set_escape_registered(&self.app, false),
+            _ => {}
+        }
+
+        if let Err(err) = (CaptionChanged { caption: caption.cloned() }).emit(&self.app) {
+            tracing::warn!(error = %err, "could not emit a caption");
+        }
     }
 
     fn set_cancel_key_active(&self, active: bool) {

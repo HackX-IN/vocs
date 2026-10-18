@@ -123,6 +123,7 @@ export const commands = {
 /** Events */
 export const events = {
 	audioLevelChanged: makeEvent<AudioLevelChanged>("audio-level-changed"),
+	captionChanged: makeEvent<CaptionChanged>("caption-changed"),
 	micTestChanged: makeEvent<MicTestChanged>("mic-test-changed"),
 	modelDownloadProgress: makeEvent<ModelDownloadProgress>("model-download-progress"),
 	modelStateChanged: makeEvent<ModelStateChanged>("model-state-changed"),
@@ -242,6 +243,30 @@ export type CapabilityKey =
 "DICTATION" | "HISTORY" | "STATS" | "DICTIONARY" | "MODELS" | "SETTINGS" | "ONBOARDING" | "UPDATES" | 
 /**  A page that exists to say there is nothing to pay for. */
 "BILLING";
+
+export type Caption = 
+/**  Words appearing as you speak. */
+{ kind: "LIVE"; heard: string; fixed: string } | 
+/**
+ *  The corrected text, held for `hold_ms` before it is pasted. Escape
+ *  withholds it.
+ */
+{ kind: "PREVIEW"; text: string; hold_ms: number };
+
+/**
+ * 
+ *  * SOURCE OF TRUTH KEYWORDS: CaptionChanged
+ *  * WHAT:  What the caption HUD should show, or `None` when it should be empty.
+ *  * WHY:   The HUD is one window for two features — live captions and the preview
+ *  *        before a paste — so it is one event carrying a `Caption`. Pushed on
+ *  *        every change rather than polled: a caption is only ever the latest
+ *  *        text, so a dropped frame is invisible and the next one corrects it.
+ *  * WHERE: Emitted by the TauriEventSink; rendered by src/app/caption.
+ *  
+ */
+export type CaptionChanged = {
+	caption: Caption | null,
+};
 
 /**
  * 

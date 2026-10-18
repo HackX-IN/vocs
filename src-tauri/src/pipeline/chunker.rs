@@ -36,6 +36,8 @@ const MAX_CHUNK_MS: u64 = 15_000;
 const BOUNDARY_SILENCE_MS: u64 = 350;
 /// Carried into the next chunk so a word across the seam survives.
 const OVERLAP_MS: u64 = 200;
+/// An interim snapshot shorter than this is a breath, not a caption.
+const MIN_INTERIM_MS: u64 = 1_200;
 
 fn ms_to_samples(ms: u64) -> usize {
     (ms as usize * TARGET_SAMPLE_RATE as usize) / 1000
@@ -125,6 +127,30 @@ impl Chunker {
      */
     pub fn close_tail(&mut self) -> Option<AudioChunk> {
         self.close(ChunkKind::Tail)
+    }
+
+    /**
+     * SOURCE OF TRUTH KEYWORDS: snapshot_interim, live_captions
+     * WHAT:  A copy of the audio buffered so far, tagged Interim — or None when
+     *        there is too little of it, or too little speech in it.
+     * WHY:   Read-only by construction (`&self`): taking a snapshot must never
+     *        close the chunk, move the overlap or reset the detector, or live
+     *        captions would change what the transcript contains. The same speech
+     *        gate as `close` applies, so a pause is not handed to the model to
+     *        invent words from.
+     * WHERE: Called by the session actor when session/captions.rs says a snapshot
+     *        is due.
+     */
+    pub fn snapshot_interim(&self) -> Option<AudioChunk> {
+        if samples_to_ms(self.buffer.len()) < MIN_INTERIM_MS || !self.detector.carries_speech() {
+            return None;
+        }
+        Some(AudioChunk {
+            samples: self.buffer.clone(),
+            start_ms: samples_to_ms(self.chunk_start_samples),
+            end_ms: samples_to_ms(self.chunk_start_samples + self.buffer.len()),
+            kind: ChunkKind::Interim,
+        })
     }
 
     fn close(&mut self, kind: ChunkKind) -> Option<AudioChunk> {
@@ -286,6 +312,34 @@ mod tests {
 
     fn quiet(ms: u64) -> Vec<f32> {
         vec![0.0; ms_to_samples(ms)]
+    }
+
+    #[test]
+    fn a_snapshot_copies_the_buffer_and_leaves_the_chunk_exactly_as_it_was() {
+        let mut chunker = Chunker::new();
+        assert!(chunker.push(&speech!(2_000)).is_none());
+        let pending = chunker.pending_ms();
+
+        let snapshot = chunker.snapshot_interim().expect("two seconds of speech is worth a caption");
+
+        assert_eq!(snapshot.kind, ChunkKind::Interim);
+        assert_eq!(snapshot.samples.len(), ms_to_samples(pending));
+        assert_eq!(chunker.pending_ms(), pending, "taking a snapshot must not consume the buffer");
+        // And the chunk it was taken from still closes normally afterwards.
+        assert!(chunker.close_tail().is_some());
+    }
+
+    #[test]
+    fn there_is_no_snapshot_of_a_breath_or_of_silence() {
+        let mut chunker = Chunker::new();
+        assert!(chunker.snapshot_interim().is_none(), "nothing buffered");
+
+        chunker.push(&speech!(500));
+        assert!(chunker.snapshot_interim().is_none(), "too short to be a caption");
+
+        let mut silent = Chunker::new();
+        silent.push(&quiet(3_000));
+        assert!(silent.snapshot_interim().is_none(), "no speech for the model to invent words from");
     }
 
     #[test]

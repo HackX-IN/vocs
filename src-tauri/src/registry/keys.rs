@@ -20,6 +20,7 @@ pub const CANCEL_COUNTDOWN_MS: &str = "dictation.cancel_countdown_ms";
 pub const DISCARD_ON_ESCAPE: &str = "dictation.discard_on_escape";
 pub const INPUT_DEVICE: &str = "dictation.input_device";
 pub const AUDIO_FEEDBACK: &str = "dictation.audio_feedback";
+pub const LIVE_CAPTIONS: &str = "dictation.live_captions";
 
 // ── Transcription ────────────────────────────────────────────────────────
 pub const TRANSCRIPTION_MODEL: &str = "transcription.model";
@@ -31,6 +32,8 @@ pub const CONTEXT_PROMPT: &str = "transcription.context_prompt";
 pub const AUTO_PASTE: &str = "output.auto_paste";
 pub const RESTORE_CLIPBOARD: &str = "output.restore_clipboard";
 pub const PASTE_DELAY_MS: &str = "output.paste_delay_ms";
+pub const PREVIEW_BEFORE_PASTE: &str = "output.preview_before_paste";
+pub const PREVIEW_MS: &str = "output.preview_ms";
 pub const CLIPBOARD_RESTORE_DELAY_MS: &str = "output.clipboard_restore_delay_ms";
 pub const COPY_LAST_ENABLED: &str = "output.copy_last_enabled";
 pub const COPY_LAST_HOTKEY: &str = "output.copy_last_hotkey";

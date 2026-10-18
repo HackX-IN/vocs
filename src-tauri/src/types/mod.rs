@@ -11,6 +11,7 @@
 
 pub mod audio;
 pub mod backup;
+pub mod caption;
 pub mod dictionary;
 pub mod diff;
 pub mod engine;
@@ -26,6 +27,7 @@ pub use audio::{
     AudioChunk, AudioLevel, CaptureMode, ChunkKind, DeviceInfo, MicTestStopReason, MicTestUpdate,
     TARGET_SAMPLE_RATE,
 };
+pub use caption::Caption;
 pub use backup::{BackupDictionaryEntry, BackupFile, ImportSummary, BACKUP_FORMAT, BACKUP_VERSION};
 pub use diff::{DiffKind, DiffSegment};
 pub use dictionary::{DictionaryEntry, DictionaryId, MatchKind};

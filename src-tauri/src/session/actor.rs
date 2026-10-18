@@ -38,6 +38,7 @@ use crate::types::{
     ChunkKind, LanguageCode, LanguageHint, LatencyStage, SessionId, SessionState,
 };
 
+use super::captions::LiveCaptions;
 use super::delivery::{FinishedRecording, PendingDelivery};
 use super::machine::{Effect, SessionEvent, SessionMachine};
 use super::settings_view::SessionSettings;
@@ -71,6 +72,8 @@ pub struct SessionActor {
     machine: SessionMachine,
     chunker: Chunker,
     assembler: Assembler,
+    /// Live captions for the recording being captured. See session/captions.rs.
+    captions: LiveCaptions,
     worker: AsrWorker,
     latency: Arc<LatencyRecorder>,
 
@@ -168,6 +171,7 @@ impl SessionActor {
             machine: SessionMachine::new(settings.cancel_countdown_ms),
             chunker: Chunker::new(),
             assembler: Assembler::new(),
+            captions: LiveCaptions::new(),
             latency: Arc::new(LatencyRecorder::new()),
             capture: None,
             capture_rx: None,
@@ -362,6 +366,15 @@ impl SessionActor {
         self.machine
             .set_discard_on_escape(self.settings.discard_on_escape);
 
+        // The dictionary is only read when captions are on: it is for the
+        // "fixed" half of the caption and nothing else here uses it.
+        let caption_dictionary = if self.settings.live_captions {
+            services::dictionary::enabled_entries(&self.ctx.db).unwrap_or_default()
+        } else {
+            Vec::new()
+        };
+        self.captions.begin(self.settings.live_captions, caption_dictionary);
+
         let session = services::sessions::NewSession {
             id: session_id,
             started_at: now_ms(),
@@ -492,10 +505,15 @@ impl SessionActor {
         match event {
             CaptureEvent::Samples(samples) => {
                 if let Some(chunk) = self.chunker.push(&samples) {
+                    // Any snapshot still being decoded now describes audio that
+                    // is about to be part of the transcript.
+                    self.captions.chunk_closed();
                     let request = self.transcribe_request();
                     if let Some(session_id) = self.machine.session_id().cloned() {
                         self.worker.submit(chunk, request, session_id);
                     }
+                } else if self.captions.due(self.chunker.duration_ms()) {
+                    self.request_caption_snapshot();
                 }
             }
             CaptureEvent::Level(level) => {
@@ -509,7 +527,56 @@ impl SessionActor {
         }
     }
 
+    /**
+     * WHAT:  Asks the engine to decode a snapshot of the open chunk, for the
+     *        live captions.
+     * WHY:   Skipped without penalty when there is nothing worth decoding yet or
+     *        the queue is full: either way the next attempt is a full interval
+     *        away, so a busy engine sees at most one extra job at a time and real
+     *        chunks are never crowded out.
+     */
+    fn request_caption_snapshot(&mut self) {
+        let now = self.chunker.duration_ms();
+        let Some(session_id) = self.machine.session_id().cloned() else {
+            return;
+        };
+        let Some(snapshot) = self.chunker.snapshot_interim() else {
+            self.captions.requested(now, false);
+            return;
+        };
+        let request = self.transcribe_request();
+        let submitted = self.worker.submit(snapshot, request, session_id);
+        self.captions.requested(now, submitted);
+    }
+
+    /// An interim snapshot came back. It never touches the transcript.
+    fn handle_interim(&mut self, decode: DecodeResult) {
+        // A result for a recording that is no longer the live one is nobody's
+        // business — and must not clear the CURRENT recording's in-flight flag.
+        if Some(&decode.session_id) != self.machine.session_id() {
+            return;
+        }
+        let current = self.captions.accept();
+        if !current || decode.error.is_some() {
+            return;
+        }
+        self.captions.show(
+            &self.ctx,
+            &self.settings,
+            &self.assembler,
+            &decode.segments,
+            self.detected_language.clone(),
+        );
+    }
+
     async fn handle_decode(&mut self, decode: DecodeResult) {
+        // Speculative work for the captions: no latency sample, no language
+        // pinning, no assembly, no checkpoint.
+        if decode.kind == ChunkKind::Interim {
+            self.handle_interim(decode);
+            return;
+        }
+
         /*
          * SOURCE OF TRUTH KEYWORDS: decode_timing_follows_its_session
          * Record against the recorder that OWNS this decode, not the actor's
@@ -734,6 +801,11 @@ impl SessionActor {
                 }
                 _ => {}
             }
+        }
+
+        // The words stop being live the moment capture ends.
+        if was_capturing && !state.is_capturing() {
+            self.captions.end(&self.ctx);
         }
 
         // Escape is ours only while there is something to cancel.

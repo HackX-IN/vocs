@@ -28,6 +28,20 @@ pub struct SessionStateChanged {
 }
 
 /**
+ * SOURCE OF TRUTH KEYWORDS: CaptionChanged
+ * WHAT:  What the caption HUD should show, or `None` when it should be empty.
+ * WHY:   The HUD is one window for two features — live captions and the preview
+ *        before a paste — so it is one event carrying a `Caption`. Pushed on
+ *        every change rather than polled: a caption is only ever the latest
+ *        text, so a dropped frame is invisible and the next one corrects it.
+ * WHERE: Emitted by the TauriEventSink; rendered by src/app/caption.
+ */
+#[derive(Debug, Clone, Serialize, Deserialize, Type, Event)]
+pub struct CaptionChanged {
+    pub caption: Option<crate::types::Caption>,
+}
+
+/**
  * SOURCE OF TRUTH KEYWORDS: TranscriptDelivered
  * WHAT:  A recording finished its journey — the text has been pasted or copied.
  * WHY:   Delivery no longer ends when the session state machine does, so the

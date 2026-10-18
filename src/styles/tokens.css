@@ -308,6 +308,18 @@
   --pill-bar-gap: 6px;
   --pill-bar-max: 26px;
 
+  /* ── The caption HUD (docs/04 §15) ──────────────────────────────────────
+   * One window for two features: the live captions shown while you speak and the
+   * preview held before a paste. Fixed size, like the pill, for the same reason
+   * — only Rust can size a window and only the webview can measure text, so the
+   * window is a size the text is laid out INTO, never one it is fitted to.
+   * src-tauri/tray.rs reads these by name. --caption-offset-bottom stands it
+   * above the pill: the pill's own offset, plus the pill's height, plus a gap. */
+  --caption-width: 520px;
+  --caption-height: 132px;
+  --caption-offset-bottom: 232px;
+  --radius-caption: 24px;
+
   /* The countdown line of docs/04 §7 — the cancel-armed state. Starts full and
    * drains to zero. Height only; its width is whatever the middle slot gives it,
    * because a line that is always the same length as the waveform it replaces
@@ -318,7 +330,6 @@
   --countdown-line-length: 26px;
 
   --pill-offset-bottom: 96px;
-  --pill-dot-size: 8px;
   --pill-pulse-duration: 2s;
   --pill-pulse-opacity-min: 0.6;
 
@@ -444,6 +455,9 @@
   /* Cards (docs/04 §11): the one surface for a unit of content. */
   --card-padding: 20px;
   --card-header-height: 20px;
+
+  /* The onboarding tour's page dots. */
+  --step-dot-size: 8px;
 
   --keycap-height-sm: 18px;
   --keycap-height-md: 24px;

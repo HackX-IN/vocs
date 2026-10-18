@@ -96,6 +96,18 @@ const KNOWN_UPWARD_IMPORTS: &[(&str, &str, &str)] = &[
         "Same as session/actor.rs: the delivery worker is handed a \
          SessionContext from ipc/context.rs.",
     ),
+    (
+        "session/preview.rs",
+        "ipc",
+        "Same as session/delivery.rs: the paste preview is run from the \
+         delivery worker and takes its SessionContext from ipc/context.rs.",
+    ),
+    (
+        "session/captions.rs",
+        "ipc",
+        "Same as session/actor.rs: live captions are driven by the actor and \
+         take its SessionContext from ipc/context.rs.",
+    ),
 ];
 
 fn layer_of(module: &str) -> Option<usize> {

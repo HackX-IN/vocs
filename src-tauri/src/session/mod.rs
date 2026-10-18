@@ -10,7 +10,10 @@
 
 pub mod actor;
 pub mod delivery;
+pub mod enhance_context;
+pub mod captions;
 pub mod machine;
+pub mod preview;
 pub mod prompt;
 
 #[cfg(test)]

@@ -1,0 +1,21 @@
+<!--
+  SOURCE OF TRUTH KEYWORDS: caption-window, caption.html, caption-entry, live-captions, preview-pill
+  WHAT:  The caption HUD document. Loads src/entries/caption.tsx.
+  WHY:   Its own document, like the pill, so the HUD ships no charts, tables or
+         router and paints inside a frame while an audio thread and an inference
+         worker are running. The body is transparent through styles/global.css.
+  WHERE: Opened as the floating caption window by src-tauri. Siblings: pill.html,
+         index.html, sidebar.html, onboarding.html.
+-->
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Vocs captions</title>
+  </head>
+  <body data-window="caption">
+    <div id="root"></div>
+    <script type="module" src="/src/entries/caption.tsx"></script>
+  </body>
+</html>

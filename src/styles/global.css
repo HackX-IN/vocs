@@ -175,7 +175,8 @@
    * across both edges instead of dumping it all on the right, and overflow is
    * clipped to the window's rounded bounds either way.
    */
-  body[data-window="pill"] #root {
+  body[data-window="pill"] #root,
+  body[data-window="caption"] #root {
     display: flex;
     align-items: center;
     justify-content: center;

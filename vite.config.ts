@@ -18,13 +18,14 @@ export default defineConfig(async () => ({
     },
   },
 
-  // Three windows, three bundles. The pill's must not contain the dashboard's
+  // One bundle per window. The pill's must not contain the dashboard's
   // charts or tables — it paints while inference runs (docs/02 §9).
   build: {
     rollupOptions: {
       input: {
         dashboard: fileURLToPath(new URL("./index.html", import.meta.url)),
         pill: fileURLToPath(new URL("./pill.html", import.meta.url)),
+        caption: fileURLToPath(new URL("./caption.html", import.meta.url)),
         onboarding: fileURLToPath(new URL("./onboarding.html", import.meta.url)),
         sidebar: fileURLToPath(new URL("./sidebar.html", import.meta.url)),
       },

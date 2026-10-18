@@ -25,7 +25,7 @@
  *        the end-to-end tests. Consumed by session/actor.rs.
  */
 
-use crate::types::{AudioLevel, DownloadProgress, MicTestUpdate, ModelId, ModelState, SessionState};
+use crate::types::{AudioLevel, Caption, DownloadProgress, MicTestUpdate, ModelId, ModelState, SessionState};
 
 pub trait EventSink: Send + Sync {
     /// The recording state changed. The pill renders exactly this.
@@ -44,6 +44,15 @@ pub trait EventSink: Send + Sync {
     fn transcript_delivered(&self, word_count: u32, delivery: crate::types::DeliveryKind);
 
     fn set_pill_visible(&self, visible: bool);
+
+    /**
+     * WHAT:  Show, update or hide the caption HUD. `None` hides it.
+     * WHY:   One seam for two features — live captions while you speak and the
+     *        preview before a paste — because they are one window. The adapter
+     *        decides what showing it means (placing it, grabbing Escape for a
+     *        preview); the domain only says what should be on screen.
+     */
+    fn caption_changed(&self, caption: Option<&Caption>);
 
     /// Model download progress, during onboarding and model switches.
     fn download_progress(&self, progress: DownloadProgress);
@@ -92,6 +101,7 @@ impl EventSink for NullEventSink {
     fn transcript_delivered(&self, _word_count: u32, _delivery: crate::types::DeliveryKind) {}
 
     fn set_pill_visible(&self, _visible: bool) {}
+    fn caption_changed(&self, _caption: Option<&Caption>) {}
     fn download_progress(&self, _progress: DownloadProgress) {}
     fn model_state_changed(&self, _model_id: ModelId, _state: ModelState) {}
     fn set_cancel_key_active(&self, _active: bool) {}

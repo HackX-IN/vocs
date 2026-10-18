@@ -268,6 +268,7 @@ mod tests {
         }
         fn transcript_delivered(&self, _words: u32, _delivery: crate::types::DeliveryKind) {}
         fn set_pill_visible(&self, _visible: bool) {}
+        fn caption_changed(&self, _caption: Option<&crate::types::Caption>) {}
         fn download_progress(&self, _progress: crate::types::DownloadProgress) {}
         fn model_state_changed(
             &self,

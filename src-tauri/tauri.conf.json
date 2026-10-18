@@ -58,6 +58,21 @@
         "acceptFirstMouse": false
       },
       {
+        "label": "caption",
+        "url": "caption.html",
+        "width": 520,
+        "height": 132,
+        "resizable": false,
+        "visible": false,
+        "transparent": true,
+        "decorations": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "shadow": true,
+        "focus": false,
+        "acceptFirstMouse": false
+      },
+      {
         "label": "onboarding",
         "url": "onboarding.html",
         "title": "Welcome to Vocs",

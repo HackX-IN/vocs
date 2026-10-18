@@ -30,6 +30,7 @@ use crate::ports::{
     TranscriptionEngine,
 };
 use crate::registry::CapabilityKey;
+use crate::session::preview::PreviewGate;
 use crate::session::SessionEvent;
 use crate::types::SessionState;
 
@@ -156,6 +157,10 @@ pub struct AppState {
     inflight: Arc<Mutex<HashSet<CapabilityKey>>>,
     /// Last state the actor published. See `current_state`.
     published_state: Arc<Mutex<SessionState>>,
+    /// The cancel signal for a paste preview. Shared with the delivery worker
+    /// through `session_context`, and reached by the Escape handler. See
+    /// session/preview.rs.
+    pub preview: PreviewGate,
 }
 
 impl AppState {
@@ -175,6 +180,7 @@ impl AppState {
             app,
             inflight: Arc::new(Mutex::new(HashSet::new())),
             published_state: Arc::new(Mutex::new(SessionState::Idle)),
+            preview: PreviewGate::new(),
         }
     }
 
@@ -211,6 +217,7 @@ impl AppState {
             ports: self.ports.clone(),
             session: self.session.clone(),
             published_state: Arc::clone(&self.published_state),
+            preview: self.preview.clone(),
         }
     }
 
@@ -270,6 +277,8 @@ pub struct SessionContext {
     pub ports: Ports,
     pub session: SessionHandle,
     published_state: Arc<Mutex<SessionState>>,
+    /// See AppState::preview.
+    pub preview: PreviewGate,
 }
 
 impl SessionContext {
@@ -280,6 +289,7 @@ impl SessionContext {
             ports,
             session,
             published_state: Arc::new(Mutex::new(SessionState::Idle)),
+            preview: PreviewGate::new(),
         }
     }
 

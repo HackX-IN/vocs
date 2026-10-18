@@ -102,6 +102,7 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             events::TranscriptDelivered,
             events::PermissionsChanged,
             events::AudioLevelChanged,
+            events::CaptionChanged,
             events::MicTestChanged,
             events::ModelDownloadProgress,
             events::ModelStateChanged,

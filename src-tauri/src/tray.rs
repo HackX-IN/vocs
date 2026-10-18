@@ -453,6 +453,97 @@ pub fn pill_radius() -> f64 {
 }
 
 /**
+ * SOURCE OF TRUTH KEYWORDS: set_caption_visible, CAPTION, CaptionMetrics, caption_window,
+ *   caption_placement, is_idle
+ * WHAT:  Shows or hides the caption HUD, placing it above the pill on the display
+ *        under the cursor when it appears.
+ * WHY:   The HUD is the pill's sibling and follows the pill's rules: created once
+ *        and only ever shown and hidden, click-through so it can never steal a
+ *        click or focus from the app being dictated into, and placed ONCE per
+ *        appearance — captions arrive several times a second, and a window that
+ *        re-chose its display on each would chase the pointer between monitors
+ *        mid-sentence. Its frame comes from the same `pill_frame_on` arithmetic
+ *        (pure, and tested across displays of different scale), with its own
+ *        inset standing it above the pill.
+ *
+ *        It hides without the pill's animated exit: that motion exists to say
+ *        "committed" or "cancelled" and a caption has no outcome to carry.
+ * WHERE: Called by TauriEventSink::caption_changed.
+ */
+static CAPTION: std::sync::LazyLock<CaptionMetrics> = std::sync::LazyLock::new(CaptionMetrics::from_tokens);
+
+struct CaptionMetrics {
+    width: f64,
+    height: f64,
+    offset_bottom: f64,
+}
+
+impl CaptionMetrics {
+    fn from_tokens() -> Self {
+        Self {
+            width: design_token("--caption-width"),
+            height: design_token("--caption-height"),
+            offset_bottom: design_token("--caption-offset-bottom"),
+        }
+    }
+}
+
+/// Whether the caption is currently up, as far as WE are concerned — see
+/// PILL_SHOWN for why `window.is_visible()` is not trusted for this.
+static CAPTION_SHOWN: AtomicBool = AtomicBool::new(false);
+
+pub fn set_caption_visible(app: &AppHandle, visible: bool) {
+    let Some(window) = app.get_webview_window(crate::bootstrap::CAPTION_WINDOW) else {
+        return;
+    };
+
+    if !visible {
+        if CAPTION_SHOWN.swap(false, Ordering::SeqCst) {
+            let _ = window.hide();
+        }
+        return;
+    }
+
+    // Placed on the way UP only; a caption that is already showing just gets new
+    // text from the event, in the same frame.
+    if !CAPTION_SHOWN.swap(true, Ordering::SeqCst) {
+        let placement = app
+            .cursor_position()
+            .ok()
+            .and_then(|cursor| app.monitor_from_point(cursor.x, cursor.y).ok().flatten())
+            .or_else(|| app.primary_monitor().ok().flatten());
+
+        if let Some(monitor) = placement {
+            let ((x, y), (w, h)) = pill_frame_on(
+                (monitor.position().x, monitor.position().y),
+                (monitor.size().width, monitor.size().height),
+                monitor.scale_factor(),
+                (CAPTION.width, CAPTION.height),
+                CAPTION.offset_bottom,
+            );
+            let position = tauri::PhysicalPosition::new(x, y);
+            // Move, size, move — the same dance, for the same reason, as
+            // apply_pill_frame.
+            let _ = window.set_position(position);
+            let _ = window.set_size(tauri::PhysicalSize::new(w, h));
+            let _ = window.set_position(position);
+        } else {
+            tracing::warn!("no display to place the captions on; leaving them where they are");
+        }
+    }
+
+    let _ = window.set_ignore_cursor_events(true);
+    let _ = window.show();
+}
+
+/// Whether no recording is live. Used to decide if Escape can be released: a
+/// live recording owns it.
+pub fn is_idle(app: &AppHandle) -> bool {
+    app.try_state::<crate::ipc::context::AppState>()
+        .is_none_or(|state| matches!(state.current_state(), crate::types::SessionState::Idle))
+}
+
+/**
  * SOURCE OF TRUTH KEYWORDS: fit_pill_to_state
  * WHAT:  Resizes the pill window to match the pill the state will draw, and
  *        keeps it centred while doing it.
@@ -575,10 +666,11 @@ fn pill_frame_on(
     monitor_size: (u32, u32),
     scale: f64,
     pill_points: (f64, f64),
+    bottom_inset_pt: f64,
 ) -> ((i32, i32), (u32, u32)) {
     let width = (pill_points.0 * scale).round() as i32;
     let height = (pill_points.1 * scale).round() as i32;
-    let inset = (PILL_BOTTOM_INSET_PT * scale).round() as i32;
+    let inset = (bottom_inset_pt * scale).round() as i32;
 
     let x = monitor_position.0 + (monitor_size.0 as i32 - width) / 2;
     let y = monitor_position.1 + monitor_size.1 as i32 - height - inset;
@@ -604,6 +696,7 @@ fn apply_pill_frame(window: &tauri::WebviewWindow, placement: PillPlacement, poi
         placement.size,
         placement.scale,
         points,
+        PILL_BOTTOM_INSET_PT,
     );
     let position = tauri::PhysicalPosition::new(x, y);
     let size = tauri::PhysicalSize::new(w, h);
@@ -666,7 +759,7 @@ mod tests {
             ("external 1x, to the right", (3456, 0), (2560, 1440), 1.0),
             ("external 1.5x, above", (0, -1600), (2560, 1600), 1.5),
         ] {
-            let ((x, y), (w, h)) = pill_frame_on(origin, size, scale, pill);
+            let ((x, y), (w, h)) = pill_frame_on(origin, size, scale, pill, PILL_BOTTOM_INSET_PT);
 
             let left_gap = x - origin.0;
             let right_gap = (origin.0 + size.0 as i32) - (x + w as i32);
@@ -702,7 +795,7 @@ mod tests {
         let pill = (200.0, 44.0);
         let external = ((3456, 0), (2560u32, 1440u32), 1.0);
 
-        let ((x, _), (w, _)) = pill_frame_on(external.0, external.1, external.2, pill);
+        let ((x, _), (w, _)) = pill_frame_on(external.0, external.1, external.2, pill, PILL_BOTTOM_INSET_PT);
 
         // What the old code effectively did: centre using the 2x display's
         // pixel width. Kept here as the counter-example so the difference is
@@ -771,6 +864,9 @@ mod tests {
         let pill = PillMetrics::from_tokens();
 
         for (name, value) in [
+            ("--caption-width", CAPTION.width),
+            ("--caption-height", CAPTION.height),
+            ("--caption-offset-bottom", CAPTION.offset_bottom),
             ("--pill-width", pill.width),
             ("--pill-height", pill.height),
             ("--pill-width-failed", pill.width_failed),

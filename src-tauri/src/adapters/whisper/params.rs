@@ -60,7 +60,7 @@ pub const ENTROPY_THOLD: f32 = 2.4;
  * WHY:   Kept separate from ChunkKind so the accuracy/latency trade is decided
  *        in one place and is legible at the call site, rather than being read
  *        off a boolean four frames deep.
- * WHERE: Derived from AudioChunk::is_tail by `DecodeProfile::for_chunk`.
+ * WHERE: Derived from AudioChunk::shrinks_context by `DecodeProfile::for_chunk`.
  */
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DecodeProfile {
@@ -87,7 +87,7 @@ impl DecodeProfile {
      * WHERE: adapters/whisper/engine.rs::transcribe, once per chunk.
      */
     pub fn for_chunk(chunk: &AudioChunk, coreml_live: bool) -> Self {
-        if chunk.is_tail() && !coreml_live {
+        if chunk.shrinks_context() && !coreml_live {
             Self::Tail
         } else {
             Self::Background

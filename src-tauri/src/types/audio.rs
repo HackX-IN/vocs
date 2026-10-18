@@ -52,6 +52,13 @@ impl AudioChunk {
     pub fn is_tail(&self) -> bool {
         matches!(self.kind, ChunkKind::Tail)
     }
+
+    /// Whether the engine may shrink its encoder context for this decode: the
+    /// tail (to be fast when the user is waiting) and an interim snapshot (to be
+    /// cheap while the user is still talking).
+    pub fn shrinks_context(&self) -> bool {
+        matches!(self.kind, ChunkKind::Tail | ChunkKind::Interim)
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -61,6 +68,10 @@ pub enum ChunkKind {
     Interior,
     /// The fragment left when stop was pressed. The only latency-critical one.
     Tail,
+    /// A snapshot of the open chunk, decoded only to draw live captions. It
+    /// never closes the chunk and never enters the transcript — see
+    /// session/captions.rs.
+    Interim,
 }
 
 /**
