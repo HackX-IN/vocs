@@ -181,6 +181,14 @@ impl AudioSource for CpalAudioSource {
                 }
             },
             move |err| {
+                // Only an error that ends the stream ends the recording. The
+                // rest are glitches the stream survives — see `is_fatal`. No
+                // logging here beyond the one call: this closure runs on the
+                // audio backend's thread.
+                if !is_fatal(err.kind()) {
+                    tracing::warn!(error = %err, "the audio stream glitched and carried on");
+                    return;
+                }
                 // The stream is dead and will not recover on its own. Report it
                 // and let the FSM deliver whatever was already captured.
                 let _ = error_sink.try_send(CaptureEvent::Lost(
@@ -379,6 +387,35 @@ impl CaptureSession for CpalCaptureSession {
 }
 
 /**
+ * SOURCE OF TRUTH KEYWORDS: is_fatal, xrun, transient_stream_error, audio_glitch
+ * WHAT:  Whether a stream error means the recording is over (true) or the stream
+ *        is still delivering audio (false).
+ * WHY:   Every error used to be treated as "the microphone disconnected", and a
+ *        single buffer underrun — which CoreAudio reports under ordinary CPU
+ *        load, most often in the first moments of a stream while the model is
+ *        warming — ended the recording before the first word was spoken. cpal
+ *        documents which kinds are survivable: an Xrun is "a potential audio
+ *        glitch", a DeviceChanged means the stream was rerouted and "remains
+ *        active", and a denied real-time promotion means "audio will still
+ *        play". Ending a session for those is an app that fails on a busy
+ *        machine. A busy device, a missing one, a permission refusal, an
+ *        invalidated stream and every unclassified error stay fatal: the stream
+ *        is not going to deliver more audio, and saying so beats a silent
+ *        recording of nothing.
+ *
+ *        `ErrorKind` is #[non_exhaustive], so the match names the survivable
+ *        kinds and defaults to FATAL — a new kind added by a cpal upgrade ends
+ *        the session (loud) rather than being silently swallowed.
+ * WHERE: The stream error callback in `start`.
+ */
+fn is_fatal(kind: cpal::ErrorKind) -> bool {
+    !matches!(
+        kind,
+        cpal::ErrorKind::Xrun | cpal::ErrorKind::DeviceChanged | cpal::ErrorKind::RealtimeDenied
+    )
+}
+
+/**
  * SOURCE OF TRUTH KEYWORDS: build_stream
  * WHAT:  Builds an input stream for whichever sample format the device uses,
  *        normalising everything to f32 inside the callback.
@@ -469,6 +506,26 @@ fn device_error(err: cpal::Error) -> AppError {
 mod tests {
     use super::*;
     use crate::types::TARGET_SAMPLE_RATE;
+
+    #[test]
+    fn a_glitch_does_not_end_the_recording_but_a_dead_stream_does() {
+        use cpal::ErrorKind;
+        // The stream carries on after each of these.
+        for survivable in [ErrorKind::Xrun, ErrorKind::DeviceChanged, ErrorKind::RealtimeDenied] {
+            assert!(!is_fatal(survivable), "{survivable:?} must not end a recording");
+        }
+        // The stream will not deliver more audio after these.
+        for fatal in [
+            ErrorKind::DeviceNotAvailable,
+            ErrorKind::DeviceBusy,
+            ErrorKind::StreamInvalidated,
+            ErrorKind::PermissionDenied,
+            ErrorKind::BackendError,
+            ErrorKind::Other,
+        ] {
+            assert!(is_fatal(fatal), "{fatal:?} must end a recording");
+        }
+    }
 
     #[test]
     fn the_ring_holds_at_least_a_second_of_the_worst_case_device() {
