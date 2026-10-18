@@ -19,7 +19,7 @@ import { useMemo } from "react";
 import { commands, type HotkeyBinding, type NavDef, type RegistrySnapshot, type SettingValue } from "@/lib/bindings";
 import { useCommand } from "@/lib/ipc";
 import { useSettings } from "./use-settings";
-import { EmptyState, ErrorBoundary, ErrorSurface, Skeleton, ScrollArea } from "@/components/global";
+import { BootScreen, EmptyState, ErrorBoundary, ErrorSurface, Skeleton, ScrollArea, useBoot } from "@/components/global";
 import { PageShell } from "./_components/PageShell";
 import { UpdateNotice } from "./_components/UpdateNotice";
 import { BillingView } from "./billing";
@@ -57,6 +57,7 @@ export function Dashboard() {
   // empty state without a reload.
   const settings = useSettings();
   const { route, section } = useHashRoute();
+  const boot = useBoot(registry.data !== null || registry.error !== null);
 
   // The rail is a separate WINDOW now, so a click over there reaches us as an
   // event rather than as a callback. One way on purpose: nothing else in the
@@ -97,7 +98,8 @@ export function Dashboard() {
   const editingDictation = activeRoute === "history" && section !== null;
 
   return (
-    <main className="flex h-full">
+    <main className="relative flex h-full">
+      {boot.visible ? <BootScreen leaving={boot.leaving} /> : null}
       {/* No rail in here any more — it is its own window, hanging off this one
           as an AppKit child (docs/04 §8). What is left is the panel, and it
           draws no surface of its own: the window's native vibrancy IS the

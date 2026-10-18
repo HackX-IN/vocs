@@ -447,6 +447,9 @@
   /* How long the editor waits after the last keystroke before it saves. */
   --autosave-delay: 700ms;
   --feedback-hold: 1200ms;
+  /* The least time the startup screen stays up, so its animation finishes once
+   * instead of flashing for a frame when the data is instant. */
+  --boot-min-ms: 1100ms;
 
   --row-height: 64px;
   /* The floating search dock over the foot of the Dictations list (docs/04

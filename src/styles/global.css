@@ -128,6 +128,81 @@
   --animate-breathe: breathe var(--pill-pulse-duration) var(--motion-ease-standard) infinite;
 }
 
+/* The startup screen (components/global/boot-screen). Everything is `both`-filled so
+   a letter is invisible until its delay ends, and every motion is off under
+   prefers-reduced-motion at the bottom of this block. */
+.boot-screen {
+  background: var(--page-glow), var(--surface-opaque);
+}
+
+.boot-lattice {
+  animation: boot-fade 900ms var(--motion-ease-standard) both;
+}
+
+.boot-mark {
+  animation: boot-rise 520ms var(--motion-ease-standard) both;
+}
+
+.boot-bar {
+  transform-origin: center;
+  animation: boot-equalise 900ms var(--motion-ease-standard) infinite alternate both;
+}
+
+.boot-letter {
+  animation: boot-letter 420ms var(--motion-ease-standard) both;
+}
+
+@keyframes boot-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes boot-rise {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes boot-equalise {
+  from {
+    transform: scaleY(0.38);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+
+@keyframes boot-letter {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+    filter: blur(3px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+    filter: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .boot-lattice,
+  .boot-mark,
+  .boot-bar,
+  .boot-letter {
+    animation: none;
+  }
+}
+
 @keyframes breathe {
   0%,
   100% {

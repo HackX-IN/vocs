@@ -30,3 +30,4 @@ export * from "./keycap";
 export * from "./mark";
 export * from "./segmented-control";
 export * from "./window-bar";
+export * from "./boot-screen";
