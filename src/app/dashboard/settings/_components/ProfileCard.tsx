@@ -50,7 +50,7 @@ export function ProfileCard({ profile, defs, globals, dynamic, engine, permissio
       <div className="flex items-center gap-3 py-3">
         <span
           aria-hidden="true"
-          className="flex size-9 shrink-0 items-center justify-center rounded-input bg-sunken-strong font-display text-label text-text-primary"
+          className="flex size-9 shrink-0 items-center justify-center rounded-input bg-sunken-strong text-body font-medium text-text-primary"
         >
           {profile.display_name.charAt(0).toUpperCase() || "?"}
         </span>
