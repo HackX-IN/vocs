@@ -88,6 +88,14 @@ impl Validate for SetSettingInput {
                 return Err(format!("{} must be between {min} and {max}.", def.label));
             }
         }
+
+        if let (SettingValue::Text(value), crate::types::SettingKind::Text { max_len: Some(max), .. }) =
+            (&self.value, &def.kind)
+        {
+            if value.chars().count() > *max as usize {
+                return Err(format!("{} must be at most {max} characters.", def.label));
+            }
+        }
         Ok(())
     }
 }
@@ -171,4 +179,31 @@ pub async fn get_registry(state: State<'_, AppState>) -> Result<RegistrySnapshot
         Ok(registry::snapshot())
     })
     .await
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::registry::{keys, CONTEXT_PROMPT_MAX_LEN};
+
+    fn context_input(text: String) -> SetSettingInput {
+        SetSettingInput {
+            key: keys::CONTEXT_PROMPT.to_string(),
+            value: SettingValue::Text(text),
+        }
+    }
+
+    #[test]
+    fn a_text_setting_at_its_limit_is_accepted_and_one_past_it_is_not() {
+        let limit = CONTEXT_PROMPT_MAX_LEN as usize;
+        assert!(context_input("a".repeat(limit)).validate().is_ok());
+        assert!(context_input("a".repeat(limit + 1)).validate().is_err());
+    }
+
+    #[test]
+    fn the_limit_counts_characters_not_bytes() {
+        // 240 multi-byte characters are well over 240 bytes and still allowed.
+        let limit = CONTEXT_PROMPT_MAX_LEN as usize;
+        assert!(context_input("é".repeat(limit)).validate().is_ok());
+    }
 }

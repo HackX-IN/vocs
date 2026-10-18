@@ -11,6 +11,7 @@
 pub mod actor;
 pub mod delivery;
 pub mod machine;
+pub mod prompt;
 
 #[cfg(test)]
 mod e2e_tests;

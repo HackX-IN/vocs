@@ -811,19 +811,18 @@ impl SessionActor {
     }
 
     /**
-     * WHAT:  The vocabulary prompt, most-important term first.
+     * WHAT:  The recognition prompt: the user's context, then dictionary terms,
+     *        most-important first.
      * WHY:   Ordering is a contract with the engine adapter: over whisper's
      *        ~224-token budget it keeps the LEADING terms and drops from the
-     *        tail. Sorted most-recently-used first, so the terms the user
-     *        actually says survive truncation.
+     *        tail. The user's context is typed deliberately, so it leads;
+     *        dictionary terms follow, sorted most-recently-used first so the
+     *        terms the user actually says survive truncation.
      * WHERE: Attached to every TranscribeRequest.
      */
     fn prompt(&self) -> Option<String> {
-        let terms = services::dictionary::recent_terms(&self.ctx.db, 64).ok()?;
-        if terms.is_empty() {
-            return None;
-        }
-        Some(terms.join(", "))
+        let terms = services::dictionary::recent_terms(&self.ctx.db, 64).unwrap_or_default();
+        super::prompt::build_prompt(self.settings.context_prompt.as_deref(), &terms)
     }
 }
 

@@ -94,17 +94,65 @@ export function NumberControl({ setting }: { setting: NumberSetting }) {
   );
 }
 
+/** Past this many characters a field is a sentence, not a word, and wraps. */
+const MULTILINE_FROM_CHARS = 80;
+
+/**
+ * WHAT:  A text field that saves when you leave it, not on every keystroke.
+ * WHY:   Settings round-trip through the backend and come back as an event, so a
+ *        field bound straight to that value saves per keystroke and then fights
+ *        the caret when the echo lands. The draft is local while focused and
+ *        follows the backend otherwise, so a change from another window still
+ *        shows. Enter commits a one-line field; a wrapping one keeps Enter for
+ *        itself.
+ */
 export function TextControl({ setting }: { setting: TextSetting }) {
+  const [draft, setDraft] = useState(setting.value);
+  const focused = useRef(false);
+
+  useEffect(() => {
+    if (!focused.current) setDraft(setting.value);
+  }, [setting.value]);
+
+  const commit = () => {
+    if (draft !== setting.value) setting.onChange(draft);
+  };
+
+  const shared = {
+    id: setting.id,
+    value: draft,
+    placeholder: setting.placeholder,
+    maxLength: setting.maxLength,
+    disabled: setting.disabled,
+    onFocus: () => {
+      focused.current = true;
+    },
+    onBlur: () => {
+      focused.current = false;
+      commit();
+    },
+    className: cn(CONTROL_CLASS, "w-56 placeholder:text-text-tertiary"),
+  };
+
+  if ((setting.maxLength ?? 0) > MULTILINE_FROM_CHARS) {
+    return (
+      <textarea
+        {...shared}
+        rows={3}
+        onChange={(event) => setDraft(event.target.value)}
+        className={cn(shared.className, "h-auto resize-none py-1.5")}
+      />
+    );
+  }
+
   return (
     <input
-      id={setting.id}
+      {...shared}
       type="text"
-      value={setting.value}
-      placeholder={setting.placeholder}
-      maxLength={setting.maxLength}
-      disabled={setting.disabled}
-      onChange={(event) => setting.onChange(event.target.value)}
-      className={cn(CONTROL_CLASS, "w-56 placeholder:text-text-tertiary")}
+      onChange={(event) => setDraft(event.target.value)}
+      onKeyDown={(event) => {
+        if (event.key === "Enter") event.currentTarget.blur();
+      }}
     />
   );
 }

@@ -25,6 +25,7 @@ pub const AUDIO_FEEDBACK: &str = "dictation.audio_feedback";
 pub const TRANSCRIPTION_MODEL: &str = "transcription.model";
 pub const LANGUAGE: &str = "transcription.language";
 pub const FINALIZE_TIMEOUT_MS: &str = "transcription.finalize_timeout_ms";
+pub const CONTEXT_PROMPT: &str = "transcription.context_prompt";
 
 // ── Output ───────────────────────────────────────────────────────────────
 pub const AUTO_PASTE: &str = "output.auto_paste";

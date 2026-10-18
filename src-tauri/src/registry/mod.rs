@@ -48,6 +48,11 @@ use crate::types::{
     EngineFeature, HotkeyBinding, KeyModifier, LatencyStage, SettingKind, SettingValue,
 };
 
+/// Longest context a user may enter, in characters. Whisper keeps ~224 tokens of
+/// prompt in total and the dictionary shares that budget, so a context that
+/// could swallow it would silently push every dictionary term out.
+pub const CONTEXT_PROMPT_MAX_LEN: u32 = 240;
+
 /// The table. Everything else in this module is a view onto it.
 pub static CAPABILITIES: LazyLock<Vec<Capability>> = LazyLock::new(build_capabilities);
 
@@ -71,6 +76,29 @@ fn toggle(
         section,
         kind: SettingKind::Toggle,
         default: SettingValue::Bool(default),
+        requires_engine: vec![],
+        requires_permission: vec![],
+        advanced: false,
+    }
+}
+
+fn free_text(
+    key: &str,
+    label: &str,
+    description: &str,
+    section: SettingSection,
+    (placeholder, max_len): (&str, u32),
+) -> SettingDef {
+    SettingDef {
+        key: text(key),
+        label: text(label),
+        description: text(description),
+        section,
+        kind: SettingKind::Text {
+            placeholder: Some(text(placeholder)),
+            max_len: Some(max_len),
+        },
+        default: SettingValue::Text(String::new()),
         requires_engine: vec![],
         requires_permission: vec![],
         advanced: false,
@@ -318,6 +346,16 @@ fn build_capabilities() -> Vec<Capability> {
                     requires_engine: vec![EngineFeature::LanguageAutoDetect],
                     requires_permission: vec![],
                     advanced: false,
+                },
+                SettingDef {
+                    requires_engine: vec![EngineFeature::InitialPrompt],
+                    ..free_text(
+                        keys::CONTEXT_PROMPT,
+                        "Context",
+                        "Tell the model what you usually talk about — jargon, product names, the topic. It listens for those words first. Your dictionary terms are added after it.",
+                        SettingSection::Transcription,
+                        ("e.g. Rust, Tauri, Kubernetes, Wire One Labs", CONTEXT_PROMPT_MAX_LEN),
+                    )
                 },
             ],
         },
@@ -691,6 +729,7 @@ mod tests {
             keys::TRANSCRIPTION_MODEL,
             keys::LANGUAGE,
             keys::FINALIZE_TIMEOUT_MS,
+            keys::CONTEXT_PROMPT,
             keys::AUTO_PASTE,
             keys::RESTORE_CLIPBOARD,
             keys::PASTE_DELAY_MS,

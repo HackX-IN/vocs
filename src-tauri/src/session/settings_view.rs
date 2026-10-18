@@ -49,6 +49,9 @@ pub struct SessionSettings {
     pub normalise_punctuation: bool,
     pub capitalise_sentences: bool,
     pub audio_feedback: bool,
+    /// The user's own recognition bias, ahead of the dictionary terms. None
+    /// when blank, so the actor never builds a prompt out of whitespace.
+    pub context_prompt: Option<String>,
 }
 
 impl SessionSettings {
@@ -133,6 +136,9 @@ impl SessionSettings {
             normalise_punctuation: read_bool(stored, keys::NORMALISE_PUNCTUATION).unwrap_or(true),
             capitalise_sentences: read_bool(stored, keys::CAPITALISE_SENTENCES).unwrap_or(true),
             audio_feedback: read_bool(stored, keys::AUDIO_FEEDBACK).unwrap_or(true),
+            context_prompt: read_choice(stored, keys::CONTEXT_PROMPT)
+                .map(|text| text.trim().to_string())
+                .filter(|text| !text.is_empty()),
         }
     }
 }
@@ -256,6 +262,24 @@ mod tests {
         let mut stored = empty();
         stored.insert(keys::PASTE_DELAY_MS.to_string(), SettingValue::Number(-5.0));
         assert_eq!(SessionSettings::from_stored(&stored).paste_delay_ms, 0);
+    }
+
+    #[test]
+    fn a_blank_context_prompt_is_no_context_prompt() {
+        assert_eq!(SessionSettings::from_stored(&empty()).context_prompt, None);
+
+        let mut stored = empty();
+        stored.insert(keys::CONTEXT_PROMPT.to_string(), SettingValue::Text("  \n ".into()));
+        assert_eq!(SessionSettings::from_stored(&stored).context_prompt, None);
+
+        stored.insert(
+            keys::CONTEXT_PROMPT.to_string(),
+            SettingValue::Text("  Rust, Tauri ".into()),
+        );
+        assert_eq!(
+            SessionSettings::from_stored(&stored).context_prompt.as_deref(),
+            Some("Rust, Tauri")
+        );
     }
 
     #[test]
