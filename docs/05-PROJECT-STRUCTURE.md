@@ -25,7 +25,7 @@ vocs/
 │   │   │   ├── stats/               # StatsView + ActivityChart, LanguageBreakdown,
 │   │   │   │                        #   LatencyPanel (no chart library — docs/04 §11)
 │   │   │   ├── history/             # HistoryView + HistoryRow + use-history,
-│   │   │   │                        #   HistoryDetail (diff), session-text
+│   │   │   │                        #   CorrectionsDock (said vs fixed overlay), FindBar, session-text
 │   │   │   ├── settings/            # SettingsView + DictionaryManager,
 │   │   │   │                        #   ModelManager, MicTestPanel, BackupPanel,
 │   │   │   │                        #   DiagnosticsPanel, AppProfiles,
@@ -61,7 +61,8 @@ vocs/
         ├── main.rs · lib.rs         # wiring only, no logic
         ├── bootstrap.rs             # ★ the ONLY file naming a concrete adapter
         ├── copy_last_hotkey.rs      # optional global shortcut: copy the last transcript
-        ├── tray.rs                  # menu bar item; pill show/hide
+        ├── tray.rs                  # menu bar item; pill and caption show/hide
+        ├── menu.rs                  # the application menu bar (Vocs, File, Edit, View, Window, Help)
         │
         ├── registry/                # ★ SINGLE SOURCE OF TRUTH
         │   ├── mod.rs               #   CAPABILITIES + validate_registry

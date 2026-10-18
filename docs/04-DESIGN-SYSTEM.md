@@ -574,3 +574,11 @@ One floating window for two features, because they are one object at two moments
 - **It never blanks itself.** Rust hides the window and the same news reaches the webview over IPC on a different frame; a view that cleared on `null` would flash an empty panel at the end of every caption. It keeps the last caption and lets the window be taken away.
 - **Escape belongs to a live recording first.** While a preview is up Escape means "keep this out"; the moment a new recording is live, Escape cancels *that* and the preview runs its course.
 
+
+## 16. The window bar and the startup screen
+
+- **One bar, three slots.** `WindowBar` (`components/global/window-bar`) is the strip across the top of the dashboard: a leading slot (the back button on a dictation), the title centred, and a trailing slot (the toolbar). Its height is `--titlebar-height` (52pt) and the native traffic lights are placed on its centre line by `tauri.conf.json`'s `trafficLightPosition` (x 24, y 28 — the buttons' centre sits at y − 2). The left slot starts at `--titlebar-safe-inset` so nothing is drawn under the lights. Pages start at `--page-header-height` (68pt); content tucks under the bar and fades.
+- **Page titles are centred and small.** The Doto face is reserved for figures and the empty and first-run states (≥ 34px); a page's name is a label on the bar, not a headline.
+- **The rail is a pill.** `--rail-width` 64pt with `--radius-rail` (32pt, half the width), `--rail-padding` 14pt and `--rail-item-gap` 10pt. The web layer paints the same curve over the window's rounded vibrancy, and the system shadow is off — it was drawn around the square window. Item names are native tooltips, because a tooltip drawn in the page would be clipped by the 64pt window.
+- **The startup screen** (`BootScreen`) covers a window until its data is ready and for at least `--boot-min-ms` (1100ms): the mark rises, three bars breathe like the pill's, and the word VOCS assembles letter by letter over a fading dot lattice. It is decoration — `aria-hidden`, and every motion stops under reduced motion.
+- **Chart tooltips.** The dot charts have no axes, so numbers are reached by pointing: `ChartTooltip` is an elevated card above the hovered column (or meter), clamped `--chart-tooltip-half-width` inside the chart. It never takes the pointer.

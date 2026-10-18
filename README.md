@@ -19,11 +19,13 @@ and no audio ever leaves your machine.
 - **99 languages**, auto-detected or pinned.
 - **A custom dictionary** for the names and jargon the model gets wrong — used
   both to bias recognition and to correct the output.
-- **Searchable local history**, so a failed paste is never a lost thought. Where
+- **A notebook of everything you dictated** — **Dictations** — searchable and filterable by period and status. Open one to edit it like a notepad: find in it, rename it, and it saves itself. It is local history, so a failed paste is never a lost thought. Where
   the rules changed your words, History shows what you said against what was
   delivered, and **Use original** takes your wording instead. **Copy Last
   Transcript** in the menu bar, or an optional global shortcut (off until you
   turn it on), is the way back from a paste that went nowhere.
+- **Writing style** — natural, casual, formal or literal — globally or per app, so chat stays casual and a terminal stays exact.
+- **Preview before pasting** and **live captions** (both off by default): see the finished text for a moment before it lands, or watch what Vocs hears rise out of the recording pill as you speak.
 - **Filler removal that does not eat real words**, at three strengths. "I like
   pizza" is never touched; "it was, like, fine" loses the "like".
 - **Optional grammar fixes** for slips that are wrong every time — "a idea",

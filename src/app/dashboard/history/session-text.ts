@@ -10,7 +10,7 @@
  *        pick its preview synchronously without a round trip per row. If one
  *        changes, the other must — the Rust test
  *        `choosing_the_original_is_a_reversible_flag…` pins the contract.
- * WHERE: HistoryRow, HistoryView and HistoryDetail.
+ * WHERE: HistoryRow, HistoryView and CorrectionsDock.
  */
 
 import type { SessionSummary } from "@/lib/bindings";
