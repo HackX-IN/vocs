@@ -725,3 +725,183 @@ mod tests {
         );
     }
 }
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: scripted_engine, ScriptedEngine, model_free_actor_tests
+ * WHAT:  The same real actor, chunker, VAD, rules and database as the tests
+ *        above, with the speech model replaced by an engine that returns a fixed
+ *        sentence and records every request it was given.
+ * WHY:   The tests above skip on any machine without the 574MB model — which is
+ *        every clean checkout and every CI run — so the actor's own wiring went
+ *        unexercised exactly where it matters most. What these cover does not
+ *        depend on the model being right: that a setting reaches the engine's
+ *        prompt, that an excluded app is refused before the microphone is
+ *        touched, that the enhancement settings change the delivered text, and
+ *        that an assembled chunk is checkpointed into the session row.
+ *        Fixture speech still comes from the system `say`, so these skip only
+ *        where that is missing, not where the model is.
+ * WHERE: Compiled with the rest of the end-to-end tests.
+ */
+#[cfg(test)]
+mod scripted {
+    use super::*;
+    use crate::ports::engine::{TranscribeRequest, TranscriptionEngine};
+    use crate::services;
+    use crate::types::{
+        AudioChunk, EngineCapabilities, EngineFeature, EngineId, LanguageCode, LanguageSupport,
+        SettingValue, TranscriptSegment,
+    };
+
+    /// Says the same thing for every chunk and remembers what it was asked.
+    struct ScriptedEngine {
+        reply: String,
+        requests: Mutex<Vec<TranscribeRequest>>,
+    }
+
+    impl ScriptedEngine {
+        fn saying(reply: &str) -> Arc<Self> {
+            Arc::new(Self {
+                reply: reply.into(),
+                requests: Mutex::new(Vec::new()),
+            })
+        }
+    }
+
+    impl TranscriptionEngine for ScriptedEngine {
+        fn capabilities(&self) -> EngineCapabilities {
+            EngineCapabilities {
+                id: EngineId("scripted".into()),
+                display_name: "Scripted".into(),
+                languages: LanguageSupport::All,
+                features: vec![EngineFeature::Streaming, EngineFeature::InitialPrompt],
+                realtime_factor: 0.0,
+                requires_download: false,
+                runs_offline: true,
+            }
+        }
+        fn prepare(&self) -> AppResult<()> {
+            Ok(())
+        }
+        fn is_ready(&self) -> bool {
+            true
+        }
+        fn transcribe(
+            &self,
+            _chunk: &AudioChunk,
+            request: &TranscribeRequest,
+        ) -> AppResult<Vec<TranscriptSegment>> {
+            self.requests.lock().push(request.clone());
+            Ok(vec![TranscriptSegment {
+                text: self.reply.clone(),
+                start_ms: 0,
+                end_ms: 1_000,
+                language: Some(LanguageCode("en".into())),
+            }])
+        }
+    }
+
+    /// One fixture file per test: `say` writes to a path derived from the name,
+    /// and two tests racing on one path corrupt each other's audio.
+    fn speech(name: &str) -> Option<Vec<f32>> {
+        crate::testing::synthesise_speech("Testing the session wiring end to end.", name).map(with_silence)
+    }
+
+    fn set(db: &Database, key: &str, value: SettingValue) {
+        services::settings::set_setting(db, key, &value, 1).expect("setting written");
+    }
+
+    /**
+     * WHAT:  An excluded app gets a refusal, not a recording.
+     * WHY:   The guarantee the feature exists for: nothing opens the microphone
+     *        — not even to ask permission — and nothing is pasted. Asserted on
+     *        the ASK (never made) and on the absence of delivery, and on the
+     *        code rather than the wording.
+     */
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn an_excluded_app_is_refused_before_the_microphone_is_touched() {
+        let permissions = Arc::new(NeverAsked::default());
+        let (harness, rx) = build_with_permissions(
+            vec![0.0; 16_000],
+            ScriptedEngine::saying("never used"),
+            Arc::clone(&permissions) as Arc<dyn PermissionProvider>,
+        )
+        .expect("harness");
+        // The fake injector reports Terminal as frontmost.
+        services::profiles::upsert_profile(
+            &harness.db,
+            &crate::types::AppProfile {
+                bundle_id: "com.apple.Terminal".into(),
+                display_name: "Terminal".into(),
+                overrides: Default::default(),
+                enabled: true,
+                excluded: true,
+            },
+        )
+        .expect("profile saved");
+
+        run_session(&harness, rx, Duration::from_millis(300)).await;
+
+        assert_eq!(permissions.asked.load(std::sync::atomic::Ordering::SeqCst), 0, "the microphone must not even be asked for");
+        assert!(harness.injector.delivered.lock().is_none(), "nothing may be pasted into an excluded app");
+        assert!(
+            harness.events.states.lock().iter().any(|s| matches!(
+                s,
+                SessionState::Failed { code: crate::error::ErrorCode::AppExcluded, .. }
+            )),
+            "the pill was never told why nothing happened"
+        );
+    }
+
+    /// Settings → actor → engine request and enhancer, with no model involved.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn the_context_line_and_dictionary_reach_the_engine_and_the_filler_setting_reaches_the_text() {
+        let Some(samples) = speech("scripted-prompt") else {
+            eprintln!("skipped: could not synthesise speech");
+            return;
+        };
+        let engine = ScriptedEngine::saying("um so we should ship it comma today");
+        let (harness, rx) = build(samples, Arc::clone(&engine) as Arc<dyn TranscriptionEngine>).expect("harness");
+        set(&harness.db, crate::registry::keys::CONTEXT_PROMPT, SettingValue::Text("Rust, Tauri".into()));
+        set(&harness.db, crate::registry::keys::STRIP_FILLERS, SettingValue::Bool(true));
+        services::dictionary::create_entry(&harness.db, "kube", "Kubernetes", crate::types::MatchKind::Word, 1)
+            .expect("entry saved");
+
+        run_session(&harness, rx, Duration::from_secs(3)).await;
+
+        let seen = engine.requests.lock().clone();
+        assert!(!seen.is_empty(), "the engine was never asked to decode anything");
+        assert_eq!(
+            seen[0].prompt.as_deref(),
+            Some("Rust, Tauri, Kubernetes"),
+            "the context line must lead and the dictionary must follow"
+        );
+        assert_eq!(
+            harness.injector.delivered.lock().clone().as_deref(),
+            Some("So we should ship it, today."),
+            "filler removal, spoken formatting and casing must all have run"
+        );
+    }
+
+    /// What was heard is in the row, beside what was delivered.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn the_heard_text_is_stored_beside_the_delivered_text() {
+        let Some(samples) = speech("scripted-raw") else {
+            eprintln!("skipped: could not synthesise speech");
+            return;
+        };
+        let (harness, rx) = build(samples, ScriptedEngine::saying("um hello there")).expect("harness");
+        set(&harness.db, crate::registry::keys::STRIP_FILLERS, SettingValue::Bool(true));
+
+        run_session(&harness, rx, Duration::from_secs(3)).await;
+
+        let session = services::sessions::list_sessions(&harness.db, 1, 0).expect("list").remove(0);
+        assert_eq!(session.raw_text.as_deref(), Some("um hello there"));
+        assert_eq!(session.final_text.as_deref(), Some("Hello there."));
+        assert!(
+            crate::pipeline::diff::word_diff("um hello there", "Hello there.")
+                .iter()
+                .any(|segment| segment.kind == crate::types::DiffKind::Removed),
+            "the History diff must show the filler as removed"
+        );
+    }
+}
