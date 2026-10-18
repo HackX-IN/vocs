@@ -1,76 +1,44 @@
 /**
  * SOURCE OF TRUTH KEYWORDS: SettingsView, getRegistry, getSettings, setSetting,
- *   SettingSection, SECTION_ORDER, advanced-disclosure, toControlSetting, AppProfiles
- * WHAT:  The settings page: every registry SettingDef grouped into its declared
- *        section, plus the model manager, the dictionary, per-app profiles and
- *        the privacy controls.
- * WHY:   Nothing here lists the settings. The rows come from the registry, the
- *        grouping comes from each def's own `section`, and the ordering of the
- *        sections is the only thing this file decides — so adding a setting in
- *        Rust makes it appear here with no frontend change (CLAUDE.md §7).
- *        Advanced settings sit behind a disclosure because they exist to unstick
- *        a specific machine, not to be browsed. Writes go through set_setting
- *        and nothing is patched locally — the settings-changed event brings the
- *        new map back, so the display is correct whoever changed it and whether
- *        or not the write was accepted. A rejected write therefore shows the
- *        old value AND the reason, instead of leaving the control sitting on a
- *        value the backend refused.
+ *   SettingSection, settings-pages, settings-search, toControlSetting, SettingsNav
+ * WHAT:  The Settings screen: a section list with search on the left, and on the
+ *        right the cards of the chosen page — or the search results.
+ * WHY:   Nothing here lists the settings. The rows come from the registry and
+ *        each page shows the registry section it is mapped to (settings-pages.ts),
+ *        so adding a setting in Rust makes it appear here with no frontend change
+ *        (CLAUDE.md §7). This file owns what the pages share: the data they read
+ *        (settings, devices, models, languages, engine, permissions), the dynamic
+ *        option lists, and the write path.
+ *
+ *        Writes go through set_setting and nothing is patched locally — the
+ *        settings-changed event brings the new map back, so the display is
+ *        correct whoever changed it and whether or not the write was accepted. A
+ *        rejected write therefore shows the old value AND the reason, instead of
+ *        leaving the control sitting on a value the backend refused.
+ *
+ *        The page is the ROUTE (`#/settings/<page>`), so a deep link from an
+ *        error action opens the right page and the back/forward history of the
+ *        window is the history of the screen.
  * WHERE: Rendered by Dashboard.tsx for the registry's "settings" route.
  */
 
 import { useCallback, useMemo, useState } from "react";
-import { ChevronDown } from "lucide-react";
-import {
-  commands,
-  type AppError,
-  type EngineCapabilities,
-  type OsPermission,
-  type PermissionReport,
-  type RegistrySnapshot,
-  type SettingDef as RegistrySettingDef,
-  type SettingSection,
-  type SettingValue,
-} from "@/lib/bindings";
+import { commands, type AppError, type SettingDef as RegistrySettingDef, type SettingSection, type SettingValue, type RegistrySnapshot } from "@/lib/bindings";
 import { unwrapCommand, useCommand } from "@/lib/ipc";
-import { missingPermissions, usePermissions } from "@/lib/use-permissions";
-import { useSettings } from "../use-settings";
+import { usePermissions } from "@/lib/use-permissions";
 import { formatBytes } from "@/lib/format";
-import { cn } from "@/lib/utils";
-import { ErrorSurface, ScrollArea, SettingControl, Skeleton } from "@/components/global";
+import { ErrorSurface, ScrollArea, Skeleton } from "@/components/global";
 import type { SettingOption } from "@/components/global";
-import { PermissionNotice } from "./_components/PermissionNotice";
-import { DiagnosticsPanel } from "./_components/DiagnosticsPanel";
-import { BackupPanel } from "./_components/BackupPanel";
-import { MicTestPanel } from "./_components/MicTestPanel";
-import { ModelManager } from "./_components/ModelManager";
-import { DictionaryManager } from "./_components/DictionaryManager";
-import { AppProfiles } from "./_components/AppProfiles";
-import { toControlSetting, type DynamicOptions } from "./to-setting-def";
-
-/** Presentation order and wording — the one thing the registry does not decide,
- *  because "which group comes first" is a layout judgement, not a fact about
- *  the app. */
-const SECTION_ORDER: readonly SettingSection[] = [
-  "RECORDING",
-  "TRANSCRIPTION",
-  "OUTPUT",
-  "VOCABULARY",
-  "PRIVACY",
-  "GENERAL",
-];
-
-const SECTION_LABEL: Readonly<Record<SettingSection, string>> = {
-  RECORDING: "Recording",
-  TRANSCRIPTION: "Transcription",
-  OUTPUT: "Output",
-  VOCABULARY: "Vocabulary",
-  PRIVACY: "Privacy",
-  GENERAL: "General",
-};
+import { navigateTo } from "../use-hash-route";
+import { useSettings } from "../use-settings";
+import { SettingsNav } from "./_components/SettingsNav";
+import { SettingsPageBody, SettingsResults, type SettingsContext } from "./_components/SettingsPageBody";
+import { pageForSection, resolvePage, type SettingsPageId } from "./settings-pages";
+import type { DynamicOptions } from "./to-setting-def";
 
 export interface SettingsViewProps {
   registry: RegistrySnapshot;
-  /** Deep-link target, e.g. from an error action. */
+  /** Deep-link target — a page id, e.g. from an error action. */
   section: string | null;
 }
 
@@ -84,6 +52,7 @@ export function SettingsView({ registry, section }: SettingsViewProps) {
   // another app, and comes back expecting these controls to have noticed.
   const permissions = usePermissions();
   const [writeError, setWriteError] = useState<AppError | null>(null);
+  const [query, setQuery] = useState("");
   // Bumped by a backup import: the dictionary and profile lists fetch once on
   // mount, so a new key is how they are told what they show has changed.
   const [dataVersion, setDataVersion] = useState(0);
@@ -123,22 +92,21 @@ export function SettingsView({ registry, section }: SettingsViewProps) {
     });
   }, []);
 
-  const allDefs = useMemo(
-    () => registry.capabilities.flatMap((capability) => capability.settings),
-    [registry],
-  );
+  const allDefs = useMemo(() => registry.capabilities.flatMap((capability) => capability.settings), [registry]);
 
   const grouped = useMemo(() => {
-    const map = new Map<SettingSection, RegistrySettingDef[]>();
-    for (const capability of registry.capabilities) {
-      for (const def of capability.settings) {
-        const bucket = map.get(def.section);
-        if (bucket) bucket.push(def);
-        else map.set(def.section, [def]);
-      }
+    const map = new Map<SettingsPageId, RegistrySettingDef[]>();
+    for (const def of allDefs) {
+      const id = pageForSection(def.section as SettingSection).id;
+      const bucket = map.get(id);
+      if (bucket) bucket.push(def);
+      else map.set(id, [def]);
     }
     return map;
-  }, [registry]);
+  }, [allDefs]);
+
+  const page = resolvePage(section);
+  const searching = query.trim().length > 0;
 
   if (settings.error) return <ErrorSurface error={settings.error} onRetry={settings.reload} />;
 
@@ -148,202 +116,51 @@ export function SettingsView({ registry, section }: SettingsViewProps) {
   if (!settings.data) {
     return (
       <ScrollArea contentClassName="px-[var(--page-padding-x)]">
-          <Skeleton rows={8} />
-        </ScrollArea>
+        <Skeleton rows={8} />
+      </ScrollArea>
     );
   }
 
-  return (
-    <ScrollArea contentClassName="flex flex-col gap-8 px-[var(--page-padding-x)] pb-8">
-        {writeError ? <ErrorSurface size="compact" error={writeError} /> : null}
-        {SECTION_ORDER.map((key) => {
-          const defs = grouped.get(key) ?? [];
-          const extra = EXTRAS[key];
-          if (defs.length === 0 && !extra) return null;
-
-          return (
-            <SettingsSection
-              key={key}
-              title={SECTION_LABEL[key]}
-              highlighted={section === key.toLowerCase()}
-              defs={defs}
-              values={settings.data}
-              dynamic={dynamic}
-              engine={engine.data}
-              permissions={permissions.data}
-              onWrite={write}
-              extra={extra}
-              dataVersion={dataVersion}
-              onDataImported={onDataImported}
-            />
-          );
-        })}
-
-        {/* Its own section rather than folded into a registry one: a profile is
-            not a setting, and claiming it belongs to Recording or Output would
-            be a layout lie about what the registry declares. */}
-        <section className="flex flex-col gap-1">
-          <h2 className="text-heading text-text-primary">Per-app profiles</h2>
-          <p className="text-caption text-text-secondary">
-            Settings that apply only while a particular app is in front. Anything a profile does not override keeps
-            following the global setting.
-          </p>
-          <AppProfiles
-            key={dataVersion}
-            defs={allDefs}
-            globals={settings.data}
-            dynamic={dynamic}
-            engine={engine.data}
-            permissions={permissions.data}
-          />
-        </section>
-    </ScrollArea>
-  );
-}
-
-/** Panels that are not settings but belong inside a section. */
-type SectionPanel = "MIC_TEST_PANEL" | "MODELS_PANEL" | "DICTIONARY_PANEL" | "PRIVACY_PANEL" | "BACKUP_PANEL";
-
-const EXTRAS: Partial<Record<SettingSection, SectionPanel>> = {
-  RECORDING: "MIC_TEST_PANEL",
-  TRANSCRIPTION: "MODELS_PANEL",
-  VOCABULARY: "DICTIONARY_PANEL",
-  PRIVACY: "PRIVACY_PANEL",
-  GENERAL: "BACKUP_PANEL",
-};
-
-function SettingsSection({
-  title,
-  highlighted,
-  defs,
-  values,
-  dynamic,
-  engine,
-  permissions,
-  onWrite,
-  extra,
-  dataVersion,
-  onDataImported,
-}: {
-  title: string;
-  highlighted: boolean;
-  defs: readonly RegistrySettingDef[];
-  values: { [key in string]: SettingValue } | null;
-  dynamic: DynamicOptions;
-  engine: EngineCapabilities | null;
-  permissions: readonly PermissionReport[] | null;
-  onWrite: (key: string, value: SettingValue) => void;
-  extra: SectionPanel | undefined;
-  /** Changes when an import has rewritten data some panels display. */
-  dataVersion: number;
-  onDataImported: () => void;
-}) {
-  const [showAdvanced, setShowAdvanced] = useState(false);
-  const plain = defs.filter((def) => !def.advanced);
-  const advanced = defs.filter((def) => def.advanced);
-
-  // One line per distinct missing grant, not one per blocked control: two
-  // controls behind the same permission are one problem with one fix.
-  const blocking = [
-    ...new Set(defs.flatMap((def) => missingPermissions(def.requires_permission, permissions))),
-  ] as OsPermission[];
+  const context: SettingsContext = {
+    values: settings.data,
+    dynamic,
+    engine: engine.data,
+    permissions: permissions.data,
+    onWrite: write,
+  };
 
   return (
-    <section className={cn("flex flex-col gap-1", highlighted && "rounded-card bg-sunken-strong p-4")}>
-      <h2 className="text-heading text-text-primary">{title}</h2>
-
-      <PermissionNotice permissions={blocking} />
-
-      {plain.map((def) => (
-        <SettingControl
-          key={def.key}
-          className="hairline-b last:border-b-0"
-          setting={toControlSetting(def, values?.[def.key], dynamic, engine, permissions, (value) =>
-            onWrite(def.key, value),
-          )}
+    <div className="flex min-h-0 flex-1">
+      {/* The list is fixed while the cards scroll, so the page you are on is
+          always in view. It sits below the page header band like the content. */}
+      <div className="shrink-0 pt-[var(--page-header-height)] pl-[var(--page-padding-x)]">
+        <SettingsNav
+          activeId={page.id}
+          onSelect={(id) => {
+            setQuery("");
+            navigateTo("settings", id);
+          }}
+          query={query}
+          onQueryChange={setQuery}
         />
-      ))}
-
-      {extra === "MIC_TEST_PANEL" ? <MicTestPanel /> : null}
-      {extra === "MODELS_PANEL" ? <ModelManager /> : null}
-      {extra === "DICTIONARY_PANEL" ? <DictionaryManager key={dataVersion} /> : null}
-      {extra === "PRIVACY_PANEL" ? (
-        <>
-          <ClearHistoryControl />
-          <DiagnosticsPanel />
-        </>
-      ) : null}
-      {extra === "BACKUP_PANEL" ? <BackupPanel onImported={onDataImported} /> : null}
-
-      {advanced.length > 0 ? (
-        <>
-          <button
-            type="button"
-            onClick={() => setShowAdvanced((open) => !open)}
-            aria-expanded={showAdvanced}
-            className="flex w-fit items-center gap-1 py-2 text-label text-text-secondary transition-colors hover:text-text-primary"
-          >
-            <ChevronDown className={cn("size-4 transition-transform", showAdvanced && "rotate-180")} />
-            Advanced
-          </button>
-          {showAdvanced
-            ? advanced.map((def) => (
-                <SettingControl
-                  key={def.key}
-                  className="hairline-b last:border-b-0"
-                  setting={toControlSetting(def, values?.[def.key], dynamic, engine, permissions, (value) =>
-                    onWrite(def.key, value),
-                  )}
-                />
-              ))
-            : null}
-        </>
-      ) : null}
-    </section>
-  );
-}
-
-/**
- * WHAT:  The delete-everything control.
- * WHY:   Two-step, and the second step is the destructive one. There is no
- *        tombstone and no undo behind this — clear_history destroys the rows —
- *        so the confirmation is the only safety net, exactly as the cancel
- *        countdown is for a recording.
- */
-function ClearHistoryControl() {
-  const [confirming, setConfirming] = useState(false);
-  const [deleted, setDeleted] = useState<number | null>(null);
-
-  return (
-    <div className="flex items-center justify-between gap-4 py-3">
-      <div className="min-w-0 flex-1">
-        <p className="text-body text-text-primary">Delete all history</p>
-        <p className="text-caption text-text-secondary">
-          {deleted === null
-            ? "Every transcript, permanently. This cannot be undone."
-            : `Deleted ${deleted} transcript${deleted === 1 ? "" : "s"}.`}
-        </p>
       </div>
-      <button
-        type="button"
-        onClick={() => {
-          if (!confirming) {
-            setConfirming(true);
-            return;
-          }
-          void unwrapCommand(commands.clearHistory).then((result) => {
-            if (result.status === "ok") setDeleted(result.data);
-            setConfirming(false);
-          });
-        }}
-        onBlur={() => setConfirming(false)}
-        className={cn(
-          "hairline h-8 shrink-0 rounded-input px-3 text-body transition-colors",
-          confirming ? "bg-danger text-opaque-elevated" : "bg-sunken text-text-primary hover:text-danger",
+
+      <ScrollArea className="flex-1" contentClassName="flex flex-col gap-4 pr-[var(--page-padding-x)] pl-6 pb-8">
+        {writeError ? <ErrorSurface size="compact" error={writeError} /> : null}
+        {searching ? (
+          <SettingsResults query={query} defs={allDefs} context={context} />
+        ) : (
+          <SettingsPageBody
+            key={page.id}
+            page={page}
+            defs={grouped.get(page.id) ?? []}
+            allDefs={allDefs}
+            context={context}
+            dataVersion={dataVersion}
+            onDataImported={onDataImported}
+          />
         )}
-      >
-        {confirming ? "Delete everything" : "Delete…"}
-      </button>
+      </ScrollArea>
     </div>
   );
 }

@@ -21,6 +21,10 @@ export interface VirtualWindowOptions {
   rowHeight: number;
   overscan: number;
   containerRef: RefObject<HTMLElement | null>;
+  /** Fixed-height content ABOVE the rows inside the same scroller (a page
+   *  header inset, a summary card). The rows start this far down, so the
+   *  visible range is computed from the scroll position past it. */
+  leadHeight?: number;
 }
 
 export interface VirtualWindow {
@@ -35,7 +39,13 @@ export interface VirtualWindow {
   viewportHeight: number;
 }
 
-export function useVirtualWindow({ count, rowHeight, overscan, containerRef }: VirtualWindowOptions): VirtualWindow {
+export function useVirtualWindow({
+  count,
+  rowHeight,
+  overscan,
+  containerRef,
+  leadHeight = 0,
+}: VirtualWindowOptions): VirtualWindow {
   const [scrollTop, setScrollTop] = useState(0);
   const [viewportHeight, setViewportHeight] = useState(0);
 
@@ -66,7 +76,8 @@ export function useVirtualWindow({ count, rowHeight, overscan, containerRef }: V
   }, [containerRef]);
 
   const visibleRows = Math.ceil(viewportHeight / rowHeight) + 1;
-  const start = Math.max(0, Math.floor(scrollTop / rowHeight) - overscan);
+  const intoRows = Math.max(0, scrollTop - leadHeight);
+  const start = Math.max(0, Math.floor(intoRows / rowHeight) - overscan);
   const end = Math.min(count, start + visibleRows + overscan * 2);
 
   return { start, end, offsetY: start * rowHeight, totalHeight: count * rowHeight, viewportHeight };

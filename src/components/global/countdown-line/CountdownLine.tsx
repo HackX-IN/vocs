@@ -18,18 +18,20 @@
  *        animation instead of replacing one. A seek is skipped entirely unless
  *        the two disagree by more than DRIFT_MS, so ordinary tick jitter costs
  *        nothing and a genuine correction still lands. This is the same
- *        anchor-and-interpolate shape as app/pill/use-elapsed.ts, which is the
- *        established answer in this codebase for "backend owns the clock, the
- *        view owns the frames".
+ *        anchor-and-interpolate shape the pill's elapsed timer used before the
+ *        capsule dropped it: the established answer in this codebase for
+ *        "backend owns the clock, the view owns the frames".
  *
  *        Drawn with transform: scaleX rather than width so the drain is a
  *        compositor job and costs no layout, which matters because it runs
  *        inside the pill while an audio thread is live. Linear, and it stays
  *        linear under prefers-reduced-motion: it is a clock, and an eased
  *        clock lies about how much time is left (docs/04 §6).
- * WHERE: The pill's cancel-armed state (docs/04 §7). Height is
- *        --countdown-line-height; its WIDTH is whatever slot it is given, so it
- *        occupies exactly the space the waveform it replaces did.
+ * WHERE: The pill's cancel-armed state (docs/04 §7). Horizontal: thickness is
+ *        --countdown-line-height and its WIDTH is whatever slot it is given.
+ *        Vertical (the capsule pill): --countdown-line-length tall, so it
+ *        occupies the space the bars it replaces did. Its colour is
+ *        currentColor, so the host decides it.
  */
 
 import { useEffect, useRef } from "react";
@@ -41,6 +43,8 @@ export type CountdownLineState = "draining" | "refilling";
 export interface CountdownLineProps {
   /** Milliseconds left, straight off the session state. The backend owns this. */
   remainingMs: number;
+  /** "vertical" stands the line up for the capsule pill: it drains downward. */
+  orientation?: "horizontal" | "vertical";
   state: CountdownLineState;
   /** Announced by VoiceOver; the pill is a live region (docs/04 §10). */
   label?: string;
@@ -51,7 +55,9 @@ export interface CountdownLineProps {
  *  Below this, a seek would be visible jitter correcting invisible error. */
 const DRIFT_MS = 120;
 
-export function CountdownLine({ remainingMs, state, label, className }: CountdownLineProps) {
+export function CountdownLine({ remainingMs, orientation = "horizontal", state, label, className }: CountdownLineProps) {
+  const vertical = orientation === "vertical";
+  const scale = vertical ? "scaleY" : "scaleX";
   const fillRef = useRef<HTMLSpanElement>(null);
   const animationRef = useRef<Animation | null>(null);
   /** The full duration, captured when the drain starts. Deliberately a ref:
@@ -68,7 +74,8 @@ export function CountdownLine({ remainingMs, state, label, className }: Countdow
 
     // Where the line actually is right now, before we drop the current
     // animation — a refill has to be handed back from here, not reset to full.
-    const currentScale = new DOMMatrixReadOnly(getComputedStyle(fill).transform).a;
+    const matrix = new DOMMatrixReadOnly(getComputedStyle(fill).transform);
+    const currentScale = vertical ? matrix.d : matrix.a;
     animationRef.current?.cancel();
     animationRef.current = null;
 
@@ -76,7 +83,7 @@ export function CountdownLine({ remainingMs, state, label, className }: Countdow
       const total = Math.max(0, remainingRef.current);
       totalRef.current = total;
       const animation = fill.animate(
-        [{ transform: "scaleX(1)" }, { transform: "scaleX(0)" }],
+        [{ transform: `${scale}(1)` }, { transform: `${scale}(0)` }],
         { duration: total, easing: "linear", fill: "forwards" },
       );
       animationRef.current = animation;
@@ -84,7 +91,7 @@ export function CountdownLine({ remainingMs, state, label, className }: Countdow
       // A second Escape: nothing was lost, so the line springs back to full
       // from wherever the drain reached rather than snapping.
       animationRef.current = fill.animate(
-        [{ transform: `scaleX(${currentScale})` }, { transform: "scaleX(1)" }],
+        [{ transform: `${scale}(${currentScale})` }, { transform: `${scale}(1)` }],
         {
           duration: readDurationMs("--motion-duration-medium"),
           easing: getComputedStyle(document.documentElement)
@@ -99,7 +106,7 @@ export function CountdownLine({ remainingMs, state, label, className }: Countdow
       animationRef.current?.cancel();
       animationRef.current = null;
     };
-  }, [state]);
+  }, [state, scale, vertical]);
 
   // Rust's ticks CORRECT the running animation; they never replace it.
   useEffect(() => {
@@ -120,14 +127,20 @@ export function CountdownLine({ remainingMs, state, label, className }: Countdow
       aria-valuemax={100}
       aria-valuenow={undefined}
       className={cn(
-        "block h-[var(--countdown-line-height)] w-full overflow-hidden rounded-pill bg-sunken-strong",
+        "block overflow-hidden rounded-pill bg-current/20",
+        vertical
+          ? "h-[var(--countdown-line-length)] w-[var(--countdown-line-height)]"
+          : "h-[var(--countdown-line-height)] w-full",
         className,
       )}
     >
       <span
         ref={fillRef}
         aria-hidden="true"
-        className="block h-full w-full origin-left rounded-pill bg-text-primary"
+        className={cn(
+          "block h-full w-full rounded-pill bg-current",
+          vertical ? "origin-bottom" : "origin-left",
+        )}
       />
     </span>
   );

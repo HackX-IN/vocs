@@ -1,6 +1,7 @@
 /**
  * SOURCE OF TRUTH KEYWORDS: formatDuration, formatClock, formatRelativeTime,
- *   formatBytes, formatRate, formatCompactDuration, formatLatency, formatLanguage
+ *   formatBytes, formatRate, formatCompactDuration, formatLatency, formatLanguage,
+ *   formatTimeOfDay, formatDayHeading, formatDateTime, dayStart
  * WHAT:  Every number-to-string the UI needs: clocks, durations, relative
  *        times, byte sizes, transfer rates and latencies.
  * WHY:   One place, because the same duration appearing as "1:23" in the pill
@@ -114,4 +115,57 @@ const chartDate = new Intl.DateTimeFormat(undefined, { month: "short", day: "num
  */
 export function formatChartDate(date: string): string {
   return chartDate.format(new Date(`${date}T00:00:00`));
+}
+
+const timeOfDay = new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" });
+
+/** "11:04" or "3:10 PM" — the time a row sits at inside its day group. */
+export function formatTimeOfDay(epochMs: number): string {
+  return timeOfDay.format(new Date(epochMs));
+}
+
+const weekdayDate = new Intl.DateTimeFormat(undefined, { weekday: "short", month: "short", day: "numeric" });
+const weekdayDateYear = new Intl.DateTimeFormat(undefined, {
+  weekday: "short",
+  month: "short",
+  day: "numeric",
+  year: "numeric",
+});
+
+/** Local midnight of the day `epochMs` falls on, as a stable group key. */
+export function dayStart(epochMs: number): number {
+  const date = new Date(epochMs);
+  return new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+}
+
+/**
+ * WHAT:  The heading over a day's dictations: "Today", "Yesterday", then
+ *        "Wed, Oct 15" — with the year only once it stops being this one.
+ * WHY:   Days are compared by LOCAL midnight, stepped with setDate rather than
+ *        by subtracting 86 400 000 ms, which is an hour out on the two days a
+ *        year the clocks change and would file a session under the wrong day.
+ */
+export function formatDayHeading(epochMs: number, now: number = Date.now()): string {
+  const today = new Date(dayStart(now));
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+
+  const day = dayStart(epochMs);
+  if (day === today.getTime()) return "Today";
+  if (day === yesterday.getTime()) return "Yesterday";
+  const sameYear = new Date(epochMs).getFullYear() === today.getFullYear();
+  return (sameYear ? weekdayDate : weekdayDateYear).format(new Date(epochMs));
+}
+
+const longDateTime = new Intl.DateTimeFormat(undefined, {
+  weekday: "short",
+  month: "short",
+  day: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+});
+
+/** "Wed, Oct 15, 11:04" — the date chip on an open dictation. */
+export function formatDateTime(epochMs: number): string {
+  return longDateTime.format(new Date(epochMs));
 }

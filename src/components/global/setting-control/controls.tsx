@@ -36,18 +36,18 @@ export function ToggleControl({ setting }: { setting: ToggleSetting }) {
       disabled={setting.disabled}
       onClick={() => setting.onChange(!setting.value)}
       className={cn(
-        // ON is --text-primary, not --accent. A settings screen is a wall of
-        // switches and half of them are on by default; ember on each one is a
-        // wall of ember on a screen where nothing is happening (docs/04 §1.3).
-        // The inverted fill reads as ON at least as clearly and costs no hue.
+        // ON is the accent: a settings screen is a wall of switches and the lit
+        // ones are the ones doing something, so they are the only coloured thing
+        // on it. The knob is --accent-ink so it reads against the lit track in
+        // both schemes (docs/04 §2).
         "relative h-6 w-10 shrink-0 rounded-pill transition-colors disabled:opacity-50",
-        setting.value ? "bg-text-primary" : "bg-sunken hairline",
+        setting.value ? "bg-accent" : "bg-sunken-strong",
       )}
     >
       <span
         className={cn(
-          "absolute top-0.5 left-0.5 size-5 rounded-pill bg-opaque-elevated shadow-pill transition-transform",
-          setting.value && "translate-x-4",
+          "absolute top-0.5 left-0.5 size-5 rounded-pill shadow-pill transition-transform",
+          setting.value ? "translate-x-4 bg-accent-ink" : "bg-text-secondary",
         )}
       />
     </button>

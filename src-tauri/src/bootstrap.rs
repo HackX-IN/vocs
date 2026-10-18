@@ -1509,7 +1509,7 @@ fn rail_size_points() -> (f64, f64) {
 
     let padding = design_token("--rail-padding");
     let height = 2.0 * padding
-        + design_token("--mark-size-md")
+        + design_token("--rail-mark-height")
         + design_token("--rail-mark-gap")
         + nav_items * design_token("--rail-item-size")
         + (nav_items - 1.0).max(0.0) * design_token("--rail-item-gap");

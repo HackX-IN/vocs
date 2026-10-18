@@ -1,5 +1,5 @@
 /**
- * SOURCE OF TRUTH KEYWORDS: effectiveText, wasCorrected, session-text,
+ * SOURCE OF TRUTH KEYWORDS: effectiveText, wasCorrected, session-text, sessionTitle, firstLine,
  *   SessionSummary, reverted
  * WHAT:  Which text a history session stands for, and whether the rules changed
  *        it at all.
@@ -26,4 +26,22 @@ export function wasCorrected(session: SessionSummary): boolean {
   const { raw_text: raw, final_text: fixed } = session;
   if (raw === null || fixed === null) return false;
   return raw.split(/\s+/).join(" ").trim() !== fixed.split(/\s+/).join(" ").trim();
+}
+
+/** The first non-empty line of what the session stands for, or null. */
+export function firstLine(session: SessionSummary): string | null {
+  const text = effectiveText(session);
+  if (text === null) return null;
+  const line = text.trim().split("\n", 1)[0];
+  return line.length > 0 ? line : null;
+}
+
+/**
+ * WHAT:  What a dictation is called: the name the user gave it, else the first
+ *        line of its text, else null.
+ * WHY:   One answer for the row and the editor's heading, so a title typed in
+ *        the editor is exactly what the list then shows.
+ */
+export function sessionTitle(session: SessionSummary): string | null {
+  return session.title ?? firstLine(session);
 }

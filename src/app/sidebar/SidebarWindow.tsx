@@ -25,9 +25,11 @@
  *        supposed to be hanging off. The dashboard's header remains the drag
  *        surface for the app.
  *
- *        Selection is --surface-sunken-strong, never a hue: there is no accent
- *        colour in this app (docs/04 §2), and a rail that lights up because you
- *        clicked Settings would be inventing one.
+ *        Selection is the accent on its soft wash — the one place the rail
+ *        speaks. The rail paints its own solid surface (body[data-window=
+ *        "sidebar"] in global.css) because the dashboard no longer shows native
+ *        vibrancy through a translucent page; a bare rail would be the only
+ *        see-through object in the app.
  * WHERE: Rendered by src/entries/sidebar.tsx into the `sidebar` window. Route
  *        choices leave via onSelect, which the entry forwards to the dashboard
  *        as `nav-selected`. Icons resolve through lib/icons.ts.
@@ -50,7 +52,9 @@ export function SidebarWindow({ items, activeRoute, onSelect }: SidebarWindowPro
       aria-label="Sections"
       className="flex h-full w-full flex-col items-center gap-[var(--rail-item-gap)] p-[var(--rail-padding)]"
     >
-      <Mark label="Vocs" className="mb-[var(--rail-mark-gap)] shrink-0" />
+      <span className="mb-[var(--rail-mark-gap)] flex h-[var(--rail-mark-height)] shrink-0 items-center text-text-primary">
+        <Mark label="Vocs" />
+      </span>
 
       {items.map((item) => {
         const Icon = iconFor(item.icon);
@@ -66,7 +70,7 @@ export function SidebarWindow({ items, activeRoute, onSelect }: SidebarWindowPro
             className={cn(
               "flex size-[var(--rail-item-size)] shrink-0 items-center justify-center rounded-input transition-colors",
               isActive
-                ? "bg-sunken-strong text-text-primary"
+                ? "bg-accent-soft text-accent"
                 : "text-text-secondary hover:bg-sunken hover:text-text-primary",
             )}
           >

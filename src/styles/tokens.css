@@ -2,8 +2,9 @@
  * SOURCE OF TRUTH KEYWORDS: tokens.css, surface-glass, surface-elevated,
  *   border-hairline, text-primary, accent, shadow-pill, radius-pill, space-1,
  *   noise-image, spring-pill-appear, motion-duration-fast, row-height, keycap-height,
- *   surface-sunken-strong, rail-width, control-height, chart-height, chart-point-size,
- *   chart-inset, segment-height, mark-size-md, mark-ratio-peak
+ *   surface-sunken-strong, rail-width, control-height, dot-row-pitch, dot-radius,
+ *   segment-height, mark-size-md, pill-surface, page-glow, font-display-stack,
+ *   dock-height, card-padding
  * WHAT:  Every literal value the frontend is allowed to contain — colour,
  *        material, geometry, type, motion and component metric — as CSS custom
  *        properties on :root, redefined for dark and for reduced transparency.
@@ -21,61 +22,70 @@
 :root {
   color-scheme: light dark;
 
-  /* ── Colour — light (docs/04 §2) ──────────────────────────────────── */
-  --surface-glass: rgba(252, 250, 247, 0.55);
-  --surface-elevated: rgba(255, 254, 252, 0.72);
-  --surface-sunken: rgba(40, 34, 28, 0.04);
-  --surface-sunken-strong: rgba(40, 34, 28, 0.07);
-  --surface-opaque: #f7f4f0;
-  --surface-opaque-elevated: #fdfbf8;
+  /* ── Colour — light, "paper" (docs/04 §2) ─────────────────────────────
+   * Warm off-white page, white cards, ink text, ONE signal hue. The page is
+   * --surface-glass and the card is --surface-elevated; both are near-opaque
+   * so the look is a solid, calm surface rather than a see-through one, and
+   * the native vibrancy behind them only has to carry the window shape. */
+  --surface-glass: rgba(244, 243, 238, 0.94);
+  --surface-elevated: rgba(255, 255, 255, 0.96);
+  --surface-sunken: rgba(27, 26, 23, 0.045);
+  --surface-sunken-strong: rgba(27, 26, 23, 0.08);
+  --surface-opaque: #f4f3ee;
+  --surface-opaque-elevated: #ffffff;
 
-  --border-hairline: rgba(40, 34, 28, 0.09);
-  --border-highlight: rgba(255, 255, 255, 0.7);
+  --border-hairline: rgba(27, 26, 23, 0.09);
+  --border-highlight: rgba(255, 255, 255, 0.9);
 
-  --text-primary: rgba(28, 24, 20, 0.9);
-  --text-secondary: rgba(28, 24, 20, 0.54);
-  --text-tertiary: rgba(28, 24, 20, 0.32);
+  --text-primary: rgba(27, 26, 23, 0.92);
+  --text-secondary: rgba(27, 26, 23, 0.58);
+  --text-tertiary: rgba(27, 26, 23, 0.38);
 
   /* ── State colour (docs/04 §2) ────────────────────────────────────────
-   * THERE IS NO ACCENT HUE. The app is ink on paper: black, white and grey.
-   * The operator asked for exactly that and rejected the ember/orange theme
-   * outright, so --accent is INK, not a colour — it keeps its name because it
-   * still means "the emphasised thing", and every consumer already asks for it
-   * by role rather than by hue.
-   *
-   * --success was ALREADY ink before this change, and that is the precedent
-   * this follows rather than an invention: a positive state in a monochrome
-   * interface is simply the primary text colour, and a green tick would be the
-   * only saturated pixel on its screen.
-   *
-   * State is carried by FORM, not hue — a moving waveform, a draining line, a
-   * sentence. See docs/04 §7: hue was never doing that work, it was decorating
-   * work already done, which is why removing it costs nothing.
-   *
-   * --danger is the ONE surviving colour, because destructive and failed are
-   * the two cases where losing the distinction is a safety regression, not a
-   * style choice: "Delete all history" must not look like "Cancel". It is
-   * retuned off the old rust tone (hue ~10 deg, which reads as orange) to a
-   * true red (hue ~4 deg), so it cannot be mistaken for the theme that was
-   * rejected. It is used as a MARK — text, icon, dot — and never as a wash. */
-  --accent: rgba(28, 24, 20, 0.9);
-  --accent-soft: rgba(40, 34, 28, 0.06);
-  --success: rgba(28, 24, 20, 0.9);
-  --success-soft: rgba(40, 34, 28, 0.06);
-  --warning: rgba(28, 24, 20, 0.54);
-  --warning-soft: rgba(40, 34, 28, 0.06);
-  --danger: #a8342c;
-  --danger-soft: rgba(168, 52, 44, 0.1);
+   * TWO hues carry meaning, and each has exactly one job:
+   *   --accent  (signal orange) — the emphasised thing: the selected nav item,
+   *             the figure a card exists to show, the primary action, focus.
+   *   --signal  (live green)    — a session is running or text was delivered.
+   *             It is the pill's bars and nothing else decorative.
+   * --danger is failure and destruction only, and it is a red that cannot be
+   * mistaken for the orange: hue ~350 deg against ~20 deg. */
+  --accent: #e8501a;
+  --accent-soft: rgba(232, 80, 26, 0.12);
+  --accent-ink: #ffffff;
+  --signal: #4fa823;
+  --signal-soft: rgba(79, 168, 35, 0.14);
+  --success: #3f9b2c;
+  --success-soft: rgba(63, 155, 44, 0.12);
+  --warning: #b9770e;
+  --warning-soft: rgba(185, 119, 14, 0.12);
+  --danger: #d6334a;
+  --danger-soft: rgba(214, 51, 74, 0.1);
+
+  /* The pill is dark in BOTH schemes: it floats over arbitrary content and a
+   * black capsule with a light ring is legible over all of it. */
+  --pill-surface: #1d1d1d;
+  --pill-ring: #3a3a3a;
+  --pill-ink: #e6e3dc;
+  --pill-signal: #7bc83b;
+  --pill-danger: #ff7a8a;
+  --pill-danger-wash: rgba(255, 93, 115, 0.16);
+
+  /* The page behind everything: a faint warm bloom from the top-left corner,
+   * the one decorative gradient in the app. */
+  --page-glow: radial-gradient(900px 420px at 6% -10%, rgba(255, 150, 90, 0.12), transparent 70%);
+  --dot-grid-ink: rgba(27, 26, 23, 0.1);
+  --dot-grid-radius: 0.9px;
+  --dot-grid-pitch: 14px;
 
   --shadow-pill: 0 12px 40px rgba(28, 24, 20, 0.16);
   --shadow-panel: 0 24px 64px rgba(28, 24, 20, 0.14);
-  --shadow-card: 0 8px 24px rgba(28, 24, 20, 0.1);
+  --shadow-card: 0 1px 2px rgba(28, 24, 20, 0.04), 0 8px 24px rgba(28, 24, 20, 0.06);
 
   /* ── Materials (docs/04 §3) ───────────────────────────────────────────
    * Three, and only three. Native NSVisualEffectView vibrancy is the actual
    * material; these three-part treatments are the web layer's entire
    * contribution — surface tint, hairline, inner top highlight, shadow. */
-  --material-pill-surface: var(--surface-glass);
+  --material-pill-surface: var(--pill-surface);
   /* No outer shadow: the window is exactly the pill, so a drop shadow has
    * nowhere to fall and is clipped away by the window bounds. The pill's
    * shadow is the native window shadow (tauri.conf.json "shadow"), which is
@@ -85,7 +95,7 @@
   --material-panel-surface: var(--surface-glass);
   --material-panel-shadow: var(--shadow-panel);
   --material-elevated-surface: var(--surface-elevated);
-  --material-elevated-shadow: var(--shadow-panel);
+  --material-elevated-shadow: var(--shadow-card);
 
   --border-width-hairline: 0.5px;
   --glass-backdrop-blur: 24px;
@@ -98,15 +108,15 @@
   --noise-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
 
   /* ── Geometry (docs/04 §4) ────────────────────────────────────────── */
-  --radius-pill: 18px;
+  --radius-pill: 26px;
   /* The WINDOW's corner radius — the whole app as one rounded object. Read by
    * src-tauri so the native vibrancy is cut to the same shape; a CSS-only round
    * here would leave the effect view's square corners poking out past it, which
    * is the "huge square" bug in a new place. XL on purpose: the target is an
    * Apple-widget feel rather than a document window. */
   --radius-window: 26px;
-  --radius-panel: 32px;
-  --radius-card: 24px;
+  --radius-panel: 28px;
+  --radius-card: 20px;
   --radius-input: 12px;
 
   --space-1: 4px;
@@ -129,7 +139,7 @@
    * one item, with no number to remember to update:
    *
    *   height = 2*--rail-padding
-   *          + --mark-size-md + --rail-mark-gap
+   *          + --rail-mark-height + --rail-mark-gap
    *          + N*--rail-item-size + (N-1)*--rail-item-gap
    *
    * There is NO drag region in the rail: it is an addChildWindow of the
@@ -147,25 +157,34 @@
   --rail-item-size: 36px;
   --rail-item-gap: 4px;
   --rail-padding: 12px;
-  --rail-mark-gap: 16px;
+  --rail-mark-gap: 18px;
+  /* The mark's drawn height at --mark-size-md: 26px wide x 91.2:75.5. The rail's
+   * height formula adds this, and bootstrap.rs reads it by name. */
+  --rail-mark-height: 22px;
   --control-height: 32px;
   --control-height-sm: 28px;
 
   /* ── Typography (docs/04 §5) ──────────────────────────────────────────
-   * SF via the system stack. Never a webfont: it costs a request or a bundle,
-   * and SF is most of what makes the app feel native. */
+   * Two voices. SF (the system stack) reads everything a person has to read:
+   * body, labels, transcripts. Doto, a dot-matrix face bundled with the app
+   * (OFL-1.1, no network), is reserved for the things the product is PROUD of —
+   * the page title and the one big figure per card — which is what gives the
+   * interface its instrument-panel character. Labels that index a card use the
+   * mono stack in capitals. Doto is never used below --text-title-size: its
+   * dots stop reading as dots and start reading as noise. */
   --font-system: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", system-ui, sans-serif;
   --font-mono-stack: "SF Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --font-display-stack: "Doto Variable", var(--font-mono-stack);
 
-  --text-display-size: 40px;
-  --text-display-line: 44px;
-  --text-display-weight: 600;
-  --text-display-tracking: -0.02em;
+  --text-display-size: 52px;
+  --text-display-line: 56px;
+  --text-display-weight: 800;
+  --text-display-tracking: 0em;
 
-  --text-title-size: 22px;
-  --text-title-line: 28px;
-  --text-title-weight: 600;
-  --text-title-tracking: -0.01em;
+  --text-title-size: 34px;
+  --text-title-line: 40px;
+  --text-title-weight: 800;
+  --text-title-tracking: 0em;
 
   --text-heading-size: 16px;
   --text-heading-line: 22px;
@@ -186,6 +205,17 @@
   --text-caption-line: 14px;
   --text-caption-weight: 400;
   --text-caption-tracking: 0.01em;
+
+  /* The reading face for a document you are editing: larger and looser than body,
+   * because a dictation is prose and body is chrome. */
+  --text-reading-size: 15px;
+  --text-reading-line: 26px;
+
+  /* The index label on a card: "01 · TIME SAVED". Mono, capitals, wide. */
+  --text-eyebrow-size: 10.5px;
+  --text-eyebrow-line: 14px;
+  --text-eyebrow-weight: 500;
+  --text-eyebrow-tracking: 0.1em;
 
   --text-mono-size: 12px;
   --text-mono-line: 18px;
@@ -250,34 +280,42 @@
   --pill-exit-duration-ms: 160;
   --pill-exit-travel: 8;
 
-  --pill-width: 176px;
-  --pill-height: 36px;
+  /* THE PILL IS A VERTICAL CAPSULE (docs/04 §7): the mark above, three bars
+   * below, in a dark rounded shape with a lighter ring. 52 x 104 is the 1 : 2
+   * proportion of the reference, and --radius-pill is half the width so every
+   * pixel of the window is the capsule. The window follows these numbers. */
+  --pill-width: 52px;
+  --pill-height: 104px;
 
-  /* Failure is a sentence, not a status, and the corpus it has to seat runs to
-   * 100 characters ("Vocs heard nothing at all. Check that the right input
-   * device is selected and that it is not muted."). Measured at --text-label,
-   * every message in that corpus wraps to at most two lines at 340px; 360px is
-   * that threshold plus room for the copy to grow by a few words without a
-   * redesign. Height is two line-boxes plus 12px above and below: at 16px it
-   * reads as a dialog rather than as the pill grown, which was visible the
-   * moment the two were put side by side. Content is CENTRED, not top-aligned,
-   * so a one-line message sits in the middle of the box instead of floating at
-   * the top of it. The radius stays --radius-pill so the failure is visibly the
-   * same object, and so the window's vibrancy radius is never re-applied at
-   * runtime. */
+  /* Failure is a sentence, not a status, so it is the one state that is WIDE: a
+   * horizontal capsule, the mark beside the words. The corpus it has to seat
+   * runs to 100 characters ("Vocs heard nothing at all. Check that the right
+   * input device is selected and that it is not muted."); at --text-label every
+   * message in it wraps to at most two lines at 340px, and 360px is that
+   * threshold plus room to grow by a few words. Height is two line-boxes plus
+   * 12px above and below. Content is CENTRED, so a one-line message sits in the
+   * middle instead of floating at the top. Same --radius-pill, so the failure is
+   * visibly the same object and the window's vibrancy radius is never
+   * re-applied at runtime. */
   --pill-width-failed: 360px;
   --pill-height-failed: 56px;
+
+  /* The ring that outlines the capsule, and the room between the mark and the
+   * bars. Bars: three, centre-weighted — see PillBars for the resting shape. */
+  --pill-ring-width: 2px;
+  --pill-content-gap: 22px;
+  --pill-bar-width: 5px;
+  --pill-bar-gap: 6px;
+  --pill-bar-max: 26px;
 
   /* The countdown line of docs/04 §7 — the cancel-armed state. Starts full and
    * drains to zero. Height only; its width is whatever the middle slot gives it,
    * because a line that is always the same length as the waveform it replaces
    * is the thing that makes the swap read as one object changing mode. */
   --countdown-line-height: 3px;
-
-  /* The timer is reserved, not measured, so a minute rolling over cannot steal
-   * width from the waveform mid-recording. Fits M:SS and MM:SS in tabular
-   * figures. */
-  --pill-timer-width: 32px;
+  /* The same line, standing up, inside the vertical pill: its length is the
+   * bar group's height and its thickness is the line's. */
+  --countdown-line-length: 26px;
 
   --pill-offset-bottom: 96px;
   --pill-dot-size: 8px;
@@ -317,7 +355,7 @@
    * a grey slab sitting on the glass. A mask makes the content itself fade to
    * nothing, which is what the operator described and the only version that
    * survives a translucent background. */
-  --page-header-height: 52px;
+  --page-header-height: 92px;
 
   /* How far page content sits from the window's edge. 32px, up from 24: the
    * window's corners are now --radius-window (26px), and content padded less
@@ -357,39 +395,55 @@
   --window-min-height: 560px;
 
   /* ── Lists and keycaps (docs/04 §11) ──────────────────────────────── */
-  --chart-line-width: 1.5px;
-  --chart-ink-opacity: 0.72;
-  --chart-row-height: 32px;
-  --chart-label-gutter: 96px;
-  --chart-height: 96px;
-  --chart-point-size: 3px;
-  --chart-inset: 4px;
+  /* Dot-matrix charts (docs/04 §11). A chart is a lattice of dots: --dot-row-pitch
+   * is the vertical distance between dot centres in a DotColumns chart,
+   * --dot-radius is the largest dot it will draw (narrow columns draw smaller
+   * ones), and --dot-size is the fixed diameter of a DotMeter dot. */
+  --dot-row-pitch: 11px;
+  --dot-radius: 3px;
+  --dot-size: 5px;
+  --chart-row-height: 36px;
+  --chart-label-gutter: 72px;
 
   --segment-height: var(--control-height-sm);
   --segment-radius: var(--radius-input);
   --segment-padding: 2px;
 
   --search-debounce: 180ms;
+  /* How long the editor waits after the last keystroke before it saves. */
+  --autosave-delay: 700ms;
   --feedback-hold: 1200ms;
   --titlebar-height: 38px;
 
-  --row-height: 56px;
+  --row-height: 64px;
+  /* The floating search dock over the foot of the Dictations list (docs/04
+   * §13). --dock-clearance is the dead space left under the last row so it can
+   * scroll clear of the dock: dock height plus its offset plus a breath. */
+  --dock-height: 48px;
+  --dock-offset: 20px;
+  --dock-clearance: 88px;
+  --dock-max-width: 560px;
+  /* The reading column of the Dictations list and the editor: narrow on purpose,
+   * like a page rather than a table. Summary height is the strip plus the gap
+   * below it — the list reads it to place its first row (data-list `leadHeight`). */
+  --content-max-width: 720px;
+  /* The Settings section list (docs/04 §14). */
+  --settings-nav-width: 188px;
+  --history-summary-height: 112px;
   --row-overscan: 6;
   /* The said-vs-fixed panel under the history list. Capped so a long
    * transcript scrolls inside it instead of squeezing the list to nothing. */
   --history-detail-max-height: 192px;
 
-  /* The mark: the waveform at rest (docs/04 §12). Never ember — a logo that
-   * looks live while nothing is happening is the same lie as a dead toggle. */
-  --mark-bar-width: 2px;
-  --mark-bar-gap: 2px;
-  --mark-size-md: 24px;
-  --mark-size-lg: 40px;
-  /* Ratios, not pixels: one shape at every size. Bar width and gap stay fixed —
-   * scaling the stroke with the height turns the mark into a blob (docs/04 §12). */
-  --mark-ratio-outer: 0.25;
-  --mark-ratio-mid: 0.5;
-  --mark-ratio-peak: 0.75;
+  /* The mark: the whispering head (docs/04 §12). Width only — the glyph's
+   * aspect ratio (91.2 : 75.5) is part of the drawing, so height follows. */
+  --mark-size-sm: 18px;
+  --mark-size-md: 26px;
+  --mark-size-lg: 48px;
+
+  /* Cards (docs/04 §11): the one surface for a unit of content. */
+  --card-padding: 20px;
+  --card-header-height: 20px;
 
   --keycap-height-sm: 18px;
   --keycap-height-md: 24px;
@@ -406,32 +460,38 @@
  */
 @media (prefers-color-scheme: dark) {
   :root {
-    --surface-glass: rgba(36, 33, 30, 0.58);
-    --surface-elevated: rgba(52, 48, 44, 0.72);
-    --surface-sunken: rgba(252, 250, 247, 0.04);
-    --surface-sunken-strong: rgba(252, 250, 247, 0.08);
-    --surface-opaque: #24211e;
-    --surface-opaque-elevated: #34302c;
+    --surface-glass: rgba(19, 17, 15, 0.94);
+    --surface-elevated: rgba(30, 28, 26, 0.96);
+    --surface-sunken: rgba(255, 244, 230, 0.05);
+    --surface-sunken-strong: rgba(255, 244, 230, 0.09);
+    --surface-opaque: #13110f;
+    --surface-opaque-elevated: #1f1d1a;
 
-    --border-hairline: rgba(252, 250, 247, 0.1);
-    --border-highlight: rgba(252, 250, 247, 0.13);
+    --border-hairline: rgba(255, 244, 230, 0.09);
+    --border-highlight: rgba(255, 244, 230, 0.07);
 
-    --text-primary: rgba(252, 250, 247, 0.92);
-    --text-secondary: rgba(252, 250, 247, 0.56);
-    --text-tertiary: rgba(252, 250, 247, 0.34);
+    --text-primary: rgba(246, 242, 235, 0.94);
+    --text-secondary: rgba(246, 242, 235, 0.58);
+    --text-tertiary: rgba(246, 242, 235, 0.36);
 
-    --accent: rgba(252, 250, 247, 0.92);
-    --accent-soft: rgba(252, 250, 247, 0.08);
-    --success: rgba(252, 250, 247, 0.92);
-    --success-soft: rgba(252, 250, 247, 0.08);
-    --warning: rgba(252, 250, 247, 0.56);
-    --warning-soft: rgba(252, 250, 247, 0.08);
-    --danger: #e2685c;
-    --danger-soft: rgba(226, 104, 92, 0.14);
+    --accent: #ff6a2b;
+    --accent-soft: rgba(255, 106, 43, 0.16);
+    --accent-ink: #1a0d06;
+    --signal: #7bc83b;
+    --signal-soft: rgba(123, 200, 59, 0.16);
+    --success: #7bc83b;
+    --success-soft: rgba(123, 200, 59, 0.14);
+    --warning: #f0a93a;
+    --warning-soft: rgba(240, 169, 58, 0.14);
+    --danger: #ff5d73;
+    --danger-soft: rgba(255, 93, 115, 0.14);
+
+    --page-glow: radial-gradient(900px 440px at 6% -12%, rgba(255, 122, 48, 0.2), transparent 70%);
+    --dot-grid-ink: rgba(255, 244, 230, 0.09);
 
     --shadow-pill: 0 12px 40px rgba(0, 0, 0, 0.5);
     --shadow-panel: 0 24px 64px rgba(0, 0, 0, 0.46);
-    --shadow-card: 0 8px 24px rgba(0, 0, 0, 0.34);
+    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.28);
   }
 }
 

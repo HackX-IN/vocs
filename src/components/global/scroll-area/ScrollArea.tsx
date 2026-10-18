@@ -58,6 +58,7 @@ export function ScrollArea({
               // not slide behind it and show through.
               "--fade-size-top":
                 "calc(var(--page-header-height) + var(--scroll-fade-size))",
+              "--fade-hold-size-top": "var(--page-header-height)",
             } as CSSProperties
           : undefined
       }

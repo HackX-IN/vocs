@@ -13,6 +13,7 @@
     "sot:show": "node scripts/sot.mjs --show"
   },
   "dependencies": {
+    "@fontsource-variable/doto": "^5.3.0",
     "@hookform/resolvers": "^5.9.1",
     "@tauri-apps/api": "^2",
     "@tauri-apps/plugin-autostart": "^2.5.1",

@@ -10,7 +10,7 @@
  *        construction. The tokens are read once: this runs on every audio
  *        frame, and getComputedStyle there would cost a style resolution per
  *        frame.
- * WHERE: PillWaveform.tsx and settings/_components/MicTestPanel.tsx.
+ * WHERE: PillBars.tsx and settings/_components/MicTestPanel.tsx.
  */
 
 import { useState } from "react";

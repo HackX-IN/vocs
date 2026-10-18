@@ -16,11 +16,19 @@
  *        the container with aria-activedescendant rather than moving DOM focus
  *        per row, because focusing a row that virtualization is about to
  *        unmount throws focus back to <body> mid-scroll.
+ *
+ *        Two layout slots exist because History grew a notebook look: rows can
+ *        be NON-SELECTABLE (`isSelectable` — a day header is a row for the
+ *        virtualiser, which needs one uniform height, but arrow keys step over
+ *        it and it takes no hover or active state), and the search field can be
+ *        DOCKED (`searchPosition="dock"`) — a floating bar over the foot of the
+ *        list, with the toolbar inside it — instead of a row above.
  * WHERE: The dashboard history view, and anything else that lists rows. Uses
  *        use-virtual-window.ts; row height and overscan come from tokens.css.
  */
 
 import {
+  type CSSProperties,
   useCallback,
   useEffect,
   useId,
@@ -30,6 +38,7 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
   type ReactNode,
 } from "react";
+import { Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useScrollEdges } from "../scroll-area/use-scroll-edges";
 import { readNumberToken, readPxToken } from "@/lib/motion";
@@ -55,6 +64,8 @@ export interface DataListSearch<T> {
   hotkey?: boolean;
 }
 
+export type DataListSearchPosition = "top" | "dock";
+
 export interface DataListProps<T> {
   items: readonly T[];
   getKey: (item: T, index: number) => string;
@@ -68,8 +79,12 @@ export interface DataListProps<T> {
   search?: DataListSearch<T>;
   /** Sits beside the search field — filters, sort, bulk actions. */
   toolbar?: ReactNode;
-  /** ⏎ on the active row. */
+  /** ⏎ on the active row — and a click or a double click, per `activateOn`. */
   onActivate?: (item: T, index: number) => void;
+  /** What opens a row with the pointer. A table wants a double click (a click
+   *  selects); a list of documents wants a single click, like every list of
+   *  documents a person has used. */
+  activateOn?: "click" | "doubleClick";
   onActiveChange?: (item: T | null, index: number) => void;
   /** Fired when the rendered window comes within an overscan of the last row.
    *  Paginated sources load their next page here; it fires once per arrival at
@@ -80,6 +95,21 @@ export interface DataListProps<T> {
   rowHeight?: number;
   overscan?: number;
   dividers?: boolean;
+  /** Rows that cannot be selected — group headers. Skipped by the keyboard,
+   *  and drawn without hover or active styling. Omit for "every row is". */
+  isSelectable?: (item: T) => boolean;
+  /** "top" puts search in a row above the list; "dock" floats it over the foot. */
+  searchPosition?: DataListSearchPosition;
+  /** Replaces the default row chrome (padding, hover shape). Dividers still
+   *  follow `dividers`. */
+  rowClassName?: string;
+  /** Content above the rows that scrolls with them — a summary card. Its height
+   *  must be given, because the virtualiser reads the scroll position past it. */
+  lead?: ReactNode;
+  leadHeight?: number;
+  /** Pad the content down past the overlaying page header and fade under it,
+   *  exactly as ScrollArea does for every other page. */
+  headerInset?: boolean;
   /** Accessible name for the listbox — the caller's words, not ours. */
   label: string;
   className?: string;
@@ -95,12 +125,19 @@ export function DataList<T>({
   search,
   toolbar,
   onActivate,
+  activateOn = "doubleClick",
   onActiveChange,
   onReachEnd,
   footer,
   rowHeight,
   overscan,
   dividers = true,
+  isSelectable,
+  searchPosition = "top",
+  rowClassName,
+  lead,
+  leadHeight = 0,
+  headerInset = false,
   label,
   className,
 }: DataListProps<T>) {
@@ -113,6 +150,9 @@ export function DataList<T>({
 
   const [tokenRowHeight] = useState(() => readPxToken("--row-height"));
   const [tokenOverscan] = useState(() => readNumberToken("--row-overscan"));
+  const [insetPx] = useState(() => (headerInset ? readPxToken("--page-header-height") : 0));
+  // Everything above the first row inside the scroller, in pixels.
+  const leadPx = insetPx + leadHeight;
   const height = rowHeight ?? tokenRowHeight;
   const overscanRows = overscan ?? tokenOverscan;
 
@@ -125,14 +165,27 @@ export function DataList<T>({
     return items.filter((item) => matches(item, query));
   }, [items, query, matches]);
 
+  const selectableRef = useRef(isSelectable);
+  selectableRef.current = isSelectable;
+  const canSelect = useCallback((item: T) => selectableRef.current?.(item) ?? true, []);
+
   const [activeIndex, setActiveIndex] = useState(0);
-  const clampedActive = filtered.length === 0 ? -1 : Math.min(activeIndex, filtered.length - 1);
+  // The nearest selectable row to the requested one — forward first, then back.
+  // A list that opens on a day header must still start with a real row active.
+  const clampedActive = useMemo(() => {
+    if (filtered.length === 0) return -1;
+    const wanted = Math.min(activeIndex, filtered.length - 1);
+    for (let index = wanted; index < filtered.length; index += 1) if (canSelect(filtered[index])) return index;
+    for (let index = wanted - 1; index >= 0; index -= 1) if (canSelect(filtered[index])) return index;
+    return -1;
+  }, [activeIndex, canSelect, filtered]);
 
   const window_ = useVirtualWindow({
     count: filtered.length,
     rowHeight: height,
     overscan: overscanRows,
     containerRef: scrollRef,
+    leadHeight: leadPx,
   });
 
   const onReachEndRef = useRef(onReachEnd);
@@ -160,23 +213,31 @@ export function DataList<T>({
     (index: number) => {
       const container = scrollRef.current;
       if (!container) return;
-      const top = index * height;
-      if (top < container.scrollTop) container.scrollTop = top;
+      const top = leadPx + index * height;
+      // Keep the row clear of the page header's fade and the dock, not merely
+      // inside the viewport — a row scrolled to the very edge is still hidden.
+      if (top < container.scrollTop + insetPx) container.scrollTop = top - insetPx;
       else if (top + height > container.scrollTop + container.clientHeight) {
         container.scrollTop = top + height - container.clientHeight;
       }
     },
-    [height],
+    [height, insetPx, leadPx],
   );
 
   const moveActive = useCallback(
     (next: number) => {
       if (filtered.length === 0) return;
       const bounded = Math.max(0, Math.min(next, filtered.length - 1));
-      setActiveIndex(bounded);
-      revealRow(bounded);
+      const direction = bounded >= clampedActive ? 1 : -1;
+      // Step over headers in the direction of travel; if the edge of the list is
+      // all headers, stay put rather than land on one.
+      let target = bounded;
+      while (target >= 0 && target < filtered.length && !canSelect(filtered[target])) target += direction;
+      if (target < 0 || target >= filtered.length) return;
+      setActiveIndex(target);
+      revealRow(target);
     },
-    [filtered.length, revealRow],
+    [canSelect, clampedActive, filtered, revealRow],
   );
 
   const setQuery = useCallback(
@@ -253,25 +314,28 @@ export function DataList<T>({
   for (let index = window_.start; index < window_.end; index += 1) {
     const item = filtered[index];
     const isActive = index === clampedActive;
+    const selectable = canSelect(item);
     const args: DataListRowArgs<T> = { item, index, isActive };
     rows.push(
       <div
         key={getKey(item, index)}
         id={`${listId}-row-${index}`}
-        role="option"
-        aria-selected={isActive}
+        role={selectable ? "option" : "presentation"}
+        aria-selected={selectable ? isActive : undefined}
         data-active={isActive}
         style={{ height }}
-        onMouseDown={() => setActiveIndex(index)}
-        onDoubleClick={() => onActivate?.(item, index)}
+        onMouseDown={selectable ? () => setActiveIndex(index) : undefined}
+        onClick={selectable && activateOn === "click" ? () => onActivate?.(item, index) : undefined}
+        onDoubleClick={selectable && activateOn === "doubleClick" ? () => onActivate?.(item, index) : undefined}
         className={cn(
-          "group flex items-center gap-3 px-4 cursor-default transition-colors",
-          dividers && "hairline-b",
-          isActive ? "bg-sunken-strong" : "hover:bg-sunken",
+          "group flex items-center gap-3 cursor-default transition-colors",
+          rowClassName ?? "px-4",
+          dividers && selectable && "hairline-b",
+          selectable && (isActive ? "bg-sunken-strong" : "hover:bg-sunken"),
         )}
       >
         <div className="min-w-0 flex-1">{renderRow(args)}</div>
-        {renderRowActions ? (
+        {renderRowActions && selectable ? (
           <div
             className={cn(
               "shrink-0 opacity-0 transition-opacity",
@@ -294,34 +358,39 @@ export function DataList<T>({
   const showNoResults = filtered.length === 0 && searching;
   const showEmpty = filtered.length === 0 && !searching;
 
+  const docked = searchPosition === "dock";
+
+  const searchField = search ? (
+    <input
+      ref={inputRef}
+      type="search"
+      value={query}
+      placeholder={search.placeholder}
+      aria-label={search.placeholder ?? "Search"}
+      onChange={(event) => setQuery(event.target.value)}
+      onKeyDown={(event) => {
+        if (event.key === "ArrowDown" || event.key === "Enter") {
+          event.preventDefault();
+          scrollRef.current?.focus();
+          if (event.key === "ArrowDown") moveActive(clampedActive + 1);
+          else if (clampedActive >= 0) onActivate?.(filtered[clampedActive], clampedActive);
+        } else if (event.key === "Escape" && query.length > 0) {
+          event.preventDefault();
+          setQuery("");
+        }
+      }}
+      className={cn(
+        "min-w-0 flex-1 text-body text-text-primary placeholder:text-text-tertiary",
+        docked ? "h-full bg-transparent" : "hairline h-8 rounded-input bg-sunken px-3",
+      )}
+    />
+  ) : null;
+
   return (
-    <div className={cn("flex h-full min-h-0 flex-col", className)}>
-      {search || toolbar ? (
+    <div className={cn("relative flex h-full min-h-0 flex-col", className)}>
+      {!docked && (search || toolbar) ? (
         <div className="flex items-center gap-2 px-4 py-3">
-          {search ? (
-            <input
-              ref={inputRef}
-              type="search"
-              value={query}
-              placeholder={search.placeholder}
-              onChange={(event) => setQuery(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "ArrowDown" || event.key === "Enter") {
-                  event.preventDefault();
-                  scrollRef.current?.focus();
-                  if (event.key === "ArrowDown") moveActive(clampedActive + 1);
-                  else if (clampedActive >= 0) onActivate?.(filtered[clampedActive], clampedActive);
-                } else if (event.key === "Escape" && query.length > 0) {
-                  event.preventDefault();
-                  setQuery("");
-                }
-              }}
-              className={cn(
-                "hairline h-8 min-w-0 flex-1 rounded-input bg-sunken px-3",
-                "text-body text-text-primary placeholder:text-text-tertiary",
-              )}
-            />
-          ) : null}
+          {searchField}
           {toolbar}
         </div>
       ) : null}
@@ -336,17 +405,41 @@ export function DataList<T>({
         data-scroll-area=""
         data-fade-top={edges.hasAbove}
         data-fade-bottom={edges.hasBelow}
+        style={
+          headerInset
+            ? ({
+                // Content must dissolve completely before it reaches the title.
+                "--fade-size-top": "calc(var(--page-header-height) + var(--scroll-fade-size))",
+                "--fade-hold-size-top": "var(--page-header-height)",
+              } as CSSProperties)
+            : undefined
+        }
         className="scroll-fade min-h-0 flex-1 overflow-auto outline-offset-[calc(var(--focus-ring-offset)*-1)]"
       >
+        {insetPx > 0 ? <div aria-hidden="true" style={{ height: insetPx }} /> : null}
         {showEmpty ? empty : null}
         {showNoResults ? (noResults ?? empty) : null}
         {!showEmpty && !showNoResults ? (
-          <div style={{ height: window_.totalHeight }} className="relative">
-            <div style={{ transform: `translateY(${window_.offsetY}px)` }}>{rows}</div>
-          </div>
+          <>
+            {lead ? <div style={{ height: leadHeight }}>{lead}</div> : null}
+            <div style={{ height: window_.totalHeight }} className="relative">
+              <div style={{ transform: `translateY(${window_.offsetY}px)` }}>{rows}</div>
+            </div>
+          </>
         ) : null}
         {footer}
+        {docked ? <div aria-hidden="true" className="h-[var(--dock-clearance)]" /> : null}
       </div>
+
+      {docked && (search || toolbar) ? (
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 flex justify-center px-[var(--page-padding-x)] pb-[var(--dock-offset)]">
+          <div className="material-elevated pointer-events-auto flex h-[var(--dock-height)] w-full max-w-[var(--dock-max-width)] items-center gap-3 rounded-pill pr-2 pl-5">
+            <Search aria-hidden="true" className="size-4 shrink-0 text-text-tertiary" />
+            {searchField}
+            {toolbar}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

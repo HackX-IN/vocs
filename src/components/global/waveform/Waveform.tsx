@@ -24,6 +24,9 @@ export interface WaveformHandle {
   push(level: number): void;
   /** Return every bar to the floor. */
   reset(): void;
+  /** Replace every bar's level at once (oldest first), without shifting. For a
+   *  caller that derives the bars itself — the pill's three-bar equaliser. */
+  set(levels: readonly number[]): void;
 }
 
 export interface WaveformProps {
@@ -31,13 +34,15 @@ export interface WaveformProps {
   values?: readonly number[];
   /** Override the token bar count — for a wider or narrower host. */
   bars?: number;
+  /** Where the bars grow from. "end" is a baseline; "center" grows both ways. */
+  align?: "end" | "center";
   className?: string;
   ref?: Ref<WaveformHandle>;
 }
 
 const clamp01 = (value: number): number => (value < 0 ? 0 : value > 1 ? 1 : value);
 
-export function Waveform({ values, bars, className, ref }: WaveformProps) {
+export function Waveform({ values, bars, align = "end", className, ref }: WaveformProps) {
   const [tokenBars] = useState(() => readNumberToken("--waveform-bars"));
   const [minScale] = useState(() => readPxToken("--waveform-bar-min") / readPxToken("--waveform-bar-max"));
 
@@ -81,6 +86,11 @@ export function Waveform({ values, bars, className, ref }: WaveformProps) {
         levelsRef.current.fill(0);
         applyLevels();
       },
+      set(next: readonly number[]) {
+        const levels = levelsRef.current;
+        for (let index = 0; index < levels.length; index += 1) levels[index] = clamp01(next[index] ?? 0);
+        applyLevels();
+      },
     }),
     [applyLevels],
   );
@@ -88,7 +98,11 @@ export function Waveform({ values, bars, className, ref }: WaveformProps) {
   return (
     <div
       aria-hidden="true"
-      className={cn("flex items-end gap-[var(--waveform-bar-gap)] h-[var(--waveform-bar-max)]", className)}
+      className={cn(
+        "flex gap-[var(--waveform-bar-gap)] h-[var(--waveform-bar-max)]",
+        align === "center" ? "items-center" : "items-end",
+        className,
+      )}
     >
       {indices.map((index) => (
         <span
@@ -96,7 +110,10 @@ export function Waveform({ values, bars, className, ref }: WaveformProps) {
           ref={(element) => {
             barRefs.current[index] = element;
           }}
-          className="w-[var(--waveform-bar-width)] h-full origin-bottom rounded-full bg-current"
+          className={cn(
+            "w-[var(--waveform-bar-width)] h-full rounded-full bg-current",
+            align === "center" ? "origin-center" : "origin-bottom",
+          )}
           style={{ transform: `scaleY(${minScale})` }}
         />
       ))}

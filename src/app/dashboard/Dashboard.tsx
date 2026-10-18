@@ -92,6 +92,9 @@ export function Dashboard() {
   // rather than from a literal inside each view means a page added to the
   // registry — Billing, say — arrives titled without an edit here.
   const activeTitle = navItems.find((item) => item.route === activeRoute)?.label ?? "";
+  // An open dictation draws its own header — the shell must not add a second
+  // title above the one the user is editing.
+  const editingDictation = activeRoute === "history" && section !== null;
 
   return (
     <main className="flex h-full">
@@ -101,7 +104,7 @@ export function Dashboard() {
           floating glass object, and a GlassPanel inside it would put two seams
           where the design has one. */}
       <div className="flex min-w-0 flex-1 flex-col">
-        <PageShell title={activeTitle}>
+        <PageShell title={editingDictation ? null : activeTitle}>
         <ErrorBoundary
           key={activeRoute}
           fallback={({ error, reset }) => (
@@ -159,7 +162,7 @@ function View({
     case "stats":
       return <StatsView metrics={metrics} hotkey={hotkey} mode={mode} />;
     case "history":
-      return <HistoryView hotkey={hotkey} mode={mode} />;
+      return <HistoryView hotkey={hotkey} mode={mode} section={section} />;
     case "settings":
       return <SettingsView registry={registry} section={section} />;
     case "billing":

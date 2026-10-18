@@ -1,9 +1,9 @@
 /**
  * SOURCE OF TRUTH KEYWORDS: HistoryDetail, DiffText, diffHistoryEntry,
  *   setHistoryReverted, use-original, said-vs-fixed, DiffSegment
- * WHAT:  The panel under the history list for the selected session: what was
- *        said against what was delivered, with every change marked, and one
- *        button to take the original instead.
+ * WHAT:  The "said vs fixed" card in the dictation editor: what was said against
+ *        what was delivered, with every change marked, and one button to take
+ *        the original instead.
  * WHY:   A correction nobody can see is a correction nobody can trust. The diff
  *        is computed in Rust on request (one session, not a page of them) and
  *        drawn as runs: removed words struck through, added words highlighted,
@@ -12,16 +12,21 @@
  *        tints apart. "Use original" records the choice as a flag rather than
  *        rewriting the text, so it is undoable and the delivered text is never
  *        lost; copy and export then honour it. Only shown when something
- *        actually changed — a panel restating a transcript that was not
- *        touched is noise under every row.
- * WHERE: Rendered by HistoryView below the DataList for the active row.
+ *        actually changed — a card restating a transcript that was not touched
+ *        is noise under every dictation.
+ *
+ *        The caller owns the moment of toggling: the editor has to save any
+ *        words it is holding BEFORE the flag flips (a flip would otherwise swap
+ *        the text out from under the cursor), so this card asks through
+ *        `beforeToggle` and waits.
+ * WHERE: Rendered by DictationEditor under the text, for a corrected session.
  */
 
 import { useState } from "react";
 import { commands, type AppError, type DiffKind, type SessionSummary } from "@/lib/bindings";
 import { unwrapCommand, useCommand } from "@/lib/ipc";
 import { cn } from "@/lib/utils";
-import { Button, ErrorSurface } from "@/components/global";
+import { Button, Card, ErrorSurface } from "@/components/global";
 
 const SEGMENT_CLASS: Readonly<Record<DiffKind, string>> = {
   SAME: "text-text-secondary",
@@ -31,18 +36,21 @@ const SEGMENT_CLASS: Readonly<Record<DiffKind, string>> = {
 
 export interface HistoryDetailProps {
   session: SessionSummary;
+  /** Awaited before the flag changes — flush unsaved edits here. */
+  beforeToggle: () => Promise<void>;
   /** Called with the new flag once the backend has accepted it. */
   onRevertedChange: (id: string, reverted: boolean) => void;
 }
 
-export function HistoryDetail({ session, onRevertedChange }: HistoryDetailProps) {
-  const diff = useCommand(() => commands.diffHistoryEntry({ id: session.id }), [session.id]);
+export function HistoryDetail({ session, beforeToggle, onRevertedChange }: HistoryDetailProps) {
+  const diff = useCommand(() => commands.diffHistoryEntry({ id: session.id }), [session.id, session.edited_at_ms]);
   const [error, setError] = useState<AppError | null>(null);
   const [busy, setBusy] = useState(false);
 
   const toggle = async () => {
     setBusy(true);
     setError(null);
+    await beforeToggle();
     const next = !session.reverted;
     const result = await unwrapCommand(() => commands.setHistoryReverted({ id: session.id, reverted: next }));
     setBusy(false);
@@ -51,20 +59,19 @@ export function HistoryDetail({ session, onRevertedChange }: HistoryDetailProps)
   };
 
   return (
-    <section aria-label="What was said and what was fixed" className="hairline-t flex max-h-[var(--history-detail-max-height)] shrink-0 flex-col gap-2 overflow-y-auto px-[var(--page-padding-x)] py-3">
-      <div className="flex items-center justify-between gap-4">
-        <p className="text-label text-text-secondary">
-          {session.reverted ? "You chose the original" : "Said → fixed"}
-        </p>
+    <Card
+      title={session.reverted ? "You chose the original" : "Said → fixed"}
+      aria-label="What was said and what was fixed"
+      actions={
         <Button disabled={busy} onClick={() => void toggle()}>
           {session.reverted ? "Use the fixed text" : "Use original"}
         </Button>
-      </div>
-
+      }
+    >
       {diff.error ? (
         <ErrorSurface size="compact" error={diff.error} onRetry={diff.reload} />
       ) : (
-        <p className="text-body">
+        <p data-selectable="true" className="text-body leading-relaxed">
           {(diff.data ?? []).map((segment, index) => (
             <span key={`${index}-${segment.kind}`} className={cn(SEGMENT_CLASS[segment.kind])}>
               {segment.text}{" "}
@@ -73,6 +80,6 @@ export function HistoryDetail({ session, onRevertedChange }: HistoryDetailProps)
         </p>
       )}
       {error ? <ErrorSurface size="compact" error={error} /> : null}
-    </section>
+    </Card>
   );
 }

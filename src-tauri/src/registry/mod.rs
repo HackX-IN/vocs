@@ -560,10 +560,13 @@ fn build_capabilities() -> Vec<Capability> {
             requires: vec![],
             engine_needs: vec![],
             nav: Some(NavDef {
-                label: text("History"),
+                // "Dictations" in the sidebar and the page title; the capability
+                // keeps its internal name. It is FIRST: it is the home of the
+                // app — the notebook of everything you have said.
+                label: text("Dictations"),
                 route: text("history"),
-                icon: text("Clock"),
-                order: 20,
+                icon: text("NotebookText"),
+                order: 10,
             }),
             hotkey: None,
             metrics: vec![],
@@ -589,7 +592,7 @@ fn build_capabilities() -> Vec<Capability> {
                 label: text("Stats"),
                 route: text("stats"),
                 icon: text("ChartNoAxesColumn"),
-                order: 10,
+                order: 20,
             }),
             hotkey: None,
             metrics: vec![],

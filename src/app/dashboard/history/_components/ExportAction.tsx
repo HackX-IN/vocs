@@ -19,6 +19,7 @@ import { commands, type AppError, type ExportFormat } from "@/lib/bindings";
 import { unwrapCommand } from "@/lib/ipc";
 import { saveTextFile } from "@/lib/save-file";
 import { cn } from "@/lib/utils";
+import { buttonClass } from "@/components/global";
 
 const FORMAT_META: Readonly<Record<ExportFormat, { label: string; extension: string }>> = {
   JSON: { label: "JSON", extension: "json" },
@@ -28,8 +29,9 @@ const FORMAT_META: Readonly<Record<ExportFormat, { label: string; extension: str
 
 const FORMATS: readonly ExportFormat[] = ["JSON", "MARKDOWN", "PLAIN_TEXT"];
 
-const BUTTON_CLASS =
-  "hairline h-8 shrink-0 rounded-input bg-sunken px-3 text-body text-text-primary transition-colors hover:bg-sunken-strong disabled:opacity-50";
+// Quiet and round: the action lives inside the floating search dock, where a
+// bordered square button would be the loudest thing in it.
+const BUTTON_CLASS = cn(buttonClass({ variant: "ghost" }), "rounded-pill");
 
 export function ExportAction({ onError }: { onError: (error: AppError | null) => void }) {
   const [open, setOpen] = useState(false);

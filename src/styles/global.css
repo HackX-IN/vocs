@@ -1,7 +1,7 @@
 /**
  * SOURCE OF TRUTH KEYWORDS: global.css, tailwind-theme, material-pill,
  *   material-panel, material-elevated, glass-noise, focus-ring, hairline,
- *   hairline-r, mark-bars, color-sunken-strong, transparent-body,
+ *   hairline-r, dot-grid, color-sunken-strong, transparent-body,
  *   prefers-reduced-motion, prefers-reduced-transparency
  * WHAT:  The Tailwind v4 entry point. Imports the tokens, maps them into the
  *        Tailwind theme so every token is reachable as a utility, defines the
@@ -24,6 +24,7 @@
  */
 
 @import "tailwindcss";
+@import "@fontsource-variable/doto/wght.css";
 @import "./tokens.css";
 
 @theme inline {
@@ -43,6 +44,15 @@
 
   --color-accent: var(--accent);
   --color-accent-soft: var(--accent-soft);
+  --color-accent-ink: var(--accent-ink);
+  --color-signal: var(--signal);
+  --color-signal-soft: var(--signal-soft);
+  --color-pill-surface: var(--pill-surface);
+  --color-pill-ring: var(--pill-ring);
+  --color-pill-ink: var(--pill-ink);
+  --color-pill-signal: var(--pill-signal);
+  --color-pill-danger: var(--pill-danger);
+  --color-pill-danger-wash: var(--pill-danger-wash);
   --color-success: var(--success);
   --color-success-soft: var(--success-soft);
   --color-warning: var(--warning);
@@ -61,6 +71,7 @@
 
   --font-sans: var(--font-system);
   --font-mono: var(--font-mono-stack);
+  --font-display: var(--font-display-stack);
 
   --text-display: var(--text-display-size);
   --text-display--line-height: var(--text-display-line);
@@ -91,6 +102,11 @@
   --text-caption--line-height: var(--text-caption-line);
   --text-caption--font-weight: var(--text-caption-weight);
   --text-caption--letter-spacing: var(--text-caption-tracking);
+
+  --text-eyebrow: var(--text-eyebrow-size);
+  --text-eyebrow--line-height: var(--text-eyebrow-line);
+  --text-eyebrow--font-weight: var(--text-eyebrow-weight);
+  --text-eyebrow--letter-spacing: var(--text-eyebrow-tracking);
 
   --text-mono: var(--text-mono-size);
   --text-mono--line-height: var(--text-mono-line);
@@ -164,6 +180,22 @@
     align-items: center;
     justify-content: center;
     overflow: hidden;
+  }
+
+  /**
+   * The page. Dashboard and onboarding are ordinary opaque-looking windows, so
+   * they paint the page colour and its one warm bloom themselves; the pill and
+   * the rail own their own surfaces and stay transparent. Painting it on the
+   * body rather than in a component means the rounded native window shows
+   * exactly one surface from edge to edge.
+   */
+  body[data-window="dashboard"],
+  body[data-window="onboarding"] {
+    background: var(--page-glow), var(--surface-glass);
+  }
+
+  body[data-window="sidebar"] {
+    background: var(--surface-elevated);
   }
 
   body {
@@ -264,39 +296,18 @@
 }
 
 /**
- * WHAT:  The identity mark (docs/04 §12) — the waveform at rest, five bars.
- * WHY:   Heights are ratios of --mark-size, so the mark is ONE shape at every
- *        size instead of five numbers re-picked per use. Bar width and gap stay
- *        fixed on purpose: scaling the stroke with the height turns the mark
- *        into a blob when it is large and a smear when it is small. Authored
- *        here rather than as inline styles because a component that writes
- *        `height: 25%` five times has put a design value back into JSX.
+ * WHAT:  The dot-matrix grid — a faint lattice of dots behind a hero surface.
+ * WHY:   The instrument-panel texture of docs/04 §1, drawn as one radial
+ *        gradient so it costs a paint and no element. Pitch and dot ink are
+ *        tokens; it is decoration only and never carries information.
  */
-@utility mark-bars {
-  display: flex;
-  align-items: center;
-  gap: var(--mark-bar-gap);
-  height: var(--mark-size);
+@utility dot-grid-fade {
+  mask-image: linear-gradient(to bottom left, #000, transparent 72%);
+}
 
-  & > span {
-    width: var(--mark-bar-width);
-    border-radius: var(--mark-bar-width);
-    background: currentColor;
-  }
-
-  & > span:nth-child(1),
-  & > span:nth-child(5) {
-    height: calc(var(--mark-size) * var(--mark-ratio-outer));
-  }
-
-  & > span:nth-child(2),
-  & > span:nth-child(4) {
-    height: calc(var(--mark-size) * var(--mark-ratio-mid));
-  }
-
-  & > span:nth-child(3) {
-    height: calc(var(--mark-size) * var(--mark-ratio-peak));
-  }
+@utility dot-grid {
+  background-image: radial-gradient(circle, var(--dot-grid-ink) var(--dot-grid-radius), transparent calc(var(--dot-grid-radius) + 0.5px));
+  background-size: var(--dot-grid-pitch) var(--dot-grid-pitch);
 }
 
 /** A single hairline rule, so no component improvises a 1px divider. */
@@ -363,6 +374,12 @@
   initial-value: 0px;
 }
 
+@property --fade-hold-top {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
 @property --fade-bottom {
   syntax: "<length>";
   inherits: false;
@@ -371,6 +388,7 @@
 
 @utility scroll-fade {
   --fade-top: 0px;
+  --fade-hold-top: 0px;
   --fade-bottom: 0px;
   /* How tall each fade is WHEN ON. Overridable because a scroller that sits
    * under the page header has to dissolve its content across the whole header
@@ -378,12 +396,18 @@
    * would look wrong reaching up into somebody else's chrome. */
   --fade-size-top: var(--scroll-fade-size);
   --fade-size-bottom: var(--scroll-fade-size);
+  /* How far down from the top edge content is FULLY hidden before it starts to
+   * fade in. Zero for a plain scroller; a page with an overlaying header sets it
+   * to the header's height so nothing shows through behind the title. */
+  --fade-hold-size-top: 0px;
   transition:
+    --fade-hold-top var(--motion-duration-medium) var(--motion-ease-standard),
     --fade-top var(--motion-duration-medium) var(--motion-ease-standard),
     --fade-bottom var(--motion-duration-medium) var(--motion-ease-standard);
   -webkit-mask-image: linear-gradient(
     to bottom,
     transparent 0,
+    transparent var(--fade-hold-top),
     #000 var(--fade-top),
     #000 calc(100% - var(--fade-bottom)),
     transparent 100%
@@ -391,6 +415,7 @@
   mask-image: linear-gradient(
     to bottom,
     transparent 0,
+    transparent var(--fade-hold-top),
     #000 var(--fade-top),
     #000 calc(100% - var(--fade-bottom)),
     transparent 100%
@@ -398,6 +423,7 @@
 
   &[data-fade-top="true"] {
     --fade-top: var(--fade-size-top);
+    --fade-hold-top: var(--fade-hold-size-top);
   }
 
   &[data-fade-bottom="true"] {

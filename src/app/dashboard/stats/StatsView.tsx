@@ -1,34 +1,37 @@
 /**
  * SOURCE OF TRUTH KEYWORDS: StatsView, StatsSummary, getStats, hero-stat,
- *   LanguageBreakdown, ActivityChart, LatencyPanel, elevated-card
- * WHAT:  The stats view: one elevated card holding the hero number and the
- *        activity line, then the secondary grid, the language breakdown and the
- *        latency rows sitting directly on the panel below it.
+ *   LanguageBreakdown, ActivityChart, LatencyPanel, instrument-grid, numbered-cards
+ * WHAT:  The stats view as a panel of numbered instrument cards: time saved
+ *        with the activity chart, the streak, three headline counts, the
+ *        language breakdown and the latency table.
  * WHY:   One get_stats call fills the whole page — six commands would be six
  *        chances to render half a page, which is why the Rust side returns one
  *        shape. Nothing here computes a statistic: every number is served,
  *        because a frontend that derives "time saved" is a second opinion about
  *        the product's central claim.
  *
- *        The card is the ONE elevated surface this view is allowed (docs/04
- *        §1.2), and it holds the hero number and the chart because those are
- *        the thing the view exists to show. Everything under it is grouped by
- *        spacing and a hairline instead of by a surface — repeat the card and
- *        none of them is elevated any more, they are six boxes on glass, which
- *        is the widget look §1.2 is about.
+ *        The cards are numbered in reading order and the numbers are assigned
+ *        here, by position, because only this view knows which cards it shows —
+ *        the streak card disappears for a brand-new user and the rest must not
+ *        keep a gap. The hero card is the only one with the dot lattice behind
+ *        it (docs/04 §1.2): it holds the figure the view exists to show.
  * WHERE: Rendered by Dashboard.tsx for the registry's "stats" route.
  */
 
 import { commands, type HotkeyBinding, type MetricDef } from "@/lib/bindings";
 import { useCommand } from "@/lib/ipc";
 import { formatCompactDuration, formatCount } from "@/lib/format";
-import { GlassPanel, ScrollArea, StatCard } from "@/components/global";
+import { fillCalendar } from "@/lib/calendar-window";
+import { Card, DotColumns, ScrollArea, StatCard } from "@/components/global";
 import type { DictationMode } from "@/lib/dictation-mode";
 import { NoTranscriptionsYet } from "../_components/NoTranscriptionsYet";
 import { ViewState } from "../_components/ViewState";
-import { ActivityChart } from "./_components/ActivityChart";
+import { ActivityChart, useActivityRange } from "./_components/ActivityChart";
 import { LatencyPanel } from "./_components/LatencyPanel";
 import { LanguageBreakdown } from "./_components/LanguageBreakdown";
+
+/** The streak card draws the last week, which is a calendar fact, not a design value. */
+const STREAK_DAYS = 7;
 
 export interface StatsViewProps {
   /** Registry metric declarations — they decide what the latency panel shows. */
@@ -40,57 +43,75 @@ export interface StatsViewProps {
 
 export function StatsView({ metrics, hotkey, mode }: StatsViewProps) {
   const stats = useCommand(commands.getStats, []);
+  const { range, picker } = useActivityRange();
 
   return (
-    <ScrollArea contentClassName="flex flex-col gap-5 px-[var(--page-padding-x)] pb-8">
-        <ViewState state={stats} onRetry={stats.reload}>
-          {(data) =>
-            data.total_sessions === 0 ? (
-              <NoTranscriptionsYet hotkey={hotkey} mode={mode} />
-            ) : (
-              <>
-                <GlassPanel material="elevated" radius="card" className="flex flex-col gap-4 p-5">
-                  <StatCard
-                    size="hero"
-                    label="Time saved"
-                    value={formatCompactDuration(data.time_saved_ms)}
-                    delta={
-                      data.speaking_wpm !== null && data.baseline_typing_wpm !== null
-                        ? {
-                            label: `${Math.round(data.speaking_wpm)} wpm spoken vs ${Math.round(
-                              data.baseline_typing_wpm,
-                            )} typed`,
-                          }
-                        : undefined
-                    }
+    <ScrollArea contentClassName="px-[var(--page-padding-x)] pb-8">
+      <ViewState state={stats} onRetry={stats.reload}>
+        {(data) =>
+          data.total_sessions === 0 ? (
+            <NoTranscriptionsYet hotkey={hotkey} mode={mode} />
+          ) : (
+            <div className="grid grid-cols-3 gap-4">
+              <StatCard
+                index="01"
+                label="Time saved"
+                size="hero"
+                tone="hero"
+                className="col-span-2"
+                value={formatCompactDuration(data.time_saved_ms)}
+                caption={
+                  data.speaking_wpm !== null && data.baseline_typing_wpm !== null
+                    ? `${Math.round(data.speaking_wpm)} wpm spoken vs ${Math.round(data.baseline_typing_wpm)} typed`
+                    : undefined
+                }
+                actions={picker}
+                chart={<ActivityChart days={data.activity} range={range} />}
+              />
+
+              <StatCard
+                index="02"
+                label="Streak"
+                value={formatCount(data.current_streak_days)}
+                unit={data.current_streak_days === 1 ? "day" : "days"}
+                caption={`${formatCount(data.sessions_this_week)} sessions this week`}
+                chart={
+                  <DotColumns
+                    values={fillCalendar(data.activity, STREAK_DAYS).map((day) => day.session_count)}
+                    label="Sessions in the last seven days"
                   />
-                  {data.activity.length > 1 ? <ActivityChart days={data.activity} /> : null}
-                </GlassPanel>
+                }
+              />
 
-                <div className="grid grid-cols-3 gap-x-6 gap-y-5">
-                  <StatCard label="Transcriptions" value={formatCount(data.total_sessions)} />
-                  <StatCard label="Words" value={formatCount(data.total_words)} />
-                  <StatCard label="Time spoken" value={formatCompactDuration(data.total_speaking_ms)} />
-                  <StatCard label="This week" value={formatCount(data.sessions_this_week)} unit="sessions" />
-                  <StatCard label="Words this week" value={formatCount(data.words_this_week)} />
-                  <StatCard label="Streak" value={formatCount(data.current_streak_days)} unit="days" />
-                </div>
+              <StatCard index="03" label="Transcriptions" value={formatCount(data.total_sessions)} />
+              <StatCard
+                index="04"
+                label="Words"
+                value={formatCount(data.total_words)}
+                caption={`${formatCount(data.words_this_week)} this week`}
+              />
+              <StatCard index="05" label="Time spoken" value={formatCompactDuration(data.total_speaking_ms)} />
 
-                {data.languages.length > 0 ? (
-                  <section className="flex flex-col gap-2 hairline-t pt-5">
-                    <h2 className="text-label text-text-secondary">Languages</h2>
-                    <LanguageBreakdown languages={data.languages} />
-                  </section>
-                ) : null}
+              {data.languages.length > 0 ? (
+                <Card index="06" title="Languages" className="col-span-1">
+                  <LanguageBreakdown languages={data.languages} />
+                </Card>
+              ) : null}
 
-                <section className="flex flex-col gap-2 hairline-t pt-5">
-                  <h2 className="text-label text-text-secondary">Latency</h2>
+              <Card
+                index={data.languages.length > 0 ? "07" : "06"}
+                title="Latency"
+                flush
+                className={data.languages.length > 0 ? "col-span-2" : "col-span-3"}
+              >
+                <div className="px-[var(--card-padding)] pt-3 pb-[var(--card-padding)]">
                   <LatencyPanel metrics={metrics} latency={data.latency} />
-                </section>
-              </>
-            )
-          }
-        </ViewState>
+                </div>
+              </Card>
+            </div>
+          )
+        }
+      </ViewState>
     </ScrollArea>
   );
 }

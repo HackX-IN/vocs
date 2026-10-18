@@ -1,50 +1,42 @@
 /**
- * SOURCE OF TRUTH KEYWORDS: StatCard, StatCardProps, StatDelta, StatTone,
- *   StatCardSize, TONE_CLASS, tabular-nums
- * WHAT:  One measurement: a label, a value, an optional delta, and a slot for
- *        a chart or sparkline beneath it.
- * WHY:   No surface of its own by default. Content sits on the material, and a
- *        card-on-glass is the fastest way to make this look like a Vista widget
- *        (docs/04 §2) — pass surface only where a stat genuinely needs to
- *        detach from what is behind it. The value is tabular-nums because a
- *        number that reflows as its digits change reads as cheap, and stats
- *        update live. Tone is opt-in rather than derived from the sign: the app
- *        has one accent by design, so a green number has to be a deliberate
- *        statement about state, not an automatic consequence of arithmetic.
- *        At hero size the delta drops to its own line. Hung off the baseline of
- *        a 40px number it has to be read as part of that number, and it is not —
- *        it is the sentence explaining where the number came from. At default
- *        size it stays inline, because next to a 22px value it reads as an
- *        annotation rather than as a caption fighting for the same line.
- * WHERE: The stats view — one hero card (time saved plus the activity chart)
- *        and the 2×3 grid — and the latency panel. The chart slot takes any
- *        element; there is no chart library in this app (docs/04 §11).
+ * SOURCE OF TRUTH KEYWORDS: StatCard, StatCardProps, StatCardSize, display-figure,
+ *   numbered-stat, font-display, tabular-nums
+ * WHAT:  One measurement as a card: a numbered eyebrow, the figure in the
+ *        display face, an optional unit, a one-line caption and a slot for a
+ *        chart beneath it.
+ * WHY:   The figure is the loudest thing on the screen on purpose — the
+ *        product's whole claim is a measurement — and it is the one place the
+ *        dot-matrix face appears besides the page title. It is tabular-nums
+ *        because stats update live and a number that reflows as its digits
+ *        change reads as cheap. The caption is the sentence explaining where
+ *        the number came from ("67 wpm spoken vs 40 typed"), so it is text, not
+ *        a coloured delta: whether a figure is good is for the reader to judge,
+ *        and the app has no business tinting arithmetic green or red.
+ *        Built on Card so the surface, radius and eyebrow stay one definition.
+ * WHERE: The Stats view.
  */
 
 import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import { Card, type CardTone } from "../card";
 
-export type StatTone = "neutral" | "positive" | "negative";
 export type StatCardSize = "default" | "hero";
 
-export interface StatDelta {
-  /** Already formatted by the caller: "+12%", "−4 min". */
-  label: string;
-  tone?: StatTone;
-}
-
 export interface StatCardProps {
+  /** "01" — the card's place in its view. */
+  index?: string;
   label: string;
   /** Formatted by the caller — formatting rules live in lib/format.ts. */
   value: ReactNode;
-  /** Rendered next to the value at label size: "min", "wpm". */
+  /** Rendered beside the value at label size: "days", "sessions". */
   unit?: ReactNode;
-  delta?: StatDelta;
-  /** Sparkline, bar chart, heatmap — anything, or nothing. */
+  caption?: ReactNode;
+  /** Right-hand side of the header: a range picker, say. */
+  actions?: ReactNode;
+  /** Sparkline, dot chart — anything, or nothing. */
   chart?: ReactNode;
   size?: StatCardSize;
-  /** Give the card its own elevated material. Off by default, on purpose. */
-  surface?: boolean;
+  tone?: CardTone;
   className?: string;
 }
 
@@ -53,45 +45,28 @@ const VALUE_CLASS: Readonly<Record<StatCardSize, string>> = {
   hero: "text-display",
 };
 
-const TONE_CLASS: Readonly<Record<StatTone, string>> = {
-  neutral: "text-text-secondary",
-  positive: "text-success",
-  negative: "text-danger",
-};
-
 export function StatCard({
+  index,
   label,
   value,
   unit,
-  delta,
+  caption,
+  actions,
   chart,
   size = "default",
-  surface = false,
+  tone = "default",
   className,
 }: StatCardProps) {
   return (
-    <div
-      className={cn(
-        "flex flex-col gap-1",
-        surface && "material-elevated rounded-card p-4",
-        className,
-      )}
-    >
-      <p className="text-label text-text-secondary">{label}</p>
-
+    <Card index={index} title={label} actions={actions} tone={tone} className={className}>
       <div className="flex items-baseline gap-2">
-        <span className={cn(VALUE_CLASS[size], "text-text-primary tabular-nums")}>{value}</span>
+        <span className={cn("font-display tabular-nums text-text-primary", VALUE_CLASS[size])}>{value}</span>
         {unit ? <span className="text-label text-text-tertiary">{unit}</span> : null}
-        {delta && size !== "hero" ? (
-          <span className={cn("text-label tabular-nums", TONE_CLASS[delta.tone ?? "neutral"])}>{delta.label}</span>
-        ) : null}
       </div>
 
-      {delta && size === "hero" ? (
-        <span className={cn("text-label tabular-nums", TONE_CLASS[delta.tone ?? "neutral"])}>{delta.label}</span>
-      ) : null}
+      {caption ? <p className="pt-1 text-label tabular-nums text-text-secondary">{caption}</p> : null}
 
-      {chart ? <div className="pt-2">{chart}</div> : null}
-    </div>
+      {chart ? <div className="pt-4">{chart}</div> : null}
+    </Card>
   );
 }
