@@ -389,7 +389,7 @@ async fn await_delivery(harness: &Harness) {
         // finalised row means the whole delivery is done. Waiting on the
         // injector alone would race the History assertions — the text can be
         // on screen a few milliseconds before it is in the database.
-        let finished = crate::services::sessions::list_sessions(&harness.db, 10, 0)
+        let finished = crate::services::sessions::list_sessions(&harness.db, &crate::types::HistoryFilter::default(), 10, 0)
             .map(|rows| rows.iter().any(|row| row.ended_at_ms.is_some()))
             .unwrap_or(false);
         if finished {
@@ -529,7 +529,7 @@ mod tests {
         let (harness, rx) = build(samples, engine).expect("harness");
         run_session(&harness, rx, Duration::from_secs(4)).await;
 
-        let sessions = services::sessions::list_sessions(&harness.db, 10, 0).expect("list");
+        let sessions = services::sessions::list_sessions(&harness.db, &crate::types::HistoryFilter::default(), 10, 0).expect("list");
         assert_eq!(sessions.len(), 1, "exactly one session should be recorded");
 
         let session = &sessions[0];
@@ -645,7 +645,7 @@ mod tests {
 
         // And it is in history, because it was never cancelled.
         assert_eq!(
-            services::sessions::list_sessions(&harness.db, 10, 0)
+            services::sessions::list_sessions(&harness.db, &crate::types::HistoryFilter::default(), 10, 0)
                 .expect("list")
                 .len(),
             1
@@ -682,7 +682,7 @@ mod tests {
 
         // A row exists while recording — that is the crash-recovery guarantee.
         assert_eq!(
-            services::sessions::list_sessions(&harness.db, 10, 0).expect("list").len(),
+            services::sessions::list_sessions(&harness.db, &crate::types::HistoryFilter::default(), 10, 0).expect("list").len(),
             1,
             "the in-flight row must exist during recording"
         );
@@ -696,7 +696,7 @@ mod tests {
             "a cancelled recording must never be pasted"
         );
         assert_eq!(
-            services::sessions::list_sessions(&harness.db, 10, 0).expect("list").len(),
+            services::sessions::list_sessions(&harness.db, &crate::types::HistoryFilter::default(), 10, 0).expect("list").len(),
             0,
             "escape means gone — no row, no tombstone"
         );
@@ -951,7 +951,7 @@ mod scripted {
         run_session(&harness, rx, Duration::from_secs(3)).await;
 
         assert!(harness.injector.delivered.lock().is_none(), "the paste was withheld");
-        let session = services::sessions::list_sessions(&harness.db, 1, 0).expect("list").remove(0);
+        let session = services::sessions::list_sessions(&harness.db, &crate::types::HistoryFilter::default(), 1, 0).expect("list").remove(0);
         assert_eq!(session.final_text.as_deref(), Some("Hello there."), "the words are still saved");
         assert_eq!(session.delivery, crate::types::DeliveryKind::None);
     }
@@ -1006,7 +1006,7 @@ mod scripted {
 
         run_session(&harness, rx, Duration::from_secs(3)).await;
 
-        let stored = services::sessions::list_sessions(&harness.db, 10, 0).expect("list");
+        let stored = services::sessions::list_sessions(&harness.db, &crate::types::HistoryFilter::default(), 10, 0).expect("list");
         assert!(stored.is_empty(), "an empty recording must not be stored, found {stored:?}");
     }
 
@@ -1039,7 +1039,7 @@ mod scripted {
 
         run_session(&harness, rx, Duration::from_secs(3)).await;
 
-        let session = services::sessions::list_sessions(&harness.db, 1, 0).expect("list").remove(0);
+        let session = services::sessions::list_sessions(&harness.db, &crate::types::HistoryFilter::default(), 1, 0).expect("list").remove(0);
         assert_eq!(session.raw_text.as_deref(), Some("um hello there"));
         assert_eq!(session.final_text.as_deref(), Some("Hello there."));
         assert!(

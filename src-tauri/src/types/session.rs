@@ -265,3 +265,38 @@ impl SessionSummary {
         }
     }
 }
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: HistoryFilter, HistoryStatus, history_filter, dictation_filters
+ * WHAT:  Everything the Dictations list can be narrowed by: a search phrase, a
+ *        start time, and a status.
+ * WHY:   One filter shape for the whole list, applied in SQL, because the list is
+ *        paged: narrowing the pages already loaded would show a "Failed" filter
+ *        that misses every failure beyond the first screen. The start time is
+ *        sent as an instant, not as a name like "today", because where the day
+ *        begins is a fact about the user's clock and time zone that only the
+ *        webview knows.
+ * WHERE: Built by the History view, carried by list_history, applied by
+ *        services::sessions::list_sessions.
+ */
+#[derive(Debug, Clone, Default, Serialize, Deserialize, Type)]
+pub struct HistoryFilter {
+    /// Words to find in the title and text. Matched as a phrase.
+    pub query: Option<String>,
+    /// Only dictations that started at or after this instant.
+    #[specta(type = Option<TsNumber>)]
+    pub since_ms: Option<i64>,
+    #[serde(default)]
+    pub status: HistoryStatus,
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize, Type)]
+#[serde(rename_all = "SCREAMING_SNAKE_CASE")]
+pub enum HistoryStatus {
+    #[default]
+    All,
+    /// The user changed the words after dictating.
+    Edited,
+    /// The dictation did not finish.
+    Failed,
+}

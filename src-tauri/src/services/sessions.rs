@@ -1,6 +1,6 @@
 /*!
  * SOURCE OF TRUTH KEYWORDS: create_session, finalize_session, get_session,
- *   list_sessions, search_sessions, delete_session, delete_all_sessions,
+ *   list_sessions, delete_session, delete_all_sessions,
  *   find_orphans, mark_orphaned, purge_older_than, NewSession, row_to_summary
  * WHAT:  Pure SQLite access to the sessions table. One verb per function.
  * WHY:   No business rules live here — no deciding what an outcome means, no
@@ -20,7 +20,7 @@ use rusqlite::{params, Connection, Row};
 
 use crate::db::Database;
 use crate::error::AppResult;
-use crate::types::{DeliveryKind, SessionId, SessionOutcome, SessionSummary};
+use crate::types::{DeliveryKind, HistoryFilter, HistoryStatus, SessionId, SessionOutcome, SessionSummary};
 
 /**
  * SOURCE OF TRUTH KEYWORDS: NewSession
@@ -116,35 +116,55 @@ pub fn get_session(db: &Database, id: &SessionId) -> AppResult<Option<SessionSum
     })
 }
 
-/// Newest first. Cancelled sessions do not exist, so no filter is needed for
-/// them; orphans and failures DO appear, which is the point of history.
-pub fn list_sessions(db: &Database, limit: i64, offset: i64) -> AppResult<Vec<SessionSummary>> {
-    db.with_connection(|conn| {
-        let mut stmt = conn.prepare(&format!(
-            "{SELECT_COLUMNS} ORDER BY started_at DESC LIMIT ?1 OFFSET ?2"
-        ))?;
-        let rows = stmt.query_map(params![limit, offset], row_to_summary)?;
-        rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
-    })
-}
-
 /**
- * SOURCE OF TRUTH KEYWORDS: search_sessions
- * WHAT:  Full-text search over final transcripts, newest first.
- * WHY:   Goes through the FTS index rather than a LIKE scan, which stops being
- *        usable somewhere in the low thousands of rows — and this table is
- *        expected to reach tens of thousands.
- * WHERE: The History view's search box.
+ * SOURCE OF TRUTH KEYWORDS: list_sessions, HistoryFilter, search_sessions, paged_history
+ * WHAT:  One page of history, newest first, narrowed by a filter.
+ * WHY:   The text search goes through the FTS index rather than a LIKE scan,
+ *        which stops being usable somewhere in the low thousands of rows — and
+ *        this table is expected to reach tens of thousands. The phrase is quoted
+ *        here so a user's apostrophe is a character to find, not an FTS syntax
+ *        error. Search and filters share one query and one OFFSET because the
+ *        list pages: a separate search path returned one fixed page and could
+ *        not scroll. Cancelled sessions do not exist, so no filter is needed for
+ *        them; orphans and failures DO appear, which is the point of history.
+ * WHERE: The History view (via list_history), diagnostics, export, and tests.
  */
-pub fn search_sessions(db: &Database, query: &str, limit: i64) -> AppResult<Vec<SessionSummary>> {
+pub fn list_sessions(
+    db: &Database,
+    filter: &HistoryFilter,
+    limit: i64,
+    offset: i64,
+) -> AppResult<Vec<SessionSummary>> {
+    let mut clauses: Vec<&str> = Vec::new();
+    let mut values: Vec<rusqlite::types::Value> = Vec::new();
+
+    if let Some(query) = filter.query.as_deref().map(str::trim).filter(|q| !q.is_empty()) {
+        clauses.push("rowid IN (SELECT rowid FROM sessions_fts WHERE sessions_fts MATCH ?)");
+        values.push(format!("\"{}\"", query.replace('"', "\"\"")).into());
+    }
+    if let Some(since) = filter.since_ms {
+        clauses.push("started_at >= ?");
+        values.push(since.into());
+    }
+    match filter.status {
+        HistoryStatus::All => {}
+        HistoryStatus::Edited => clauses.push("edited_at IS NOT NULL"),
+        HistoryStatus::Failed => clauses.push("outcome = 'failed'"),
+    }
+
+    let condition = if clauses.is_empty() {
+        String::new()
+    } else {
+        format!(" WHERE {}", clauses.join(" AND "))
+    };
+    values.push(limit.into());
+    values.push(offset.into());
+
     db.with_connection(|conn| {
         let mut stmt = conn.prepare(&format!(
-            "{SELECT_COLUMNS}
-             WHERE rowid IN (SELECT rowid FROM sessions_fts WHERE sessions_fts MATCH ?1)
-             ORDER BY started_at DESC
-             LIMIT ?2"
+            "{SELECT_COLUMNS}{condition} ORDER BY started_at DESC LIMIT ? OFFSET ?"
         ))?;
-        let rows = stmt.query_map(params![query, limit], row_to_summary)?;
+        let rows = stmt.query_map(rusqlite::params_from_iter(values), row_to_summary)?;
         rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
     })
 }
@@ -338,6 +358,10 @@ fn row_count(conn: &Connection, table: &str) -> rusqlite::Result<i64> {
 mod tests {
     use super::*;
 
+    fn searching(query: &str) -> HistoryFilter {
+        HistoryFilter { query: Some(query.to_string()), ..HistoryFilter::default() }
+    }
+
     fn seed(db: &Database, id: &str, started_at: i64) -> AppResult<SessionId> {
         let session_id = SessionId(id.to_string());
         create_session(
@@ -409,8 +433,8 @@ mod tests {
             },
         )?;
 
-        assert_eq!(search_sessions(&db, "brown", 10)?.len(), 1);
-        assert_eq!(search_sessions(&db, "elephant", 10)?.len(), 0);
+        assert_eq!(list_sessions(&db, &searching("brown"), 10, 0)?.len(), 1);
+        assert_eq!(list_sessions(&db, &searching("elephant"), 10, 0)?.len(), 0);
         Ok(())
     }
 
@@ -537,12 +561,12 @@ mod tests {
         let id = seed(&db, "s1", 1_000)?;
         update_session_text(&db, &id, Some("Standup notes"), "we shipped the thing", 2_000)?;
 
-        assert_eq!(search_sessions(&db, "\"standup\"", 10)?.len(), 1, "found by title");
-        assert_eq!(search_sessions(&db, "\"shipped\"", 10)?.len(), 1, "found by text");
+        assert_eq!(list_sessions(&db, &searching("standup"), 10, 0)?.len(), 1, "found by title");
+        assert_eq!(list_sessions(&db, &searching("shipped"), 10, 0)?.len(), 1, "found by text");
 
         update_session_text(&db, &id, Some("Retro"), "we shipped the thing", 3_000)?;
-        assert!(search_sessions(&db, "\"standup\"", 10)?.is_empty(), "the old title left the index");
-        assert_eq!(search_sessions(&db, "\"retro\"", 10)?.len(), 1);
+        assert!(list_sessions(&db, &searching("standup"), 10, 0)?.is_empty(), "the old title left the index");
+        assert_eq!(list_sessions(&db, &searching("retro"), 10, 0)?.len(), 1);
         Ok(())
     }
 
@@ -634,6 +658,45 @@ mod tests {
             get_session(&db, &id)?.expect("exists").raw_text.as_deref(),
             Some("the real transcript")
         );
+        Ok(())
+    }
+
+    #[test]
+    fn the_list_narrows_by_time_and_status_and_still_pages() -> AppResult<()> {
+        let db = Database::open_in_memory()?;
+        let old = seed(&db, "old", 1_000)?;
+        let edited = seed(&db, "edited", 5_000)?;
+        let failed = seed(&db, "failed", 6_000)?;
+        update_session_text(&db, &edited, None, "hand written", 5_500)?;
+        finalize_session(
+            &db,
+            &failed,
+            &SessionResult {
+                ended_at: 6_100,
+                outcome: SessionOutcome::Failed,
+                duration_ms: 100,
+                language: None,
+                raw_text: None,
+                final_text: None,
+                word_count: None,
+                delivery: DeliveryKind::None,
+                error_code: Some("X".into()),
+                error_message: Some("no".into()),
+            },
+        )?;
+        let _ = old;
+
+        let ids = |filter: &HistoryFilter| -> AppResult<Vec<String>> {
+            Ok(list_sessions(&db, filter, 10, 0)?.into_iter().map(|s| s.id.0).collect())
+        };
+
+        assert_eq!(ids(&HistoryFilter::default())?, ["failed", "edited", "old"]);
+        assert_eq!(ids(&HistoryFilter { since_ms: Some(5_000), ..Default::default() })?, ["failed", "edited"]);
+        assert_eq!(ids(&HistoryFilter { status: HistoryStatus::Failed, ..Default::default() })?, ["failed"]);
+        assert_eq!(ids(&HistoryFilter { status: HistoryStatus::Edited, ..Default::default() })?, ["edited"]);
+
+        let second_page = list_sessions(&db, &HistoryFilter::default(), 2, 2)?;
+        assert_eq!(second_page.len(), 1, "an offset pages through a filtered or unfiltered list alike");
         Ok(())
     }
 }

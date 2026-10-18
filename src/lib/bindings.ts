@@ -13,7 +13,6 @@ export const commands = {
 	resumeRecording: () => typedError<null, AppError>(__TAURI_INVOKE("resume_recording")),
 	getSessionState: () => typedError<SessionState, AppError>(__TAURI_INVOKE("get_session_state")),
 	listHistory: (input: ListHistoryInput) => typedError<SessionSummary[], AppError>(__TAURI_INVOKE("list_history", { input })),
-	searchHistory: (input: SearchHistoryInput) => typedError<SessionSummary[], AppError>(__TAURI_INVOKE("search_history", { input })),
 	getHistoryEntry: (input: SessionIdInput) => typedError<SessionSummary, AppError>(__TAURI_INVOKE("get_history_entry", { input })),
 	deleteHistoryEntry: (input: SessionIdInput) => typedError<null, AppError>(__TAURI_INVOKE("delete_history_entry", { input })),
 	/**
@@ -488,6 +487,35 @@ export type ExportHistoryInput = {
 
 /**
  * 
+ *  * SOURCE OF TRUTH KEYWORDS: HistoryFilter, HistoryStatus, history_filter, dictation_filters
+ *  * WHAT:  Everything the Dictations list can be narrowed by: a search phrase, a
+ *  *        start time, and a status.
+ *  * WHY:   One filter shape for the whole list, applied in SQL, because the list is
+ *  *        paged: narrowing the pages already loaded would show a "Failed" filter
+ *  *        that misses every failure beyond the first screen. The start time is
+ *  *        sent as an instant, not as a name like "today", because where the day
+ *  *        begins is a fact about the user's clock and time zone that only the
+ *  *        webview knows.
+ *  * WHERE: Built by the History view, carried by list_history, applied by
+ *  *        services::sessions::list_sessions.
+ *  
+ */
+export type HistoryFilter = {
+	/**  Words to find in the title and text. Matched as a phrase. */
+	query: string | null,
+	/**  Only dictations that started at or after this instant. */
+	since_ms: number | null,
+	status?: HistoryStatus,
+};
+
+export type HistoryStatus = "ALL" | 
+/**  The user changed the words after dictating. */
+"EDITED" | 
+/**  The dictation did not finish. */
+"FAILED";
+
+/**
+ * 
  *  * SOURCE OF TRUTH KEYWORDS: HotkeyBinding, KeyModifier
  *  * WHAT:  A global shortcut as the user bound it.
  *  * WHY:   Modelled rather than stored as a string like "Alt+Space" so conflict
@@ -618,6 +646,7 @@ export type LatencySummary = {
 };
 
 export type ListHistoryInput = {
+	filter?: HistoryFilter,
 	limit: number,
 	offset: number,
 };
@@ -912,11 +941,6 @@ export type SaveTextFileInput = {
 	contents: string,
 	/**  Offered in the dialog. The user may change it. */
 	suggested_name: string,
-};
-
-export type SearchHistoryInput = {
-	query: string,
-	limit: number,
 };
 
 /**

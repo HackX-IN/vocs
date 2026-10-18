@@ -1,10 +1,10 @@
 /*!
- * SOURCE OF TRUTH KEYWORDS: list_history, search_history, get_history_entry,
+ * SOURCE OF TRUTH KEYWORDS: list_history, get_history_entry,
  *   delete_history_entry, clear_history, purge_history, ListHistoryInput
  * WHAT:  Reading and pruning the local transcript history.
- * WHY:   Search and list are separate commands rather than one with an optional
- *        query, because they hit different indexes and a caller should have to
- *        choose. Retention is applied here rather than in the service, because
+ * WHY:   Searching and filtering are part of listing — one command, one filter,
+ *        one OFFSET — so a filtered or searched list scrolls and pages exactly
+ *        like the plain one. Retention is applied here rather than in the service, because
  *        "N days ago" is a business rule that needs the user's setting.
  * WHERE: Consumed by the History view.
  */
@@ -19,13 +19,15 @@ use crate::services::sessions;
 use crate::telemetry::now_ms;
 use crate::types::numeric::TsNumber;
 use crate::pipeline::diff::word_diff;
-use crate::types::{DiffSegment, SessionId, SessionSummary};
+use crate::types::{DiffSegment, HistoryFilter, SessionId, SessionSummary};
 
 /// Bounded so a caller cannot ask for the whole table and stall the UI.
 const MAX_PAGE: i64 = 500;
 
 #[derive(Debug, serde::Deserialize, specta::Type)]
 pub struct ListHistoryInput {
+    #[serde(default)]
+    pub filter: HistoryFilter,
     #[specta(type = TsNumber)]
     pub limit: i64,
     #[specta(type = TsNumber)]
@@ -53,44 +55,7 @@ pub async fn list_history(
     input: ListHistoryInput,
 ) -> Result<Vec<SessionSummary>, AppError> {
     execute(&state, LIST, input, |ctx, input| async move {
-        sessions::list_sessions(ctx.db(), input.limit, input.offset)
-    })
-    .await
-}
-
-#[derive(Debug, serde::Deserialize, specta::Type)]
-pub struct SearchHistoryInput {
-    pub query: String,
-    #[specta(type = TsNumber)]
-    pub limit: i64,
-}
-
-impl Validate for SearchHistoryInput {
-    fn validate(&self) -> Result<(), String> {
-        if self.query.trim().is_empty() {
-            return Err("Enter something to search for.".into());
-        }
-        if self.limit <= 0 || self.limit > MAX_PAGE {
-            return Err(format!("Limit must be between 1 and {MAX_PAGE}."));
-        }
-        Ok(())
-    }
-}
-
-const SEARCH: CommandSpec = CommandSpec::new("search_history", CapabilityKey::History);
-
-#[tauri::command]
-#[specta::specta]
-pub async fn search_history(
-    state: State<'_, AppState>,
-    input: SearchHistoryInput,
-) -> Result<Vec<SessionSummary>, AppError> {
-    execute(&state, SEARCH, input, |ctx, input| async move {
-        // FTS5 treats bare punctuation as syntax. Quoting the whole phrase
-        // makes a user's apostrophe a character to find rather than a parse
-        // error they cannot interpret.
-        let escaped = format!("\"{}\"", input.query.trim().replace('"', "\"\""));
-        sessions::search_sessions(ctx.db(), &escaped, input.limit)
+        sessions::list_sessions(ctx.db(), &input.filter, input.limit, input.offset)
     })
     .await
 }
@@ -379,7 +344,7 @@ pub async fn export_history(
         // Exports everything, not a page. A partial export that looks complete
         // is worse than no export at all.
         let total = sessions::count_sessions(ctx.db())?;
-        let all = sessions::list_sessions(ctx.db(), total.max(1), 0)?;
+        let all = sessions::list_sessions(ctx.db(), &crate::types::HistoryFilter::default(), total.max(1), 0)?;
 
         Ok(match input.format {
             ExportFormat::Json => serde_json::to_string_pretty(&all)?,

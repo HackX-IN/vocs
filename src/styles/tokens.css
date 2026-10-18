@@ -401,8 +401,11 @@
   /* THE WINDOW BAR (components/global/window-bar). One height for the lights, the
    * centred title and the toolbar buttons, so they share a centre line. The
    * lights are placed by tauri.conf.json's trafficLightPosition
-   * (x 24, y 19) so their centre lands at half of this; change the two together. --titlebar-safe-inset above is how far the left slot starts from the
-   * window edge: the lights' right edge (inset + 3 buttons) plus a gap. */
+   * (x 24, y 38) so their centre lands at half of this. Tauri sizes the title-bar
+   * container to the button height plus `y` and centres the buttons in it, so
+   * y = --titlebar-height − 14; change the two together. --titlebar-safe-inset is
+   * how far the left slot starts from the window edge: the lights' right edge
+   * (inset + 3 buttons) plus a gap. */
   --titlebar-height: 52px;
   --scroll-fade-size: 52px;
 
@@ -431,7 +434,6 @@
   /* How long the editor waits after the last keystroke before it saves. */
   --autosave-delay: 700ms;
   --feedback-hold: 1200ms;
-  --titlebar-height: 38px;
 
   --row-height: 64px;
   /* The floating search dock over the foot of the Dictations list (docs/04
@@ -448,6 +450,8 @@
   /* The Settings section list (docs/04 §14). */
   --settings-nav-width: 188px;
   --history-summary-height: 112px;
+  /* The period and status pickers under the summary strip. */
+  --history-filters-height: 56px;
   --row-overscan: 6;
   /* The said-vs-fixed panel under the history list. Capped so a long
    * transcript scrolls inside it instead of squeezing the list to nothing. */

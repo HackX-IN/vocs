@@ -76,6 +76,9 @@ export interface DataListProps<T> {
   empty: ReactNode;
   /** Shown when a query matched nothing. Falls back to `empty`. */
   noResults?: ReactNode;
+  /** A filter other than the text query is active, so an empty list means "nothing
+   *  matches", not "there is nothing". */
+  narrowed?: boolean;
   search?: DataListSearch<T>;
   /** Sits beside the search field — filters, sort, bulk actions. */
   toolbar?: ReactNode;
@@ -122,6 +125,7 @@ export function DataList<T>({
   renderRowActions,
   empty,
   noResults,
+  narrowed = false,
   search,
   toolbar,
   onActivate,
@@ -354,7 +358,7 @@ export function DataList<T>({
   // search that matched nothing looks identical to having no data at all — and
   // telling someone with 4,000 transcripts that they have none, because they
   // searched for a typo, is the worst version of an empty state.
-  const searching = query.trim().length > 0;
+  const searching = query.trim().length > 0 || narrowed;
   const showNoResults = filtered.length === 0 && searching;
   const showEmpty = filtered.length === 0 && !searching;
 

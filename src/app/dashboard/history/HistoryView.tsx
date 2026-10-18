@@ -29,7 +29,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Check, Copy } from "lucide-react";
-import { commands, type AppError, type HotkeyBinding, type SessionSummary } from "@/lib/bindings";
+import { commands, type AppError, type HistoryStatus, type HotkeyBinding, type SessionSummary } from "@/lib/bindings";
 import { unwrapCommand, useCommand } from "@/lib/ipc";
 import { readDurationMs, readPxToken } from "@/lib/motion";
 import { cn } from "@/lib/utils";
@@ -40,7 +40,9 @@ import { navigateTo } from "../use-hash-route";
 import { DictationEditor } from "./_components/DictationEditor";
 import { ExportAction } from "./_components/ExportAction";
 import { HistoryHeaderRow, HistoryRow } from "./_components/HistoryRow";
+import { HistoryFilters } from "./_components/HistoryFilters";
 import { HistorySummary } from "./_components/HistorySummary";
+import { periodStart, type HistoryPeriod } from "./history-filter";
 import { groupByDay, type HistoryEntry } from "./day-groups";
 import { effectiveText } from "./session-text";
 import { useHistory } from "./use-history";
@@ -60,13 +62,22 @@ export function HistoryView({ hotkey, mode, section }: HistoryViewProps) {
   const [query, setQuery] = useState("");
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [exportError, setExportError] = useState<AppError | null>(null);
-  const feed = useHistory(query);
+  const [period, setPeriod] = useState<HistoryPeriod>("all");
+  const [status, setStatus] = useState<HistoryStatus>("ALL");
+  const since = useMemo(() => periodStart(period), [period]);
+  const feed = useHistory({ query: query.trim() || null, since_ms: since, status });
+  const narrowed = period !== "all" || status !== "ALL";
   const stats = useCommand(commands.getStats, [feed.items.length]);
   const copyTimer = useRef(0);
   const [summaryHeight] = useState(() => readPxToken("--history-summary-height"));
+  const [filtersHeight] = useState(() => readPxToken("--history-filters-height"));
 
   const entries = useMemo(() => groupByDay(feed.items), [feed.items]);
-  const showSummary = query.length === 0 && stats.data !== null && stats.data.total_sessions > 0;
+  const hasHistory = stats.data !== null && stats.data.total_sessions > 0;
+  const showSummary = query.length === 0 && !narrowed && hasHistory;
+  const filters = (
+    <HistoryFilters period={period} status={status} onPeriodChange={setPeriod} onStatusChange={setStatus} />
+  );
   const editing = section !== null;
 
   useEffect(() => {
@@ -113,8 +124,15 @@ export function HistoryView({ hotkey, mode, section }: HistoryViewProps) {
           headerInset
           searchPosition="dock"
           rowClassName="mx-auto w-full max-w-[var(--content-max-width)] rounded-input px-3"
-          lead={showSummary && stats.data ? <HistorySummary data={stats.data} /> : undefined}
-          leadHeight={showSummary ? summaryHeight : 0}
+          lead={
+            hasHistory ? (
+              <>
+                {showSummary && stats.data ? <HistorySummary data={stats.data} /> : null}
+                {filters}
+              </>
+            ) : undefined
+          }
+          leadHeight={(showSummary ? summaryHeight : 0) + (hasHistory ? filtersHeight : 0)}
           onActivate={(entry) => {
             if (entry.kind === "session") navigateTo("history", entry.session.id);
           }}
@@ -147,7 +165,16 @@ export function HistoryView({ hotkey, mode, section }: HistoryViewProps) {
               <NoTranscriptionsYet hotkey={hotkey} mode={mode} />
             )
           }
-          noResults={<EmptyState headline="Nothing matches that" description="Try a shorter search." />}
+          noResults={
+            <>
+              {filters}
+              <EmptyState
+                headline="Nothing matches that"
+                description={narrowed ? "Try a wider period or status, or a shorter search." : "Try a shorter search."}
+              />
+            </>
+          }
+          narrowed={narrowed}
           footer={
             feed.loading && feed.items.length > 0 ? <Skeleton className="h-[var(--row-height)] rounded-none" /> : null
           }

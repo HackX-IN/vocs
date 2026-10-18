@@ -116,7 +116,7 @@ pub async fn export_diagnostics(state: State<'_, AppState>) -> Result<String, Ap
             })
             .collect();
         // Codes and the app's own sentences only — never the transcript.
-        report.failures = sessions::list_sessions(db, RECENT_FAILURES, 0)?
+        report.failures = sessions::list_sessions(db, &crate::types::HistoryFilter::default(), RECENT_FAILURES, 0)?
             .into_iter()
             .filter(|s| s.outcome == SessionOutcome::Failed)
             .map(|s| (s.error_code.unwrap_or_default(), s.error_message.unwrap_or_default()))

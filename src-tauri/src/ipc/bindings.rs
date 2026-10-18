@@ -44,7 +44,6 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             commands::session::get_session_state,
             // History
             commands::history::list_history,
-            commands::history::search_history,
             commands::history::get_history_entry,
             commands::history::delete_history_entry,
             commands::history::set_history_reverted,

@@ -864,7 +864,7 @@ mod corpus_measurement {
             return;
         };
 
-        let sessions = crate::services::sessions::list_sessions(&db, 10_000, 0).unwrap_or_default();
+        let sessions = crate::services::sessions::list_sessions(&db, &crate::types::HistoryFilter::default(), 10_000, 0).unwrap_or_default();
         let en = LanguageCode("en".into());
         let (mut changed, mut total) = (0, 0);
 

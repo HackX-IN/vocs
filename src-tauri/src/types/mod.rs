@@ -41,7 +41,8 @@ pub use metrics::{
     ActivityDay, LanguageCount, LatencyStage, LatencySummary, MetricSample, StatsSummary,
 };
 pub use session::{
-    DeliveryKind, RecordingMode, SessionId, SessionOutcome, SessionState, SessionSummary,
+    DeliveryKind, HistoryFilter, HistoryStatus, RecordingMode, SessionId, SessionOutcome, SessionState,
+    SessionSummary,
 };
 pub use settings::{
     ChoiceSource, FillerStrength, HotkeyBinding, Tone, KeyModifier, SettingChoice, SettingKind, SettingValue,

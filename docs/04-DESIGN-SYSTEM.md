@@ -400,6 +400,7 @@ Colour is `--accent` (§10). Offset rather than inset, so the ring never sits on
 --dock-max-width:    560px
 --content-max-width: 720px   /* the reading column */
 --history-summary-height: 112px  /* the summary strip plus the gap under it */
+--history-filters-height: 56px   /* the period + status pickers under it */
 ```
 
 A uniform row height is a constraint, not a limitation: it is what lets a list of tens of thousands of rows resolve its scroll position by arithmetic instead of by measurement. A day header is therefore a **row like any other** — it fills one 64pt slot with its label at the bottom, which reads as spacing — and the list steps over it (`isSelectable`) for the keyboard and gives it no hover. A list that needs genuinely variable-height rows needs a different component and a reason. Content above the rows that scrolls with them (the summary strip) is a `lead` of known `leadHeight`; the virtualiser reads the scroll position past it.
@@ -444,7 +445,7 @@ Not motion — these are how long the interface waits before acting, and they be
 --search-debounce:  180ms   /* keystroke to query dispatch */
 --autosave-delay:   700ms   /* the editor waits this long after the last keystroke before saving */
 --feedback-hold:   1200ms   /* how long a confirmation glyph stays after an action */
---titlebar-height:  38px    /* inset traffic lights clear this; drag region fills it */
+--titlebar-height:  52px    /* the window bar: lights, centred title and toolbar share its centre line; drag region fills it */
 ```
 
 180ms is under the ~250ms at which a person perceives a pause, and long enough that a typed word costs one query rather than five. 700ms is long enough that a sentence being typed is one write and short enough that closing the window right after typing loses nothing (leaving flushes anyway).
