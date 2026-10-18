@@ -240,6 +240,12 @@ pub struct SessionSummary {
     /// The user chose the original wording over the corrected text. Copy and
     /// export honour it; see migration 003.
     pub reverted: bool,
+    /// The name the user gave this dictation, if any. History shows the first
+    /// line of the text until one is set; see migration 005.
+    pub title: Option<String>,
+    /// When the user last edited the text by hand, if they ever did.
+    #[specta(type = Option<TsNumber>)]
+    pub edited_at_ms: Option<i64>,
 }
 
 impl SessionSummary {

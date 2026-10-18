@@ -44,10 +44,15 @@ const MIGRATIONS: &[Migration] = &[
         name: "profile_excluded",
         sql: include_str!("migrations/004_profile_excluded.sql"),
     },
+    Migration {
+        version: 5,
+        name: "session_title",
+        sql: include_str!("migrations/005_session_title.sql"),
+    },
 ];
 
 /// The version a fresh database ends up at.
-pub const SCHEMA_VERSION: i64 = 4;
+pub const SCHEMA_VERSION: i64 = 5;
 
 pub fn schema_version(conn: &Connection) -> AppResult<i64> {
     let version: i64 = conn.query_row("PRAGMA user_version", [], |row| row.get(0))?;

@@ -29,6 +29,17 @@ export const commands = {
 	setHistoryReverted: (input: SetRevertedInput) => typedError<null, AppError>(__TAURI_INVOKE("set_history_reverted", { input })),
 	/**
 	 * 
+	 *  * WHAT:  Saves a dictation's title and hand-edited text and returns the row.
+	 *  * WHY:   Exclusive, so two saves of the same row cannot interleave and the
+	 *  *        later keystroke always wins. Returns the updated summary rather than
+	 *  *        unit so the editor patches its list from the one authoritative copy
+	 *  *        (the word count is recomputed server-side) instead of guessing it.
+	 *  * WHERE: The dictation editor's autosave.
+	 *  
+	 */
+	updateHistoryEntry: (input: UpdateHistoryInput) => typedError<SessionSummary, AppError>(__TAURI_INVOKE("update_history_entry", { input })),
+	/**
+	 * 
 	 *  * WHAT:  Word-level said-vs-fixed comparison for one session.
 	 *  * WHY:   Computed on request, for the one row being looked at, rather than for
 	 *  *        every row of a page: 200 diffs to render a list that shows one.
@@ -947,6 +958,13 @@ export type SessionSummary = {
 	 *  export honour it; see migration 003.
 	 */
 	reverted: boolean,
+	/**
+	 *  The name the user gave this dictation, if any. History shows the first
+	 *  line of the text until one is set; see migration 005.
+	 */
+	title: string | null,
+	/**  When the user last edited the text by hand, if they ever did. */
+	edited_at_ms: number | null,
 };
 
 export type SetRevertedInput = {
@@ -1169,6 +1187,13 @@ export type UpdateDictionaryEntryInput = {
 	replacement: string,
 	match_kind: MatchKind,
 	enabled: boolean,
+};
+
+export type UpdateHistoryInput = {
+	id: SessionId,
+	/**  None or blank clears the title. */
+	title: string | null,
+	text: string,
 };
 
 /* Tauri Specta runtime */

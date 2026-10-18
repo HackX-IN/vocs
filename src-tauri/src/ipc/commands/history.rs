@@ -221,6 +221,59 @@ pub async fn get_history_entry(
     .await
 }
 
+/// A title is a label, not a document; the cap keeps a paste-gone-wrong out of
+/// the row layout and the search index.
+const MAX_TITLE_CHARS: usize = 200;
+/// Generous — a long dictation is thousands of words — but bounded, so one
+/// write cannot be a gigabyte.
+const MAX_TEXT_CHARS: usize = 200_000;
+
+#[derive(Debug, serde::Deserialize, specta::Type)]
+pub struct UpdateHistoryInput {
+    pub id: SessionId,
+    /// None or blank clears the title.
+    pub title: Option<String>,
+    pub text: String,
+}
+
+impl Validate for UpdateHistoryInput {
+    fn validate(&self) -> Result<(), String> {
+        if self.id.as_str().trim().is_empty() {
+            return Err("A session id is required.".into());
+        }
+        if self.title.as_deref().is_some_and(|title| title.chars().count() > MAX_TITLE_CHARS) {
+            return Err(format!("A title can be at most {MAX_TITLE_CHARS} characters."));
+        }
+        if self.text.chars().count() > MAX_TEXT_CHARS {
+            return Err(format!("A dictation can be at most {MAX_TEXT_CHARS} characters."));
+        }
+        Ok(())
+    }
+}
+
+const UPDATE: CommandSpec = CommandSpec::new("update_history_entry", CapabilityKey::History).exclusive();
+
+/**
+ * WHAT:  Saves a dictation's title and hand-edited text and returns the row.
+ * WHY:   Exclusive, so two saves of the same row cannot interleave and the
+ *        later keystroke always wins. Returns the updated summary rather than
+ *        unit so the editor patches its list from the one authoritative copy
+ *        (the word count is recomputed server-side) instead of guessing it.
+ * WHERE: The dictation editor's autosave.
+ */
+#[tauri::command]
+#[specta::specta]
+pub async fn update_history_entry(
+    state: State<'_, AppState>,
+    input: UpdateHistoryInput,
+) -> Result<SessionSummary, AppError> {
+    execute(&state, UPDATE, input, |ctx, input| async move {
+        sessions::update_session_text(ctx.db(), &input.id, input.title.as_deref(), &input.text, now_ms())?
+            .ok_or_else(|| AppError::not_found("That transcript"))
+    })
+    .await
+}
+
 const DELETE: CommandSpec =
     CommandSpec::new("delete_history_entry", CapabilityKey::History).exclusive();
 
@@ -397,6 +450,8 @@ mod export_tests {
             error_code: None,
             error_message: None,
             reverted: false,
+            title: None,
+            edited_at_ms: None,
         }
     }
 

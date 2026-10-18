@@ -190,6 +190,46 @@ pub fn set_reverted(db: &Database, id: &SessionId, reverted: bool) -> AppResult<
     })
 }
 
+/**
+ * SOURCE OF TRUTH KEYWORDS: update_session_text, edit_dictation, manual_edit
+ * WHAT:  Saves the user's own title and wording for one dictation, returning the
+ *        updated row, or None when no such session exists.
+ * WHY:   The edit goes to `final_text`, the column everything reads (row preview,
+ *        copy, export, search) and leaves `raw_text` alone — what was SAID is a
+ *        record and a person editing the result must not be able to rewrite
+ *        it, which is also what keeps the said-vs-fixed comparison meaningful.
+ *        `reverted` is cleared: choosing to work on the text means working on
+ *        THIS text, and a stale "use original" flag would make copy and export
+ *        ignore the very edit just saved. The word count is recomputed here for
+ *        the same reason the row stores one — Stats must agree with the text.
+ *        A blank title is stored as NULL so "unnamed" has one representation.
+ * WHERE: ipc/commands/history.rs::update_history_entry.
+ */
+pub fn update_session_text(
+    db: &Database,
+    id: &SessionId,
+    title: Option<&str>,
+    text: &str,
+    now_ms: i64,
+) -> AppResult<Option<SessionSummary>> {
+    let title = title.map(str::trim).filter(|title| !title.is_empty());
+    let word_count = text.split_whitespace().count() as i64;
+
+    let changed = db.with_connection(|conn| {
+        Ok(conn.execute(
+            "UPDATE sessions
+                SET title = ?2, final_text = ?3, word_count = ?4, reverted = 0, edited_at = ?5
+              WHERE id = ?1",
+            params![id.as_str(), title, text, word_count, now_ms],
+        )?)
+    })?;
+
+    if changed == 0 {
+        return Ok(None);
+    }
+    get_session(db, id)
+}
+
 pub fn find_orphans(db: &Database) -> AppResult<Vec<SessionSummary>> {
     db.with_connection(|conn| {
         let mut stmt = conn.prepare(&format!(
@@ -258,7 +298,7 @@ pub fn count_sessions(db: &Database) -> AppResult<i64> {
 /// Column order here is the contract `row_to_summary` reads by index.
 const SELECT_COLUMNS: &str = "SELECT id, started_at, ended_at, outcome, duration_ms, language, \
      engine_id, model_id, raw_text, final_text, word_count, app_bundle_id, delivery, error_code, \
-     error_message, reverted FROM sessions";
+     error_message, reverted, title, edited_at FROM sessions";
 
 fn row_to_summary(row: &Row<'_>) -> rusqlite::Result<SessionSummary> {
     let outcome: String = row.get(3)?;
@@ -283,6 +323,8 @@ fn row_to_summary(row: &Row<'_>) -> rusqlite::Result<SessionSummary> {
         error_code: row.get(13)?,
         error_message: row.get(14)?,
         reverted: row.get(15)?,
+        title: row.get(16)?,
+        edited_at_ms: row.get(17)?,
     })
 }
 
@@ -439,6 +481,75 @@ mod tests {
 
         assert!(set_reverted(&db, &id, false)?);
         assert_eq!(get_session(&db, &id)?.expect("exists").effective_text(), Some("Hello there."));
+        Ok(())
+    }
+
+    #[test]
+    fn editing_a_dictation_changes_what_it_stands_for_and_nothing_it_recorded() -> AppResult<()> {
+        let db = Database::open_in_memory()?;
+        let id = seed(&db, "s1", 1_000)?;
+        finalize_session(
+            &db,
+            &id,
+            &SessionResult {
+                ended_at: 2_000,
+                outcome: SessionOutcome::Delivered,
+                duration_ms: 1_000,
+                language: Some("en".into()),
+                raw_text: Some("um hello there".into()),
+                final_text: Some("Hello there.".into()),
+                word_count: Some(2),
+                delivery: DeliveryKind::Pasted,
+                error_code: None,
+                error_message: None,
+            },
+        )?;
+        // The user had chosen the original; editing must not leave that flag
+        // hiding the edit from copy and export.
+        set_reverted(&db, &id, true)?;
+
+        let saved = update_session_text(&db, &id, Some("  Greeting  "), "Hello there, friend.", 5_000)?
+            .expect("the session exists");
+
+        assert_eq!(saved.title.as_deref(), Some("Greeting"), "the title is trimmed");
+        assert_eq!(saved.final_text.as_deref(), Some("Hello there, friend."));
+        assert_eq!(saved.word_count, Some(3), "the word count follows the text");
+        assert_eq!(saved.raw_text.as_deref(), Some("um hello there"), "what was said is a record");
+        assert!(!saved.reverted, "editing means working on the saved text");
+        assert_eq!(saved.effective_text(), Some("Hello there, friend."));
+        assert_eq!(saved.edited_at_ms, Some(5_000));
+        Ok(())
+    }
+
+    #[test]
+    fn a_blank_title_is_stored_as_no_title() -> AppResult<()> {
+        let db = Database::open_in_memory()?;
+        let id = seed(&db, "s1", 1_000)?;
+        update_session_text(&db, &id, Some("Named"), "text", 2_000)?;
+        let cleared = update_session_text(&db, &id, Some("   "), "text", 3_000)?.expect("exists");
+        assert_eq!(cleared.title, None);
+        Ok(())
+    }
+
+    #[test]
+    fn a_renamed_dictation_is_found_by_its_new_name_and_not_its_old_one() -> AppResult<()> {
+        let db = Database::open_in_memory()?;
+        let id = seed(&db, "s1", 1_000)?;
+        update_session_text(&db, &id, Some("Standup notes"), "we shipped the thing", 2_000)?;
+
+        assert_eq!(search_sessions(&db, "\"standup\"", 10)?.len(), 1, "found by title");
+        assert_eq!(search_sessions(&db, "\"shipped\"", 10)?.len(), 1, "found by text");
+
+        update_session_text(&db, &id, Some("Retro"), "we shipped the thing", 3_000)?;
+        assert!(search_sessions(&db, "\"standup\"", 10)?.is_empty(), "the old title left the index");
+        assert_eq!(search_sessions(&db, "\"retro\"", 10)?.len(), 1);
+        Ok(())
+    }
+
+    #[test]
+    fn editing_a_session_that_does_not_exist_reports_it() -> AppResult<()> {
+        let db = Database::open_in_memory()?;
+        assert!(update_session_text(&db, &SessionId("nope".into()), None, "x", 1)?.is_none());
         Ok(())
     }
 
