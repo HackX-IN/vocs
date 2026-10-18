@@ -152,6 +152,19 @@
   animation: boot-letter 420ms var(--motion-ease-standard) both;
 }
 
+.boot-caret {
+  animation: breathe 1s steps(2, jump-none) infinite;
+}
+
+/* The tour's stage: a soft dot lattice behind the picture, strongest at the
+   centre. Painted here, not in the component, so it follows the dot tokens. */
+.dot-grid-stage {
+  background-image:
+    radial-gradient(circle, var(--dot-grid-ink) var(--dot-grid-radius), transparent calc(var(--dot-grid-radius) + 0.5px)),
+    radial-gradient(ellipse at center, transparent 30%, var(--surface-opaque) 100%);
+  background-size: var(--dot-grid-pitch) var(--dot-grid-pitch), 100% 100%;
+}
+
 @keyframes boot-fade {
   from {
     opacity: 0;
@@ -198,6 +211,7 @@
   .boot-lattice,
   .boot-mark,
   .boot-bar,
+  .boot-caret,
   .boot-letter {
     animation: none;
   }

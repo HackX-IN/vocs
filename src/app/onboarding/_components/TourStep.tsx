@@ -28,7 +28,8 @@ import type { HotkeyBinding } from "@/lib/bindings";
 import type { DictationMode } from "@/lib/dictation-mode";
 import { glyphsForBinding } from "@/lib/hotkey";
 import { cn } from "@/lib/utils";
-import { Button, Keycap, Mark } from "@/components/global";
+import { Button, Keycap } from "@/components/global";
+import { TourIllustration, type TourIllustrationKind } from "./TourIllustration";
 
 interface TourSlide {
   /** Derived from the gesture, because slide one teaches it and the two
@@ -36,7 +37,7 @@ interface TourSlide {
   title: (mode: DictationMode) => string;
   /** One line. Anything longer stops being read on a first-run screen. */
   body: (hotkey: HotkeyBinding | null, mode: DictationMode) => React.ReactNode;
-  media: string;
+  media: TourIllustrationKind;
 }
 
 const TOUR_SLIDES: readonly TourSlide[] = [
@@ -62,17 +63,17 @@ const TOUR_SLIDES: readonly TourSlide[] = [
         <>Press {key} anywhere and start talking. Press it again when you are done.</>
       );
     },
-    media: "/onboarding/step-1.gif",
+    media: "shortcut",
   },
   {
     title: () => "It lands where you type",
     body: () => <>Your words paste straight into whatever app you were already in.</>,
-    media: "/onboarding/step-2.gif",
+    media: "paste",
   },
   {
     title: () => "Nothing leaves your Mac",
     body: () => <>Every word is transcribed on your own machine. No account, no upload.</>,
-    media: "/onboarding/step-3.gif",
+    media: "private",
   },
 ];
 
@@ -94,9 +95,9 @@ export function TourStep({
 
   return (
     <section className="flex h-full flex-col items-center justify-center gap-6 px-8">
-      <Mark size="lg" label="Vocs" />
-
-      <TourMedia key={slide.media} src={slide.media} title={title} />
+      <div className="hairline dot-grid-stage flex h-52 w-full max-w-96 items-center justify-center overflow-hidden rounded-card bg-sunken/40">
+        <TourIllustration key={slide.media} kind={slide.media} hotkey={hotkey} />
+      </div>
 
       <header className="flex flex-col items-center gap-2 text-center">
         <h1 className="font-display text-title text-text-primary">{title}</h1>
@@ -145,40 +146,5 @@ export function TourStep({
         ))}
       </div>
     </section>
-  );
-}
-
-/**
- * The reserved slot. Sized and positioned now so that dropping a file into
- * public/onboarding/ is the only change needed — but it renders NOTHING until
- * a file is actually there.
- *
- * An empty bordered rectangle on the first screen a person ever sees does not
- * read as "media pending", it reads as broken, and this flow ships before the
- * GIFs do. Collapsing is not a fallback, it is the correct state for a build
- * that has no media: logo, one line, one heading is a finished minimal screen
- * on its own. The layout only changes between builds, never in front of a user.
- */
-function TourMedia({ src, title }: { src: string; title: string }) {
-  const [loaded, setLoaded] = useState(false);
-  const [failed, setFailed] = useState(false);
-
-  if (failed) return null;
-
-  return (
-    <div
-      className={cn(
-        "hairline aspect-[16/10] w-full max-w-80 overflow-hidden rounded-card bg-sunken",
-        !loaded && "hidden",
-      )}
-    >
-      <img
-        src={src}
-        alt={title}
-        onLoad={() => setLoaded(true)}
-        onError={() => setFailed(true)}
-        className="size-full object-cover"
-      />
-    </div>
   );
 }

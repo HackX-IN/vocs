@@ -39,7 +39,7 @@ import {
 } from "@/lib/bindings";
 import { unwrapCommand, useCommand } from "@/lib/ipc";
 import { useTauriEvent } from "@/lib/use-event";
-import { Button, ErrorSurface } from "@/components/global";
+import { BootScreen, Button, ErrorSurface, useBoot } from "@/components/global";
 import { StepShell } from "./_components/StepShell";
 import { usePermissions } from "@/lib/use-permissions";
 import { dictationModeFrom } from "@/lib/dictation-mode";
@@ -47,6 +47,7 @@ import { PermissionStep } from "./_components/PermissionStep";
 import { ModelStep } from "./_components/ModelStep";
 import { HotkeyStep } from "./_components/HotkeyStep";
 import { TourStep } from "./_components/TourStep";
+import { OnboardingProgress } from "./_components/OnboardingProgress";
 
 /** Declared by the Onboarding capability in the registry. Named here because
  *  "which setting means first run is over" is a contract between the two
@@ -108,6 +109,10 @@ export function Onboarding() {
   }, []);
 
   const error = permissions.error ?? models.error ?? registry.error ?? finishError;
+  // Which of the four labelled steps is showing: derived from the same
+  // conditions as the screens below, so the two cannot disagree.
+  const step = !toured ? 0 : !micGranted ? 1 : !modelReady && model ? 2 : 3;
+  const boot = useBoot(permissions.data !== null && models.data !== null && registry.data !== null);
 
   return (
     // NO GLASS PANEL HERE. This window already HAS native Popover vibrancy
@@ -118,8 +123,11 @@ export function Onboarding() {
     // window IS the surface, the web layer's job is to stay out of the way and
     // let the native material through. The noise layer goes with it; at 3% over
     // a surface that is now genuinely translucent it was texture on nothing.
-    <div className="h-full">
-      <div data-tauri-drag-region className="h-[var(--titlebar-height)]" />
+    <div className="relative flex h-full flex-col">
+      {boot.visible ? <BootScreen leaving={boot.leaving} /> : null}
+      <div data-tauri-drag-region className="h-[var(--titlebar-height)] shrink-0" />
+      <OnboardingProgress current={step} />
+      <div className="min-h-0 flex-1">
       {error ? (
         <ErrorSurface
           error={error}
@@ -165,6 +173,7 @@ export function Onboarding() {
           <HotkeyStep hotkey={hotkey} mode={mode} onDelivered={() => setTested(true)} />
         </StepShell>
       )}
+      </div>
     </div>
   );
 }
