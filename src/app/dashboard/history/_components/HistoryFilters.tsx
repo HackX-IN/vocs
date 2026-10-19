@@ -12,7 +12,11 @@
 
 import type { HistoryStatus } from "@/lib/bindings";
 import { SegmentedControl } from "@/components/global";
-import { PERIOD_OPTIONS, STATUS_OPTIONS, type HistoryPeriod } from "../history-filter";
+import {
+  PERIOD_OPTIONS,
+  STATUS_OPTIONS,
+  type HistoryPeriod,
+} from "../history-filter";
 
 export interface HistoryFiltersProps {
   period: HistoryPeriod;
@@ -21,11 +25,26 @@ export interface HistoryFiltersProps {
   onStatusChange: (status: HistoryStatus) => void;
 }
 
-export function HistoryFilters({ period, status, onPeriodChange, onStatusChange }: HistoryFiltersProps) {
+export function HistoryFilters({
+  period,
+  status,
+  onPeriodChange,
+  onStatusChange,
+}: HistoryFiltersProps) {
   return (
-    <div className="mx-auto flex w-full max-w-[var(--content-max-width)] flex-wrap items-center justify-between gap-3 px-3 py-2">
-      <SegmentedControl label="Period" options={PERIOD_OPTIONS} value={period} onChange={onPeriodChange} />
-      <SegmentedControl label="Status" options={STATUS_OPTIONS} value={status} onChange={onStatusChange} />
+    <div className="mx-auto flex w-full max-w-[var(--content-max-width)] flex-wrap items-center justify-between gap-3 px-3 py-2 mt-4">
+      <SegmentedControl
+        label="Period"
+        options={PERIOD_OPTIONS}
+        value={period}
+        onChange={onPeriodChange}
+      />
+      <SegmentedControl
+        label="Status"
+        options={STATUS_OPTIONS}
+        value={status}
+        onChange={onStatusChange}
+      />
     </div>
   );
 }

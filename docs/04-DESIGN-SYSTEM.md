@@ -80,7 +80,7 @@ State is still carried by FORM first and hue second: a moving waveform means rec
 
 ```css
 --pill-surface: #1D1D1D;  --pill-ring: #3A3A3A;  --pill-ink: #E6E3DC;
---pill-signal:  #7BC83B;  --pill-danger: #FF7A8A; --pill-danger-wash: rgba(255, 93, 115, 0.16);
+--pill-signal:  #9D4E20;  --pill-danger: #FF7A8A; --pill-danger-wash: rgba(255, 93, 115, 0.16);
 ```
 
 It floats over arbitrary content; a near-black capsule with a lighter ring is legible over all of it, which a scheme-following pill is not.
@@ -482,7 +482,7 @@ Change the path in `assets/mark.svg` and `Mark.tsx` together or not at all. The 
 
 ```
 --mark-size-sm: 18px   --mark-size-md: 26px   --mark-size-lg: 48px   /* width; height follows the 91.2 : 75.5 aspect */
---rail-mark-height: 22px   /* the mark's drawn height at md — the rail's height formula reads it */
+--rail-mark-height: 16px   /* the mark's drawn height at md — the rail's height formula reads it */
 ```
 
 Onboarding shows the mark on the tour and nowhere else. The setup steps that follow carry **no progress dots**: they are derived from backend state rather than a fixed-length sequence, so a "1 of 3" would announce a length that varies per machine.

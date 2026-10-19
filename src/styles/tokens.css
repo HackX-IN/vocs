@@ -66,20 +66,25 @@
   --pill-surface: #1d1d1d;
   --pill-ring: #3a3a3a;
   --pill-ink: #e6e3dc;
-  --pill-signal: #7bc83b;
+  --pill-signal: #9d4e20;
   --pill-danger: #ff7a8a;
   --pill-danger-wash: rgba(255, 93, 115, 0.16);
 
   /* The page behind everything: a faint warm bloom from the top-left corner,
    * the one decorative gradient in the app. */
-  --page-glow: radial-gradient(900px 420px at 6% -10%, rgba(255, 150, 90, 0.12), transparent 70%);
+  --page-glow: radial-gradient(
+    900px 420px at 6% -10%,
+    rgba(255, 150, 90, 0.12),
+    transparent 70%
+  );
   --dot-grid-ink: rgba(27, 26, 23, 0.1);
   --dot-grid-radius: 0.9px;
   --dot-grid-pitch: 14px;
 
   --shadow-pill: 0 12px 40px rgba(28, 24, 20, 0.16);
   --shadow-panel: 0 24px 64px rgba(28, 24, 20, 0.14);
-  --shadow-card: 0 1px 2px rgba(28, 24, 20, 0.04), 0 8px 24px rgba(28, 24, 20, 0.06);
+  --shadow-card:
+    0 1px 2px rgba(28, 24, 20, 0.04), 0 8px 24px rgba(28, 24, 20, 0.06);
 
   /* ── Materials (docs/04 §3) ───────────────────────────────────────────
    * Three, and only three. Native NSVisualEffectView vibrancy is the actual
@@ -157,13 +162,13 @@
   --rail-item-size: 40px;
   --rail-item-gap: 10px;
   --rail-padding: 14px;
-  --rail-mark-gap: 20px;
+  --rail-mark-gap: 12px;
   /* Half the rail's width: the rail is a pill, not a rounded rectangle. Read by
    * src-tauri/src/bootstrap.rs for the window's vibrancy cut. */
   --radius-rail: 32px;
   /* The mark's drawn height at --mark-size-md: 26px wide x 91.2:75.5. The rail's
    * height formula adds this, and bootstrap.rs reads it by name. */
-  --rail-mark-height: 22px;
+  --rail-mark-height: 16px;
   --control-height: 32px;
   --control-height-sm: 28px;
 
@@ -175,7 +180,9 @@
    * interface its instrument-panel character. Labels that index a card use the
    * mono stack in capitals. Doto is never used below --text-title-size: its
    * dots stop reading as dots and start reading as noise. */
-  --font-system: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue", system-ui, sans-serif;
+  --font-system:
+    -apple-system, BlinkMacSystemFont, "SF Pro Text", "Helvetica Neue",
+    system-ui, sans-serif;
   --font-mono-stack: "SF Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
   --font-display-stack: "Doto Variable", var(--font-mono-stack);
 
@@ -527,7 +534,11 @@
     --danger: #ff5d73;
     --danger-soft: rgba(255, 93, 115, 0.14);
 
-    --page-glow: radial-gradient(900px 440px at 6% -12%, rgba(255, 122, 48, 0.2), transparent 70%);
+    --page-glow: radial-gradient(
+      900px 440px at 6% -12%,
+      rgba(255, 122, 48, 0.2),
+      transparent 70%
+    );
     --dot-grid-ink: rgba(255, 244, 230, 0.09);
 
     --shadow-pill: 0 12px 40px rgba(0, 0, 0, 0.5);
