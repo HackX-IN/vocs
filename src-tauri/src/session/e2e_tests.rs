@@ -530,6 +530,57 @@ mod tests {
         );
     }
 
+    /**
+     * WHAT:  Real speech -> real whisper -> the rules -> the real T5 grammar
+     *        model -> the guard -> the paste.
+     * WHY:   The one test where every piece of Smart grammar is the real thing.
+     *        Self-skipping on a machine without both models (whisper and the
+     *        121 MB grammar file), like the other live tests; on a machine that
+     *        has them it is the pre-release proof that the feature fixes
+     *        grammar end to end and does not wreck a name along the way.
+     */
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    #[allow(clippy::await_holding_lock)] // the guard must span the awaits — see require_engine
+    async fn the_real_grammar_model_fixes_what_was_said_and_leaves_the_name_alone() {
+        let (engine, _engine_guard) = require_engine!();
+        let Ok(paths) = crate::config::AppPaths::resolve() else {
+            return;
+        };
+        let file = paths.asset_file("t5-grammar.safetensors");
+        if !file.is_file() {
+            eprintln!("skipped: the grammar model has not been downloaded");
+            return;
+        }
+        let samples = require_speech!("She don't know what we was doing yesterday, so ask Priya.", "grammar-live");
+
+        let grammar = crate::adapters::build_grammar_model();
+        grammar.install(file);
+        let (harness, rx) = build_with(
+            samples,
+            engine,
+            Arc::new(AlwaysGranted),
+            Arc::clone(&grammar),
+        )
+        .expect("harness");
+        services::settings::set_setting(
+            &harness.db,
+            crate::registry::keys::AI_GRAMMAR,
+            &crate::types::SettingValue::Bool(true),
+            1,
+        )
+        .expect("setting written");
+
+        run_session(&harness, rx, Duration::from_secs(5)).await;
+
+        let delivered = harness.injector.delivered.lock().clone().expect("something delivered");
+        eprintln!("delivered: {delivered}");
+        assert!(grammar.is_loaded(), "the model should have been warmed by the recording");
+        let lowered = delivered.to_lowercase();
+        assert!(lowered.contains("doesn't") || lowered.contains("does not"), "agreement not fixed: {delivered:?}");
+        assert!(lowered.contains("were"), "tense not fixed: {delivered:?}");
+        assert!(delivered.contains("Priya"), "the name must survive: {delivered:?}");
+    }
+
     /// The session must be in history, with its text and its timings.
     #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
     #[allow(clippy::await_holding_lock)] // the guard must span the awaits — see require_engine

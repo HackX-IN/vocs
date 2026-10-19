@@ -33,7 +33,7 @@ and no audio ever leaves your machine.
   exactly as you said it. Off by default; quoted speech and your dictionary are
   never touched. That rule set is small on purpose: it fixes less, and it
   cannot make a mistake you would not have spotted.
-- **Smart grammar, on your Mac.** Turn on an optional on-device model (a 121 MB
+- **Smart grammar, on your Mac.** Turn on an optional on-device model (a ~120 MB
   download, then offline) for the agreement and tense slips rules cannot see.
   It never rewrites you: only safe word-level fixes are kept, and names,
   numbers, code and your dictionary are off limits.

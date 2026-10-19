@@ -537,7 +537,7 @@ fn build_capabilities() -> Vec<Capability> {
                 toggle(
                     keys::AI_GRAMMAR,
                     "Smart grammar (on-device AI)",
-                    "Runs a small grammar model on your Mac after the rules, to fix agreement, tense and wrong word forms the rules cannot see. It only keeps safe word-level fixes \u{2014} never names, numbers, code or your dictionary words \u{2014} and History shows every change. Needs a one-time 121 MB download below, then works offline. English only; adds roughly a tenth of a second for the last sentence.",
+                    "Runs a small grammar model on your Mac after the rules, to fix agreement, tense and wrong word forms the rules cannot see. It only keeps safe word-level fixes \u{2014} never names, numbers, code or your dictionary words \u{2014} and History shows every change. Needs a one-time download of about 120 MB below, then works offline. English only; adds roughly a tenth of a second for the last sentence.",
                     SettingSection::Output,
                     false,
                 ),
