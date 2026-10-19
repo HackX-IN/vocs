@@ -17,7 +17,9 @@ pub mod disk;
 pub mod download;
 pub mod store;
 
-pub use catalog::{descriptor_for, CatalogEntry, DEFAULT_MODEL_ID, FALLBACK_MODEL_ID, MODEL_CATALOG};
+pub use catalog::{
+    descriptor_for, CatalogEntry, DEFAULT_MODEL_ID, FALLBACK_MODEL_ID, GRAMMAR_MODEL_ID, MODEL_CATALOG,
+};
 pub use download::{download_resumable, hash_file};
 pub use store::HttpModelStore;
 

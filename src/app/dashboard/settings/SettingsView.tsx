@@ -63,12 +63,14 @@ export function SettingsView({ registry, section }: SettingsViewProps) {
       value: device.id,
       label: device.is_default ? `${device.name} (system default)` : device.name,
     }));
-    const modelOptions: SettingOption[] = (models.data ?? []).map((model) => ({
-      value: model.descriptor.id,
-      label: model.descriptor.display_name,
-      description: `${formatBytes(model.descriptor.size_bytes)} · ${model.descriptor.approx_ram_mb} MB memory`,
-      disabled: model.state.kind !== "READY",
-    }));
+    const modelOptions: SettingOption[] = (models.data ?? [])
+      .filter((model) => model.descriptor.kind === "SPEECH")
+      .map((model) => ({
+        value: model.descriptor.id,
+        label: model.descriptor.display_name,
+        description: `${formatBytes(model.descriptor.size_bytes)} · ${model.descriptor.approx_ram_mb} MB memory`,
+        disabled: model.state.kind !== "READY",
+      }));
     // Unsupported languages are shown and disabled, never dropped: a language
     // that silently vanished from the list is one the user cannot work out how
     // to get back. The reason goes in the label because a native <option>

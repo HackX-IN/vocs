@@ -55,7 +55,8 @@ import { OnboardingProgress } from "./_components/OnboardingProgress";
 const ONBOARDING_COMPLETE_KEY = "general.onboarding_complete";
 
 function pickModel(models: readonly ModelReport[]): ModelReport | null {
-  return models.find((model) => model.descriptor.is_default) ?? models[0] ?? null;
+  const speech = models.filter((model) => model.descriptor.kind === "SPEECH");
+  return speech.find((model) => model.descriptor.is_default) ?? speech[0] ?? null;
 }
 
 function dictationHotkey(hotkeys: readonly (HotkeyBinding | null)[]): HotkeyBinding | null {

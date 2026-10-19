@@ -14,10 +14,21 @@
  *        port. Assets listed in docs/03-IMPLEMENTATION-NOTES.md §2.7.
  */
 
-use crate::types::{ModelDescriptor, ModelId};
+use crate::types::{ModelDescriptor, ModelId, ModelKind};
 
 /// Every file below is resolved against this. whisper.cpp's own repository.
 pub const HF_BASE_URL: &str = "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/";
+
+/// The on-device grammar model's catalog id. Not a whisper model: see ModelKind.
+pub const GRAMMAR_MODEL_ID: &str = "t5-grammar";
+
+/**
+ * The grammar model's repository, pinned to a commit. `main` can move; the
+ * SHA-256 below would then reject the download, and the user would be told their
+ * network damaged a file that was never damaged. A revision cannot move.
+ */
+const GRAMMAR_BASE_URL: &str =
+    "https://huggingface.co/AventIQ-AI/T5-small-grammar-correction/resolve/b82fb3ffb7b740d1b20848d6101043438e51b3c9/";
 
 /// The model the app installs unless the user chooses otherwise.
 pub const DEFAULT_MODEL_ID: &str = "large-v3-turbo-q5_0";
@@ -38,7 +49,11 @@ pub struct CatalogEntry {
     pub id: &'static str,
     pub display_name: &'static str,
     pub description: &'static str,
+    /// Resolved against `base_url`, and the name the file has on disk for kinds
+    /// that do not use the whisper `ggml-<id>.bin` convention.
     pub file_name: &'static str,
+    pub base_url: &'static str,
+    pub kind: ModelKind,
     pub sha256: &'static str,
     pub size_bytes: u64,
     pub approx_ram_mb: u64,
@@ -46,16 +61,33 @@ pub struct CatalogEntry {
 }
 
 impl CatalogEntry {
+    /**
+     * WHAT:  The on-disk name for kinds that do not use whisper's
+     *        `ggml-<id>.bin` convention: the catalog id plus the upstream
+     *        file's extension.
+     * WHY:   The upstream name (`model.safetensors`) is the same for every
+     *        repository that ever ships one; the id is what makes it ours.
+     * WHERE: adapters/http_models/store.rs for ModelKind::Grammar.
+     */
+    pub fn local_file_name(&self) -> String {
+        let extension = std::path::Path::new(self.file_name)
+            .extension()
+            .and_then(|e| e.to_str())
+            .unwrap_or("bin");
+        format!("{}.{extension}", self.id)
+    }
+
     pub fn descriptor(&self) -> ModelDescriptor {
         ModelDescriptor {
             id: ModelId(self.id.to_string()),
             display_name: self.display_name.to_string(),
             description: self.description.to_string(),
-            url: format!("{HF_BASE_URL}{}", self.file_name),
+            url: format!("{}{}", self.base_url, self.file_name),
             sha256: self.sha256.to_string(),
             size_bytes: self.size_bytes,
             approx_ram_mb: self.approx_ram_mb,
             is_default: self.is_default,
+            kind: self.kind,
         }
     }
 }
@@ -67,6 +99,8 @@ pub const MODEL_CATALOG: &[CatalogEntry] = &[
         display_name: "Large v3 Turbo",
         description: "The default. Full accuracy across all 99 languages, quantised so it stays fast on Apple silicon.",
         file_name: "ggml-large-v3-turbo-q5_0.bin",
+        base_url: HF_BASE_URL,
+        kind: ModelKind::Speech,
         sha256: "394221709cd5ad1f40c46e6031ca61bce88931e6e088c188294c6d5a55ffa7e2",
         size_bytes: 574_041_195,
         approx_ram_mb: 1_100,
@@ -77,10 +111,25 @@ pub const MODEL_CATALOG: &[CatalogEntry] = &[
         display_name: "Small",
         description: "A third of the size and memory. Noticeably less accurate on accents and on languages other than English.",
         file_name: "ggml-small-q5_1.bin",
+        base_url: HF_BASE_URL,
+        kind: ModelKind::Speech,
         sha256: "ae85e4a935d7a567bd102fe55afc16bb595bdb618e11b2fc7591bc08120411bb",
         size_bytes: 190_085_487,
         approx_ram_mb: 450,
         is_default: false,
+    },
+    CatalogEntry {
+        id: GRAMMAR_MODEL_ID,
+        display_name: "Grammar model",
+        description: "A small on-device model (T5) that fixes grammar the rules cannot — agreement, tense, wrong word forms. English only, runs in a fraction of a second, and never leaves your Mac.",
+        file_name: "model.safetensors",
+        base_url: GRAMMAR_BASE_URL,
+        kind: ModelKind::Grammar,
+        sha256: "b56da1e76567f50b5f6ebe3169c91d03c8c2205970f4ce98631888eeafda4c74",
+        size_bytes: 121_028_528,
+        // F32 weights after load (the file is F16), plus activations.
+        approx_ram_mb: 300,
+        is_default: true,
     },
 ];
 
@@ -94,10 +143,22 @@ mod tests {
     use super::*;
 
     #[test]
-    fn there_is_exactly_one_default() {
-        let defaults = MODEL_CATALOG.iter().filter(|e| e.is_default).count();
-        assert_eq!(defaults, 1);
+    fn there_is_exactly_one_default_per_kind() {
+        for kind in [ModelKind::Speech, ModelKind::Grammar] {
+            let defaults = MODEL_CATALOG.iter().filter(|e| e.kind == kind && e.is_default).count();
+            assert_eq!(defaults, 1, "{kind:?} needs exactly one default");
+        }
         assert!(descriptor_for(&ModelId(DEFAULT_MODEL_ID.into())).is_some_and(|e| e.is_default));
+    }
+
+    #[test]
+    fn the_grammar_model_is_a_pinned_revision_and_never_a_speech_model() {
+        let entry = descriptor_for(&ModelId(GRAMMAR_MODEL_ID.into())).expect("listed");
+        assert_eq!(entry.kind, ModelKind::Grammar);
+        let url = entry.descriptor().url;
+        assert!(!url.contains("/resolve/main/"), "a moving branch would fail the hash: {url}");
+        assert!(url.ends_with("/model.safetensors"));
+        assert_eq!(entry.local_file_name(), "t5-grammar.safetensors");
     }
 
     #[test]
@@ -119,8 +180,8 @@ mod tests {
             );
             assert!(entry.size_bytes > 0);
             let descriptor = entry.descriptor();
-            assert!(descriptor.url.starts_with(HF_BASE_URL));
-            assert!(descriptor.url.ends_with(".bin"));
+            assert!(descriptor.url.starts_with("https://huggingface.co/"));
+            assert!(descriptor.url.ends_with(entry.file_name));
         }
     }
 

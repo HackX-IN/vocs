@@ -169,6 +169,25 @@ impl AppPaths {
             .join(format!("ggml-{}-encoder.mlmodelc", strip_quantisation(model_id)))
     }
 
+    /**
+     * SOURCE OF TRUTH KEYWORDS: asset_file, asset_download_file
+     * WHAT:  Where a downloaded model that is NOT a whisper ggml file belongs,
+     *        and the temp path it downloads to.
+     * WHY:   `model_file` bakes in the `ggml-<id>.bin` naming and the bundled
+     *        weights lookup, both of which are whisper facts. The grammar model
+     *        is a safetensors file with its own name, so it gets the plain
+     *        "named file in the models directory" rule instead of a bent copy
+     *        of the whisper one.
+     * WHERE: adapters/http_models/store.rs for ModelKind::Grammar entries.
+     */
+    pub fn asset_file(&self, file_name: &str) -> PathBuf {
+        self.models_dir.join(file_name)
+    }
+
+    pub fn asset_download_file(&self, file_name: &str) -> PathBuf {
+        self.models_dir.join(format!("{file_name}.part"))
+    }
+
     pub fn data_dir(&self) -> &Path {
         &self.data_dir
     }

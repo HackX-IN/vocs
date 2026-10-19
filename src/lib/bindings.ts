@@ -744,7 +744,9 @@ export type ModelDescriptor = {
 	size_bytes: number,
 	/**  Rough resident memory once loaded, so an 8GB machine can be warned. */
 	approx_ram_mb: number,
+	/**  Default WITHIN its kind: onboarding installs the default Speech model. */
 	is_default: boolean,
+	kind: ModelKind,
 };
 
 export type ModelDownloadProgress = {
@@ -756,6 +758,22 @@ export type ModelId = string;
 export type ModelIdInput = {
 	model_id: ModelId,
 };
+
+/**
+ * 
+ *  * SOURCE OF TRUTH KEYWORDS: ModelKind, Speech, Grammar, model_purpose
+ *  * WHAT:  What a downloadable model is FOR.
+ *  * WHY:   The model store, the download progress events and the verified-marker
+ *  *        logic are all generic over "a big file that must match a hash", so the
+ *  *        grammar model rides them instead of growing a second downloader. The
+ *  *        kind is what keeps the two apart where it matters: the transcription
+ *  *        picker, the onboarding default and the Core ML cleanup must only ever
+ *  *        see Speech models, and the grammar section only Grammar ones.
+ *  * WHERE: ModelDescriptor.kind, set by adapters/http_models/catalog.rs; read by
+ *  *        the Settings model lists and onboarding.
+ *  
+ */
+export type ModelKind = "SPEECH" | "GRAMMAR";
 
 export type ModelReport = {
 	descriptor: ModelDescriptor,

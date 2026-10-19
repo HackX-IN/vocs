@@ -150,7 +150,8 @@ export function SettingsPageBody({ page, defs, allDefs, context, dataVersion, on
         ),
       });
     }
-    if (page.id === "transcription") cards.push({ title: "Models", body: <ModelManager /> });
+    if (page.id === "transcription") cards.push({ title: "Models", body: <ModelManager kind="SPEECH" /> });
+    if (page.id === "output") cards.push({ title: "Grammar model", body: <ModelManager kind="GRAMMAR" /> });
     if (page.id === "vocabulary") cards.push({ title: "Dictionary", body: <DictionaryManager key={dataVersion} /> });
     if (page.id === "privacy") {
       cards.push({

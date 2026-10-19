@@ -39,7 +39,7 @@ use parking_lot::Mutex;
 use crate::config::AppPaths;
 use crate::error::{AppError, AppResult, ErrorAction, ErrorCode};
 use crate::ports::{EventSink, ModelStatus, ModelStore};
-use crate::types::{DownloadProgress, ModelDescriptor, ModelId, ModelState};
+use crate::types::{DownloadProgress, ModelDescriptor, ModelId, ModelKind, ModelState};
 
 use super::catalog::{descriptor_for, CatalogEntry, MODEL_CATALOG};
 use super::disk::{check_space, free_bytes, megabytes, DiskSpaceCheck};
@@ -148,18 +148,26 @@ impl HttpModelStore {
         descriptor_for(id).ok_or_else(|| {
             AppError::new(
                 ErrorCode::NotFound,
-                "Vocs does not offer that transcription model.",
+                "Vocs does not offer that model.",
             )
             .with_detail(format!("unknown model id {id}"))
         })
     }
 
+    /// Whisper models keep the `ggml-<id>.bin` convention (and the bundled
+    /// weights lookup) inside AppPaths; every other kind is a named file.
     fn model_file(&self, entry: &CatalogEntry) -> PathBuf {
-        self.paths.model_file(entry.id)
+        match entry.kind {
+            ModelKind::Speech => self.paths.model_file(entry.id),
+            ModelKind::Grammar => self.paths.asset_file(&entry.local_file_name()),
+        }
     }
 
     fn part_file(&self, entry: &CatalogEntry) -> PathBuf {
-        self.paths.model_download_file(entry.id)
+        match entry.kind {
+            ModelKind::Speech => self.paths.model_download_file(entry.id),
+            ModelKind::Grammar => self.paths.asset_download_file(&entry.local_file_name()),
+        }
     }
 
     /**
@@ -673,11 +681,14 @@ impl ModelStore for HttpModelStore {
         let _ = tokio::fs::remove_file(self.model_file(entry)).await;
         let _ = tokio::fs::remove_file(self.part_file(entry)).await;
         let _ = tokio::fs::remove_file(self.verified_marker_file(entry)).await;
-        let _ = tokio::fs::remove_dir_all(self.paths.model_coreml_dir(entry.id)).await;
-        // The name whisper.cpp actually opens. See the WHY above.
-        let unquantised = strip_quantisation_suffix(entry.id);
-        if unquantised != entry.id {
-            let _ = tokio::fs::remove_dir_all(self.paths.model_coreml_dir(unquantised)).await;
+        // Core ML encoders belong to whisper models only.
+        if entry.kind == ModelKind::Speech {
+            let _ = tokio::fs::remove_dir_all(self.paths.model_coreml_dir(entry.id)).await;
+            // The name whisper.cpp actually opens. See the WHY above.
+            let unquantised = strip_quantisation_suffix(entry.id);
+            if unquantised != entry.id {
+                let _ = tokio::fs::remove_dir_all(self.paths.model_coreml_dir(unquantised)).await;
+            }
         }
 
         self.events

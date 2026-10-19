@@ -16,8 +16,12 @@
  *        we were told about a lie. OPTIMIZING is given its own
  *        wording and its own expectation: it takes 15-60s once per machine, and
  *        a user who is not told that assumes the app has frozen on first run.
- * WHERE: The transcription section of Settings. Also the shape onboarding's
- *        model step mirrors.
+ *
+ *        One component for both kinds of model (transcription and grammar): they
+ *        share the store, the events and the states, so the only difference is
+ *        which rows `kind` lets through.
+ * WHERE: The transcription and output pages of Settings. Also the shape
+ *        onboarding's model step mirrors.
  */
 
 import { useCallback, useState } from "react";
@@ -27,6 +31,7 @@ import {
   events,
   type DownloadProgress,
   type ModelId,
+  type ModelKind,
   type ModelReport,
   type ModelState,
 } from "@/lib/bindings";
@@ -44,7 +49,12 @@ const STATE_LABEL: Readonly<Record<ModelState["kind"], string>> = {
   FAILED: "Failed",
 };
 
-export function ModelManager() {
+export interface ModelManagerProps {
+  /** Which models to list: transcription ones, or the grammar model. */
+  kind: ModelKind;
+}
+
+export function ModelManager({ kind }: ModelManagerProps) {
   const models = useCommand(commands.listModels, []);
   const [progress, setProgress] = useState<Readonly<Record<string, DownloadProgress>>>({});
   const [liveStates, setLiveStates] = useState<Readonly<Record<string, ModelState>>>({});
@@ -86,16 +96,18 @@ export function ModelManager() {
 
   return (
     <ul className="flex flex-col">
-      {models.data.map((report) => {
-        // The event is the freshest thing we know about this model.
-        const model: ModelReport = { ...report, state: liveStates[report.descriptor.id] ?? report.state };
-        return (
-          <li key={model.descriptor.id} className="hairline-b flex items-center gap-4 py-3 last:border-b-0">
-            <ModelSummary model={model} progress={progress[model.descriptor.id]} />
-            <ModelAction model={model} onDownload={download} onDelete={remove} />
-          </li>
-        );
-      })}
+      {models.data
+        .filter((report) => report.descriptor.kind === kind)
+        .map((report) => {
+          // The event is the freshest thing we know about this model.
+          const model: ModelReport = { ...report, state: liveStates[report.descriptor.id] ?? report.state };
+          return (
+            <li key={model.descriptor.id} className="hairline-b flex items-center gap-4 py-3 last:border-b-0">
+              <ModelSummary model={model} progress={progress[model.descriptor.id]} />
+              <ModelAction model={model} onDownload={download} onDelete={remove} />
+            </li>
+          );
+        })}
     </ul>
   );
 }

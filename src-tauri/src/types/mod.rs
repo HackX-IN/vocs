@@ -35,7 +35,7 @@ pub use profile::AppProfile;
 pub use language::{language_label, language_options, LanguageOption, AUTO_LANGUAGE};
 pub use engine::{
     DownloadProgress, EngineCapabilities, EngineFeature, EngineId, LanguageSupport,
-    ModelDescriptor, ModelId, ModelState,
+    ModelDescriptor, ModelId, ModelKind, ModelState,
 };
 pub use metrics::{
     ActivityDay, LanguageCount, LatencyStage, LatencySummary, MetricSample, StatsSummary,
