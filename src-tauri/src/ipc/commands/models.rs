@@ -13,11 +13,12 @@
 use tauri::State;
 
 use crate::error::AppError;
-use crate::ipc::context::AppState;
+use crate::ipc::context::{AppState, CommandContext};
 use crate::ipc::factory::{execute, CommandSpec, Validate};
 use crate::ports::models::ModelStatus;
 use crate::registry::CapabilityKey;
-use crate::types::{ModelId, ModelState};
+use crate::session::grammar_runtime::{adopt_grammar_model, release_grammar_model};
+use crate::types::{ModelId, ModelKind, ModelState};
 
 #[derive(Debug, Clone, serde::Serialize, specta::Type)]
 pub struct ModelReport {
@@ -35,6 +36,16 @@ impl From<ModelStatus> for ModelReport {
             path: status.path.map(|p| p.to_string_lossy().into_owned()),
         }
     }
+}
+
+/// Whether this id names the grammar model, which needs registering with its
+/// runtime in addition to being a file on disk.
+async fn is_grammar_model(ctx: &CommandContext, id: &ModelId) -> bool {
+    ctx.ports()
+        .models
+        .status(id)
+        .await
+        .is_ok_and(|status| status.descriptor.kind == ModelKind::Grammar)
 }
 
 const LIST: CommandSpec = CommandSpec::new("list_models", CapabilityKey::Models);
@@ -96,6 +107,11 @@ pub async fn download_model(
 ) -> Result<String, AppError> {
     execute(&state, DOWNLOAD, input, |ctx, input| async move {
         let path = ctx.ports().models.ensure(&input.model_id).await?;
+        // A grammar model is registered the moment it is verified, so the
+        // setting works without a restart.
+        if is_grammar_model(&ctx, &input.model_id).await {
+            adopt_grammar_model(ctx.grammar(), path.clone());
+        }
         Ok(path.to_string_lossy().into_owned())
     })
     .await
@@ -110,7 +126,12 @@ pub async fn delete_model(
     input: ModelIdInput,
 ) -> Result<(), AppError> {
     execute(&state, DELETE, input, |ctx, input| async move {
-        ctx.ports().models.delete(&input.model_id).await
+        let grammar = is_grammar_model(&ctx, &input.model_id).await;
+        ctx.ports().models.delete(&input.model_id).await?;
+        if grammar {
+            release_grammar_model(ctx.grammar());
+        }
+        Ok(())
     })
     .await
 }

@@ -14,7 +14,12 @@
  *        values far outside [-1, 1]. Downstream that trips the VAD's range
  *        assertion, and it looks like a bug in the audio pipeline rather than
  *        in the test that fed it garbage.
- * WHERE: Used by adapters/whisper/live_tests.rs and session/e2e_tests.rs.
+ *
+ *        ScriptedGrammar lives here for the same reason: the guarded grammar
+ *        pass is tested alone (pipeline/grammar/pass.rs) and through the real
+ *        actor (session/e2e_tests.rs), and both need the same model double.
+ * WHERE: Used by adapters/whisper/live_tests.rs, session/e2e_tests.rs and
+ *        pipeline/grammar/pass.rs.
  */
 
 use std::path::{Path, PathBuf};
@@ -241,4 +246,74 @@ fn build_shared_engine() -> Option<Arc<dyn TranscriptionEngine>> {
 /// decodes — see the module WHY.
 pub fn engine_lock() -> MutexGuard<'static, ()> {
     ENGINE_LOCK.lock()
+}
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: ScriptedGrammar, grammar_model_double
+ * WHAT:  A GrammarModel that answers from a table, counts what it was asked,
+ *        and can be told to be slow or to fail.
+ * WHY:   The real model is a 121 MB download, so everything that does not
+ *        depend on its quality — the budget, the cache, the guard's wiring,
+ *        what a failure degrades to — is tested against this.
+ */
+pub struct ScriptedGrammar {
+    answers: Vec<(String, String)>,
+    pub calls: Mutex<Vec<String>>,
+    delay: std::time::Duration,
+    fails: bool,
+}
+
+impl ScriptedGrammar {
+    pub fn answering(answers: &[(&str, &str)]) -> Arc<Self> {
+        Arc::new(Self {
+            answers: answers.iter().map(|(a, b)| ((*a).to_string(), (*b).to_string())).collect(),
+            calls: Mutex::new(Vec::new()),
+            delay: std::time::Duration::ZERO,
+            fails: false,
+        })
+    }
+
+    pub fn slow(answers: &[(&str, &str)], delay: std::time::Duration) -> Arc<Self> {
+        let mut model = Arc::try_unwrap(Self::answering(answers)).unwrap_or_else(|_| unreachable!());
+        model.delay = delay;
+        Arc::new(model)
+    }
+
+    pub fn failing() -> Arc<Self> {
+        let mut model = Arc::try_unwrap(Self::answering(&[])).unwrap_or_else(|_| unreachable!());
+        model.fails = true;
+        Arc::new(model)
+    }
+}
+
+impl crate::ports::GrammarModel for ScriptedGrammar {
+    fn id(&self) -> &'static str {
+        "scripted-grammar"
+    }
+    fn install(&self, _: PathBuf) {}
+    fn uninstall(&self) {}
+    fn is_installed(&self) -> bool {
+        true
+    }
+    fn is_loaded(&self) -> bool {
+        true
+    }
+    fn warm(&self) -> crate::error::AppResult<()> {
+        Ok(())
+    }
+    fn unload_if_idle(&self, _: std::time::Duration) -> bool {
+        false
+    }
+    fn rewrite(&self, sentence: &str) -> crate::error::AppResult<String> {
+        std::thread::sleep(self.delay);
+        self.calls.lock().push(sentence.to_string());
+        if self.fails {
+            return Err(crate::error::AppError::new(crate::error::ErrorCode::Internal, "scripted failure"));
+        }
+        Ok(self
+            .answers
+            .iter()
+            .find(|(from, _)| from == sentence)
+            .map_or_else(|| sentence.to_string(), |(_, to)| to.clone()))
+    }
 }

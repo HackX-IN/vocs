@@ -374,6 +374,8 @@ impl SessionActor {
             Vec::new()
         };
         self.captions.begin(self.settings.live_captions, caption_dictionary);
+        // Load the grammar model now, behind the recording, if it will be used.
+        super::grammar_step::warm(&self.ctx, &self.settings);
 
         let session = services::sessions::NewSession {
             id: session_id,
@@ -626,7 +628,16 @@ impl SessionActor {
             None if Some(&decode.session_id) == self.machine.session_id() => {
                 let _timer = self.latency.stage_timer(LatencyStage::Assemble);
                 self.assembler.push_segments(&decode.segments);
-                checkpoint(&self.ctx.db, &decode.session_id, &self.assembler.finish());
+                let so_far = self.assembler.finish();
+                checkpoint(&self.ctx.db, &decode.session_id, &so_far);
+                // The sentences finished so far can be corrected while the
+                // person is still talking, so the stop has less left to do.
+                super::grammar_step::prefetch(
+                    &self.ctx,
+                    &self.settings,
+                    self.detected_language.clone(),
+                    so_far,
+                );
             }
             None => {
                 // Belongs to a recording that was cancelled, or one already

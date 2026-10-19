@@ -37,6 +37,7 @@ use crate::pipeline::assembler::Assembler;
 use crate::ports::injector::InjectionRequest;
 use crate::services;
 use crate::session::enhance_context::enhance_context;
+use crate::session::grammar_step;
 use crate::session::machine::SessionEvent;
 use crate::session::settings_view::SessionSettings;
 use crate::telemetry::latency::{now_ms, LatencyRecorder};
@@ -162,7 +163,8 @@ async fn deliver(ctx: &SessionContext, pending: PendingDelivery) {
 
     let final_text = {
         let _timer = latency.stage_timer(LatencyStage::Enhance);
-        ctx.ports
+        let ruled = ctx
+            .ports
             .enhancer
             .enhance(&raw, &context)
             .unwrap_or_else(|err| {
@@ -171,7 +173,11 @@ async fn deliver(ctx: &SessionContext, pending: PendingDelivery) {
                 // nothing.
                 tracing::warn!(error = %err, "enhancement failed; delivering raw text");
                 raw.clone()
-            })
+            });
+        // The optional on-device model runs AFTER the rules, on their output,
+        // and inside the same stage timer: its cost is part of "enhance", and
+        // the latency view should say so rather than hide it.
+        grammar_step::correct(ctx, &settings, language.as_ref(), context.dictionary.clone(), ruled).await
     };
 
     /*

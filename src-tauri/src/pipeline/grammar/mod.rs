@@ -16,4 +16,4 @@ pub mod guard;
 pub mod pass;
 pub mod sentences;
 
-pub use pass::{GrammarPass, PassOutcome, GRAMMAR_BUDGET};
+pub use pass::{GrammarPass, PassOptions, PassOutcome, GRAMMAR_BUDGET};

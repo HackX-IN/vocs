@@ -31,8 +31,12 @@ and no audio ever leaves your machine.
 - **Optional grammar fixes** for slips that are wrong every time — "a idea",
   "she don't", "we was", "could of been" — with the rest of your sentence left
   exactly as you said it. Off by default; quoted speech and your dictionary are
-  never touched. It is a rule set, not a language model: it fixes less, and it
+  never touched. That rule set is small on purpose: it fixes less, and it
   cannot make a mistake you would not have spotted.
+- **Smart grammar, on your Mac.** Turn on an optional on-device model (a 121 MB
+  download, then offline) for the agreement and tense slips rules cannot see.
+  It never rewrites you: only safe word-level fixes are kept, and names,
+  numbers, code and your dictionary are off limits.
 - **A context line for the model** — jargon, product names, the topic — that it
   listens for ahead of your dictionary.
 - **A live microphone meter** in Settings → Recording, on the device dictation

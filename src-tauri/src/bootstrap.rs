@@ -238,6 +238,11 @@ pub fn setup(app: &AppHandle) -> AppResult<()> {
 
     let actor = SessionActor::new(state.session_context(), worker, decode_rx, settings.clone());
     tauri::async_runtime::spawn(actor.run(event_rx));
+    // The optional grammar model: registered if it is on disk, freed when idle.
+    tauri::async_runtime::spawn(crate::session::grammar_runtime::run_grammar_housekeeping(
+        Arc::clone(&state.grammar),
+        Arc::clone(&ports.models),
+    ));
 
     apply_window_vibrancy(app);
     let_the_pill_float_over_everything(app);
@@ -303,6 +308,7 @@ fn build_ports(app: &AppHandle, paths: &AppPaths) -> AppResult<Ports> {
         engine,
         audio: Arc::new(CpalAudioSource::new()),
         enhancer: Arc::new(RuleEnhancer::new()),
+        grammar: adapters::build_grammar_model(),
         injector: Arc::new(MacosInjector::new(MacosPermissions::new())),
         models,
         permissions: Arc::new(MacosPermissions::new()),

@@ -271,7 +271,7 @@ fn replacement_is_a_fix(removed: &[Tok], added: &[Tok]) -> bool {
     similarity >= 0.7
 }
 
-fn accept_hunk(a: &[Tok], b: &[Tok], hunk: Hunk, protected: &HashSet<String>) -> bool {
+fn accept_hunk(a: &[Tok], b: &[Tok], hunk: Hunk, protected: &HashSet<String>, formal: bool) -> bool {
     let removed = &a[hunk.a0..hunk.a1];
     let added = &b[hunk.b0..hunk.b1];
 
@@ -283,6 +283,12 @@ fn accept_hunk(a: &[Tok], b: &[Tok], hunk: Hunk, protected: &HashSet<String>) ->
     }
     // The model introducing a name or number is as bad as it changing one.
     if added.iter().enumerate().any(|(k, t)| is_protected(t, hunk.a0 + k == 0, protected)) {
+        return false;
+    }
+
+    // Formal writing spells contractions out; a grammar fix must not put one back.
+    let contracts = |toks: &[Tok]| toks.iter().any(|t| t.norm.contains('\''));
+    if formal && contracts(added) && !contracts(removed) {
         return false;
     }
 
@@ -322,10 +328,17 @@ fn match_case(original: &str, replacement: &str) -> String {
 /**
  * WHAT:  `original` with the safe subset of the model's edits applied.
  * WHY:   See the module WHY. Returns the original unchanged when nothing is
- *        safe, so the caller never has to compare.
+ *        safe, so the caller never has to compare. `formal` is the Formal
+ *        writing style: its contractions were deliberately written out, and
+ *        the model would happily write them back.
  * WHERE: pipeline/grammar/pass.rs.
  */
-pub fn merge_safe_edits(original: &str, candidate: &str, protected: &HashSet<String>) -> Merged {
+pub fn merge_safe_edits(
+    original: &str,
+    candidate: &str,
+    protected: &HashSet<String>,
+    formal: bool,
+) -> Merged {
     let (a, gaps) = tokenise(original);
     let (b, _) = tokenise(candidate);
     let unchanged = || Merged { text: original.to_string(), accepted: 0, rejected: 0 };
@@ -337,7 +350,7 @@ pub fn merge_safe_edits(original: &str, candidate: &str, protected: &HashSet<Str
     let mut accepted = Vec::new();
     let mut rejected = 0;
     for hunk in hunks {
-        if accept_hunk(&a, &b, hunk, protected) {
+        if accept_hunk(&a, &b, hunk, protected, formal) {
             accepted.push(hunk);
         } else {
             rejected += 1;
@@ -452,7 +465,7 @@ mod tests {
     use super::*;
 
     fn merge(original: &str, candidate: &str) -> String {
-        merge_safe_edits(original, candidate, &HashSet::new()).text
+        merge_safe_edits(original, candidate, &HashSet::new(), false).text
     }
 
     #[test]
@@ -493,18 +506,18 @@ mod tests {
             ("We use Kubernetes now.", "We use Kubernetes Now."),
             ("The API is down.", "The Api is down."),
         ] {
-            assert_eq!(merge_safe_edits(original, candidate, &protected).text, original, "{original}");
+            assert_eq!(merge_safe_edits(original, candidate, &protected, false).text, original, "{original}");
         }
     }
 
     #[test]
     fn the_users_dictionary_terms_are_protected_in_either_direction() {
         let protected: HashSet<String> = ["kubectl".to_string()].into();
-        let merged = merge_safe_edits("Run kubectl get pods.", "Run kubectl gets pods.", &protected);
+        let merged = merge_safe_edits("Run kubectl get pods.", "Run kubectl gets pods.", &protected, false);
         // "get" -> "gets" is a legal near-spelling on its own; the point is that
         // the dictionary word itself cannot be the thing that changes.
         assert!(merged.text.contains("kubectl"));
-        let swapped = merge_safe_edits("Run kubectl now.", "Run kubectl-ctl now.", &protected);
+        let swapped = merge_safe_edits("Run kubectl now.", "Run kubectl-ctl now.", &protected, false);
         assert_eq!(swapped.text, "Run kubectl now.");
     }
 
@@ -571,6 +584,25 @@ mod tests {
     }
 
     #[test]
+    fn formal_writing_is_not_given_its_contractions_back() {
+        let spelled_out = "We do not know.";
+        assert_eq!(
+            merge_safe_edits(spelled_out, "We don't know.", &HashSet::new(), true).text,
+            spelled_out
+        );
+        // The same edit is fine when the style allows it.
+        assert_eq!(
+            merge_safe_edits(spelled_out, "We don't know.", &HashSet::new(), false).text,
+            "We don't know."
+        );
+        // A real fix in Formal still lands.
+        assert_eq!(
+            merge_safe_edits("She do not know.", "She does not know.", &HashSet::new(), true).text,
+            "She does not know."
+        );
+    }
+
+    #[test]
     fn identical_text_and_empty_candidates_change_nothing() {
         assert_eq!(merge("All good here.", "All good here."), "All good here.");
         assert_eq!(merge("All good here.", ""), "All good here.");
@@ -583,6 +615,7 @@ mod tests {
             "She don't know Priya.",
             "She doesn't know Priyanka.",
             &HashSet::new(),
+            false,
         );
         assert_eq!(merged.text, "She doesn't know Priya.");
         assert_eq!((merged.accepted, merged.rejected), (1, 1));

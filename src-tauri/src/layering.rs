@@ -108,6 +108,12 @@ const KNOWN_UPWARD_IMPORTS: &[(&str, &str, &str)] = &[
         "Same as session/actor.rs: live captions are driven by the actor and \
          take its SessionContext from ipc/context.rs.",
     ),
+    (
+        "session/grammar_step.rs",
+        "ipc",
+        "Same as session/actor.rs: the grammar step is called by the actor and \
+         the delivery worker with their SessionContext from ipc/context.rs.",
+    ),
 ];
 
 fn layer_of(module: &str) -> Option<usize> {

@@ -286,6 +286,16 @@ fn build_with_permissions(
     engine: Arc<dyn crate::ports::TranscriptionEngine>,
     permissions: Arc<dyn PermissionProvider>,
 ) -> AppResult<(Harness, mpsc::Receiver<SessionEvent>)> {
+    build_with(samples, engine, permissions, crate::adapters::build_grammar_model())
+}
+
+/// The full harness: every port that a test may want to replace.
+fn build_with(
+    samples: Vec<f32>,
+    engine: Arc<dyn crate::ports::TranscriptionEngine>,
+    permissions: Arc<dyn PermissionProvider>,
+    grammar: Arc<dyn crate::ports::GrammarModel>,
+) -> AppResult<(Harness, mpsc::Receiver<SessionEvent>)> {
     let db = Database::open_in_memory()?;
     let injector = Arc::new(CapturingInjector::default());
     let events = Arc::new(RecordingEventSink::default());
@@ -296,6 +306,7 @@ fn build_with_permissions(
             samples: Arc::new(samples),
         }),
         enhancer: Arc::new(RuleEnhancer::new()),
+        grammar,
         injector: Arc::clone(&injector) as Arc<dyn TextInjector>,
         models: Arc::new(UnusedModelStore),
         permissions,
@@ -885,6 +896,75 @@ mod scripted {
             Some("So we should ship it, today."),
             "filler removal, spoken formatting and casing must all have run"
         );
+    }
+
+    const SAID: &str = "she don't know what we was doing";
+    const RULED: &str = "She don't know what we was doing.";
+    const FIXED: &str = "She doesn't know what we were doing.";
+
+    /// Runs one scripted session with the grammar model installed and returns
+    /// what was pasted and what the model was asked.
+    async fn dictate_with_grammar(
+        suffix: &str,
+        configure: impl FnOnce(&Database),
+    ) -> Option<(String, Vec<String>)> {
+        let samples = speech(&format!("scripted-grammar-{suffix}"))?;
+        let model = crate::testing::ScriptedGrammar::answering(&[(RULED, FIXED)]);
+        let (harness, rx) = build_with(
+            samples,
+            ScriptedEngine::saying(SAID),
+            Arc::new(AlwaysGranted),
+            Arc::clone(&model) as Arc<dyn crate::ports::GrammarModel>,
+        )
+        .expect("harness");
+        configure(&harness.db);
+
+        run_session(&harness, rx, Duration::from_secs(3)).await;
+
+        let pasted = harness.injector.delivered.lock().clone().unwrap_or_default();
+        let asked = model.calls.lock().clone();
+        Some((pasted, asked))
+    }
+
+    /**
+     * WHAT:  With Smart grammar on and the model installed, the pasted text is
+     *        the corrected sentence; with it off the model is never consulted.
+     * WHY:   The wiring is the risk, not the model: setting -> session settings
+     *        -> delivery -> blocking pool -> guard -> paste. Asserted on the
+     *        pasted text and on the model's call log, so "the setting does
+     *        nothing" and "the setting runs the model when it is off" both fail.
+     */
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn smart_grammar_corrects_the_pasted_text_and_only_when_switched_on() {
+        let Some((pasted, asked)) = dictate_with_grammar("on", |db| {
+            set(db, crate::registry::keys::AI_GRAMMAR, SettingValue::Bool(true));
+        })
+        .await
+        else {
+            eprintln!("skipped: could not synthesise speech");
+            return;
+        };
+        assert_eq!(pasted, FIXED);
+        assert!(asked.iter().all(|s| s == RULED), "the model is asked about the rules' text, got {asked:?}");
+
+        let (pasted, asked) = dictate_with_grammar("off", |_| {}).await.expect("speech");
+        assert_eq!(pasted, RULED, "off means the rules' text, untouched");
+        assert!(asked.is_empty(), "the model must not be consulted when the setting is off");
+    }
+
+    /// Literal is "exactly what was heard"; a model that rewrites it is a bug.
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn the_literal_style_never_reaches_the_grammar_model() {
+        let Some((_, asked)) = dictate_with_grammar("literal", |db| {
+            set(db, crate::registry::keys::AI_GRAMMAR, SettingValue::Bool(true));
+            set(db, crate::registry::keys::TONE, SettingValue::Choice("literal".into()));
+        })
+        .await
+        else {
+            eprintln!("skipped: could not synthesise speech");
+            return;
+        };
+        assert!(asked.is_empty(), "Literal must bypass the model, got {asked:?}");
     }
 
     /**

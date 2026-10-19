@@ -24,10 +24,10 @@ use tokio::sync::mpsc;
 use crate::config::AppPaths;
 use crate::db::Database;
 use crate::error::{AppError, AppResult, ErrorCode};
-use crate::pipeline::MicMonitor;
+use crate::pipeline::{GrammarPass, MicMonitor};
 use crate::ports::{
-    AudioSource, EventSink, ModelStore, PermissionProvider, TextEnhancer, TextInjector,
-    TranscriptionEngine,
+    AudioSource, EventSink, GrammarModel, ModelStore, PermissionProvider, TextEnhancer,
+    TextInjector, TranscriptionEngine,
 };
 use crate::registry::CapabilityKey;
 use crate::session::preview::PreviewGate;
@@ -47,6 +47,8 @@ pub struct Ports {
     pub engine: Arc<dyn TranscriptionEngine>,
     pub audio: Arc<dyn AudioSource>,
     pub enhancer: Arc<dyn TextEnhancer>,
+    /// The optional on-device grammar model. Empty until its file is installed.
+    pub grammar: Arc<dyn GrammarModel>,
     pub injector: Arc<dyn TextInjector>,
     pub models: Arc<dyn ModelStore>,
     pub permissions: Arc<dyn PermissionProvider>,
@@ -153,6 +155,9 @@ pub struct AppState {
     pub app: tauri::AppHandle,
     /// The Settings microphone check. See pipeline/mic_monitor.rs.
     pub mic_monitor: MicMonitor,
+    /// The grammar pass and its sentence cache. One for the whole app so the
+    /// rewrites prefetched during a recording are the ones the delivery finds.
+    pub grammar: Arc<GrammarPass>,
     /// Capabilities with a command currently executing. See InflightGuard.
     inflight: Arc<Mutex<HashSet<CapabilityKey>>>,
     /// Last state the actor published. See `current_state`.
@@ -175,6 +180,7 @@ impl AppState {
             paths,
             db,
             mic_monitor: MicMonitor::new(Arc::clone(&ports.audio), Arc::clone(&ports.events)),
+            grammar: Arc::new(GrammarPass::new(Arc::clone(&ports.grammar))),
             ports,
             session,
             app,
@@ -218,6 +224,7 @@ impl AppState {
             session: self.session.clone(),
             published_state: Arc::clone(&self.published_state),
             preview: self.preview.clone(),
+            grammar: Arc::clone(&self.grammar),
         }
     }
 
@@ -279,6 +286,8 @@ pub struct SessionContext {
     published_state: Arc<Mutex<SessionState>>,
     /// See AppState::preview.
     pub preview: PreviewGate,
+    /// See AppState::grammar.
+    pub grammar: Arc<GrammarPass>,
 }
 
 impl SessionContext {
@@ -286,6 +295,7 @@ impl SessionContext {
     pub fn new(db: Database, ports: Ports, session: SessionHandle) -> Self {
         Self {
             db,
+            grammar: Arc::new(GrammarPass::new(Arc::clone(&ports.grammar))),
             ports,
             session,
             published_state: Arc::new(Mutex::new(SessionState::Idle)),
@@ -341,6 +351,10 @@ impl CommandContext {
 
     pub fn mic_monitor(&self) -> &MicMonitor {
         &self.state.mic_monitor
+    }
+
+    pub fn grammar(&self) -> &Arc<GrammarPass> {
+        &self.state.grammar
     }
 
     /// The last state the session actor published. See AppState::current_state.

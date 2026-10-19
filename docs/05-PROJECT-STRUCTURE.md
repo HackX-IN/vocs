@@ -82,6 +82,8 @@ vocs/
         │   ├── machine.rs           # ★ the PURE FSM — returns Effects as data
         │   ├── actor.rs             # ★ the single owner; performs the effects
         │   ├── settings_view.rs     #   typed per-session settings snapshot
+        │   ├── grammar_step.rs      #   when the grammar model runs: warm, prefetch, correct
+        │   ├── grammar_runtime.rs   #   register the verified model at launch; free it when idle
         │   └── prompt.rs            #   context line + dictionary → recognition prompt
         │
         ├── pipeline/
@@ -90,10 +92,12 @@ vocs/
         │   ├── worker.rs            # dedicated ASR thread + bounded queue
         │   ├── assembler.rs         # join segments, de-duplicate seams
         │   ├── mic_monitor.rs       # Settings microphone check: levels + watchdog
-        │   └── diff.rs              # said-vs-fixed word diff for History
+        │   ├── diff.rs              # said-vs-fixed word diff for History
+        │   └── grammar/             # on-device grammar: sentences · guard · cache · pass
+        │                            #   guard.rs keeps only SAFE word edits from the model
         │
         ├── ports/                   # ★ traits only — zero implementation
-        │   └── engine · audio · enhancer · injector · models · permissions
+        │   └── engine · audio · enhancer · grammar · injector · models · permissions
         │
         ├── adapters/                # mod.rs is the factory; one impl per port
         │   ├── whisper/             #   engine, params, prompt, blocklist,
@@ -101,6 +105,8 @@ vocs/
         │   │                        #   benchmark, live_tests
         │   ├── cpal/                #   source (realtime callback) + resample
         │   ├── macos/               #   injector, permissions, sound
+        │   ├── t5/                  #   GrammarModel over T5-small via candle (tokenizer
+        │   │                        #   and config embedded; weights downloaded)
         │   ├── rules/               #   text.rs (commands, dictionary, punctuation),
         │   │                        #   fillers.rs, grammar.rs, repeats.rs, sentences.rs,
         │   │                        #   corpus.rs (the 150+ sentence acceptance test)

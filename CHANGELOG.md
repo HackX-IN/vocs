@@ -20,6 +20,7 @@ versions follow [Semantic Versioning](https://semver.org/).
 - **Microphone level meter** (Settings → Recording): test the selected microphone with the same level curve as the pill. It closes itself after 60 seconds.
 - **Back up and restore** your dictionary and per-app profiles as a single file. Importing merges, never deletes, and every entry is re-validated; bad entries are skipped and counted.
 - **Said vs fixed** in History: see what you said next to what was delivered, with a reversible **Use original** that Copy and Export respect.
+- **Smart grammar** (Settings → Output, off by default): an on-device model (T5-small, 121 MB, downloaded once from the same screen) fixes agreement, tense and wrong word forms the rules cannot see — "she don't know what we was doing" becomes "she doesn't know what we were doing". Every proposed change is judged on its own and only safe word-level fixes are kept: names, numbers, code, acronyms and your dictionary words are never touched, a word is only swapped for another form of itself, and a rewrite that changes too much is discarded whole. Finished sentences are corrected while you are still talking, so the stop adds roughly a tenth of a second; past a time budget the rest is pasted as the rules wrote it. English only, skipped in the Literal style, and History shows every change.
 - **Fix common grammar slips** (Settings → Output, off by default): "a idea" → "an idea", "she don't" → "she doesn't", "we was" → "we were", "they has" → "they have", "their going to" → "they're going to", "its a" → "it's a", "could of been" → "could have been". English only; skips quoted speech and dictionary words.
 - **Filler removal strength** (Light / Standard / Strict). Hesitations ("um", "uh") always go; ambiguous words ("like", "you know") only when punctuation marks them as filler.
 - **Excluded apps**: turn Vocs off in chosen apps. Recording is refused before the microphone is touched.
@@ -30,6 +31,7 @@ versions follow [Semantic Versioning](https://semver.org/).
 - **Diagnostics export**: an opt-in report with home-directory paths and free-text settings redacted. Nothing is sent anywhere.
 
 ### Changed
+- The window title is larger. The Support page's Buy Me a Coffee link goes to the project's page.
 - **The recording pill is a horizontal capsule**: the mark beside three audio bars, with no timer. Live captions are gradient text that rises out of it instead of a box.
 - **A window bar** puts the title (centred) and the toolbar buttons on the same line as the traffic lights, with a proper safe area. The side rail is a rounded pill with more room.
 - **Keep history for** is a choice (forever, 1 week, 1 month, 3 months, 1 year) rather than a number of days; long text settings such as Context get the full width; a select shows what its chosen option means.

@@ -64,6 +64,26 @@ pub struct PassOutcome {
     pub left_alone: usize,
 }
 
+/**
+ * SOURCE OF TRUTH KEYWORDS: PassOptions
+ * WHAT:  What a caller may vary: the time it can spend, and whether the text is
+ *        in the Formal writing style.
+ * WHY:   A struct so a third knob does not become a fourth positional argument;
+ *        `formal` is not cosmetic — see guard::merge_safe_edits.
+ * WHERE: Built by session/delivery.rs.
+ */
+#[derive(Debug, Clone, Copy)]
+pub struct PassOptions {
+    pub budget: Duration,
+    pub formal: bool,
+}
+
+impl Default for PassOptions {
+    fn default() -> Self {
+        Self { budget: GRAMMAR_BUDGET, formal: false }
+    }
+}
+
 pub struct GrammarPass {
     model: Arc<dyn GrammarModel>,
     cache: RewriteCache,
@@ -118,7 +138,13 @@ impl GrammarPass {
      *        never to a failed paste.
      * WHERE: session/delivery.rs, on a blocking thread.
      */
-    pub fn correct(&self, text: &str, dictionary: &[DictionaryEntry], budget: Duration) -> PassOutcome {
+    pub fn correct(
+        &self,
+        text: &str,
+        dictionary: &[DictionaryEntry],
+        options: PassOptions,
+    ) -> PassOutcome {
+        let PassOptions { budget, formal } = options;
         let deadline = Instant::now() + budget;
         let protected = protected_terms(dictionary);
         let ranges = split_sentences(text);
@@ -162,7 +188,7 @@ impl GrammarPass {
 
             match candidate {
                 Some(rewrite) => {
-                    let merged = merge_safe_edits(sentence, &rewrite, &protected);
+                    let merged = merge_safe_edits(sentence, &rewrite, &protected, formal);
                     outcome.edits_kept += merged.accepted;
                     outcome.edits_refused += merged.rejected;
                     outcome.text.push_str(&merged.text);
@@ -223,56 +249,8 @@ impl GrammarPass {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::error::{AppError, AppResult, ErrorCode};
+    use crate::testing::ScriptedGrammar;
     use crate::types::{DictionaryId, MatchKind};
-    use parking_lot::Mutex;
-    use std::path::PathBuf;
-
-    /// A model that answers from a table and counts its calls.
-    struct Scripted {
-        answers: Vec<(&'static str, &'static str)>,
-        calls: Mutex<Vec<String>>,
-        fail: bool,
-        delay: Duration,
-    }
-
-    impl Scripted {
-        fn new(answers: Vec<(&'static str, &'static str)>) -> Arc<Self> {
-            Arc::new(Self { answers, calls: Mutex::new(vec![]), fail: false, delay: Duration::ZERO })
-        }
-    }
-
-    impl GrammarModel for Scripted {
-        fn id(&self) -> &'static str {
-            "scripted"
-        }
-        fn install(&self, _: PathBuf) {}
-        fn uninstall(&self) {}
-        fn is_installed(&self) -> bool {
-            true
-        }
-        fn is_loaded(&self) -> bool {
-            true
-        }
-        fn warm(&self) -> AppResult<()> {
-            Ok(())
-        }
-        fn unload_if_idle(&self, _: Duration) -> bool {
-            false
-        }
-        fn rewrite(&self, sentence: &str) -> AppResult<String> {
-            std::thread::sleep(self.delay);
-            self.calls.lock().push(sentence.to_string());
-            if self.fail {
-                return Err(AppError::new(ErrorCode::Internal, "boom"));
-            }
-            Ok(self
-                .answers
-                .iter()
-                .find(|(from, _)| *from == sentence)
-                .map_or_else(|| sentence.to_string(), |(_, to)| (*to).to_string()))
-        }
-    }
 
     const FIXES: &[(&str, &str)] = &[
         ("She don't know.", "She doesn't know."),
@@ -281,10 +259,9 @@ mod tests {
 
     #[test]
     fn each_sentence_is_corrected_and_the_gaps_between_them_survive() {
-        let model = Scripted::new(FIXES.to_vec());
-        let pass = GrammarPass::new(model);
+        let pass = GrammarPass::new(ScriptedGrammar::answering(FIXES));
 
-        let out = pass.correct("She don't know.\n\nWe was late.", &[], GRAMMAR_BUDGET);
+        let out = pass.correct("She don't know.\n\nWe was late.", &[], PassOptions::default());
 
         assert_eq!(out.text, "She doesn't know.\n\nWe were late.");
         assert_eq!((out.sentences, out.model_calls, out.edits_kept), (2, 2, 2));
@@ -292,22 +269,26 @@ mod tests {
 
     #[test]
     fn a_prefetched_sentence_costs_no_model_call_at_the_stop() {
-        let model = Scripted::new(FIXES.to_vec());
+        let model = ScriptedGrammar::answering(FIXES);
         let pass = GrammarPass::new(model.clone());
 
         // Spoken so far: one finished sentence and one still being said.
         assert_eq!(pass.prefetch("She don't know. We was"), 1);
-        let out = pass.correct("She don't know. We was late.", &[], GRAMMAR_BUDGET);
+        let out = pass.correct("She don't know. We was late.", &[], PassOptions::default());
 
         assert_eq!(out.text, "She doesn't know. We were late.");
         assert_eq!((out.cache_hits, out.model_calls), (1, 1));
         let calls = model.calls.lock().clone();
-        assert_eq!(calls.iter().filter(|c| c.as_str() == "She don't know.").count(), 1, "rewritten once, not twice");
+        assert_eq!(
+            calls.iter().filter(|c| c.as_str() == "She don't know.").count(),
+            1,
+            "rewritten once, not twice"
+        );
     }
 
     #[test]
     fn an_unfinished_sentence_is_not_prefetched() {
-        let model = Scripted::new(FIXES.to_vec());
+        let model = ScriptedGrammar::answering(FIXES);
         let pass = GrammarPass::new(model.clone());
         assert_eq!(pass.prefetch("She don't know"), 0);
         assert!(model.calls.lock().is_empty());
@@ -315,15 +296,10 @@ mod tests {
 
     #[test]
     fn the_budget_leaves_the_remaining_sentences_as_the_rules_wrote_them() {
-        let model = Arc::new(Scripted {
-            answers: FIXES.to_vec(),
-            calls: Mutex::new(vec![]),
-            fail: false,
-            delay: Duration::from_millis(30),
-        });
-        let pass = GrammarPass::new(model);
+        let pass = GrammarPass::new(ScriptedGrammar::slow(FIXES, Duration::from_millis(30)));
+        let options = PassOptions { budget: Duration::from_millis(10), formal: false };
 
-        let out = pass.correct("She don't know. We was late.", &[], Duration::from_millis(10));
+        let out = pass.correct("She don't know. We was late.", &[], options);
 
         // The first call starts inside the budget; the second does not.
         assert_eq!(out.text, "She doesn't know. We was late.");
@@ -332,15 +308,9 @@ mod tests {
 
     #[test]
     fn a_failing_model_degrades_to_the_text_it_was_given() {
-        let model = Arc::new(Scripted {
-            answers: vec![],
-            calls: Mutex::new(vec![]),
-            fail: true,
-            delay: Duration::ZERO,
-        });
-        let pass = GrammarPass::new(model);
+        let pass = GrammarPass::new(ScriptedGrammar::failing());
 
-        let out = pass.correct("She don't know.", &[], GRAMMAR_BUDGET);
+        let out = pass.correct("She don't know.", &[], PassOptions::default());
 
         assert_eq!(out.text, "She don't know.");
         assert_eq!(out.left_alone, 1);
@@ -348,9 +318,11 @@ mod tests {
 
     #[test]
     fn the_guard_still_judges_what_the_model_says() {
-        let model = Scripted::new(vec![("Send it to Priya.", "Send it to Priyanka.")]);
-        let pass = GrammarPass::new(model);
-        let out = pass.correct("Send it to Priya.", &[], GRAMMAR_BUDGET);
+        let pass = GrammarPass::new(ScriptedGrammar::answering(&[(
+            "Send it to Priya.",
+            "Send it to Priyanka.",
+        )]));
+        let out = pass.correct("Send it to Priya.", &[], PassOptions::default());
         assert_eq!(out.text, "Send it to Priya.");
         assert_eq!(out.edits_refused, 1);
     }
@@ -379,8 +351,8 @@ mod tests {
 
     #[test]
     fn text_with_nothing_to_correct_is_returned_verbatim() {
-        let pass = GrammarPass::new(Scripted::new(vec![]));
-        let out = pass.correct("  Okay.  ", &[], GRAMMAR_BUDGET);
+        let pass = GrammarPass::new(ScriptedGrammar::answering(&[]));
+        let out = pass.correct("  Okay.  ", &[], PassOptions::default());
         assert_eq!(out.text, "  Okay.  ");
         assert_eq!(out.sentences, 0);
     }
