@@ -95,3 +95,15 @@ objc2-foundation = "0.3.2"
 [dev-dependencies]
 tokio = { version = "1.53.1", features = ["rt", "macros"] }
 
+
+# The grammar model runs from `cargo test` and `tauri dev` too, and unoptimised
+# tensor code is 20-50x slower — a "100 ms" rewrite becomes seconds, which makes
+# a debug build useless for judging whether the feature feels instant.
+[profile.dev.package.candle-core]
+opt-level = 3
+[profile.dev.package.candle-nn]
+opt-level = 3
+[profile.dev.package.candle-transformers]
+opt-level = 3
+[profile.dev.package.tokenizers]
+opt-level = 3

@@ -19,7 +19,7 @@ use std::sync::Arc;
 
 use crate::config::AppPaths;
 use crate::error::{AppError, AppResult, ErrorCode};
-use crate::ports::{EventSink, ModelStore, TranscriptionEngine};
+use crate::ports::{EventSink, GrammarModel, ModelStore, TranscriptionEngine};
 use crate::types::EngineId;
 
 pub mod cpal;
@@ -27,10 +27,12 @@ pub mod events;
 pub mod http_models;
 pub mod macos;
 pub mod rules;
+pub mod t5;
 pub mod whisper;
 
 pub use events::TauriEventSink;
 pub use http_models::HttpModelStore;
+pub use t5::T5GrammarModel;
 pub use whisper::{WhisperEngine, WHISPER_ENGINE_ID};
 
 /// The engine used unless a setting says otherwise.
@@ -85,6 +87,20 @@ pub fn build_model_store(
     events: Arc<dyn EventSink>,
 ) -> AppResult<Arc<dyn ModelStore>> {
     Ok(Arc::new(HttpModelStore::new(paths, events)?))
+}
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: build_grammar_model
+ * WHAT:  Constructs the on-device grammar model, empty: no file registered, no
+ *        weights loaded.
+ * WHY:   Construction is free on purpose. Whether the model is downloaded is a
+ *        runtime fact the ModelStore owns, and the weights are loaded when a
+ *        recording starts, so building this at startup costs nothing and an app
+ *        whose user never enabled the feature never reads a byte of it.
+ * WHERE: App bootstrap; the handle goes into Ports.
+ */
+pub fn build_grammar_model() -> Arc<dyn GrammarModel> {
+    Arc::new(T5GrammarModel::new())
 }
 
 #[cfg(test)]
