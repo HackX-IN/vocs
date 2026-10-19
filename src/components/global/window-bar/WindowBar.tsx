@@ -46,7 +46,7 @@ export function WindowBar({ leading, title, trailing, className, ...rest }: Wind
       </div>
       <div data-tauri-drag-region className="flex min-w-0 items-center justify-center">
         {typeof title === "string" ? (
-          <h1 data-tauri-drag-region className="text-label truncate font-medium text-text-primary">
+          <h1 data-tauri-drag-region className="text-heading truncate font-medium text-text-primary">
             {title}
           </h1>
         ) : (

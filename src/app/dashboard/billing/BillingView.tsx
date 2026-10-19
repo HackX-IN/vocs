@@ -40,7 +40,7 @@ const SUPPORT_LINKS: readonly SupportLink[] = [
     title: "Buy Me a Coffee",
     description: "Send a one-time tip to fuel late-night coding sessions.",
     icon: Coffee,
-    url: "https://buymeacoffee.com",
+    url: "https://buymeacoffee.com/Inamul",
     badge: "Donate",
   },
   {
