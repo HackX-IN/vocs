@@ -70,6 +70,9 @@ pub enum ErrorCode {
     SecureInputActive,
     InjectionFailed,
     ClipboardUnavailable,
+    /// Voice mode could not speak: no audio device, the voice would not load,
+    /// or the first sound was too slow to be useful in a meeting.
+    SpeechFailed,
 
     // ── Hotkeys ──────────────────────────────────────────────────────────
     HotkeyConflict,

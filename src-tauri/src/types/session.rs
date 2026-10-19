@@ -165,6 +165,9 @@ pub enum DeliveryKind {
     Pasted,
     /// Clipboard written; paste skipped or refused. Still a success.
     ClipboardOnly,
+    /// Voice mode: the text was spoken into the chosen audio device instead of
+    /// being pasted.
+    Spoken,
     /// Nothing was delivered.
     None,
 }
@@ -174,6 +177,7 @@ impl DeliveryKind {
         match self {
             DeliveryKind::Pasted => "pasted",
             DeliveryKind::ClipboardOnly => "clipboard_only",
+            DeliveryKind::Spoken => "spoken",
             DeliveryKind::None => "none",
         }
     }
@@ -184,6 +188,7 @@ impl DeliveryKind {
         match value {
             "pasted" => Some(DeliveryKind::Pasted),
             "clipboard_only" => Some(DeliveryKind::ClipboardOnly),
+            "spoken" => Some(DeliveryKind::Spoken),
             "none" => Some(DeliveryKind::None),
             _ => None,
         }

@@ -317,3 +317,98 @@ impl crate::ports::GrammarModel for ScriptedGrammar {
             .map_or_else(|| sentence.to_string(), |(_, to)| to.clone()))
     }
 }
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: ScriptedSpeech, speech_output_double
+ * WHAT:  A SpeechOutput that records what it was asked to say and can be told to
+ *        succeed, fail (with or without a deliberate cancel) or be unable to start
+ *        passthrough.
+ * WHY:   Real speech needs the main run loop and an audio device; everything
+ *        Voice mode DECIDES — when to fall back, what to announce, which device —
+ *        is testable against this.
+ */
+pub struct ScriptedSpeech {
+    pub requests: Mutex<Vec<crate::types::SpeakRequest>>,
+    devices: Vec<crate::types::AudioOutputDevice>,
+    voices: Mutex<Vec<crate::types::VoiceInfo>>,
+    failure: Option<(String, Option<&'static str>)>,
+    passthrough_works: bool,
+    passthrough: std::sync::atomic::AtomicBool,
+}
+
+impl ScriptedSpeech {
+    fn base(devices: Vec<crate::types::AudioOutputDevice>) -> Self {
+        Self {
+            requests: Mutex::new(Vec::new()),
+            devices,
+            voices: Mutex::new(Vec::new()),
+            failure: None,
+            passthrough_works: true,
+            passthrough: std::sync::atomic::AtomicBool::new(false),
+        }
+    }
+
+    pub fn working(devices: Vec<crate::types::AudioOutputDevice>) -> Arc<Self> {
+        Arc::new(Self::base(devices))
+    }
+
+    /// Fails every speak with `message`; `detail` is the error's detail.
+    pub fn failing(message: &str, detail: Option<&'static str>) -> Arc<Self> {
+        let mut speech = Self::base(Vec::new());
+        speech.failure = Some((message.to_string(), detail));
+        Arc::new(speech)
+    }
+
+    pub fn without_passthrough() -> Arc<Self> {
+        let mut speech = Self::base(Vec::new());
+        speech.passthrough_works = false;
+        Arc::new(speech)
+    }
+
+    pub fn set_voices(&self, voices: Vec<crate::types::VoiceInfo>) {
+        *self.voices.lock() = voices;
+    }
+}
+
+impl crate::ports::SpeechOutput for ScriptedSpeech {
+    fn voices(&self) -> Vec<crate::types::VoiceInfo> {
+        self.voices.lock().clone()
+    }
+    fn output_devices(&self) -> Vec<crate::types::AudioOutputDevice> {
+        self.devices.clone()
+    }
+    fn personal_voice_status(&self) -> crate::types::PersonalVoiceStatus {
+        crate::types::PersonalVoiceStatus::Unsupported
+    }
+    fn request_personal_voice(&self, done: Box<dyn FnOnce(crate::types::PersonalVoiceStatus) + Send>) {
+        done(crate::types::PersonalVoiceStatus::Unsupported);
+    }
+    fn speak(&self, request: &crate::types::SpeakRequest) -> crate::error::AppResult<crate::types::SpeakReport> {
+        self.requests.lock().push(request.clone());
+        if let Some((message, detail)) = &self.failure {
+            let mut err = crate::error::AppError::new(crate::error::ErrorCode::SpeechFailed, message.clone());
+            if let Some(detail) = detail {
+                err = err.with_detail(*detail);
+            }
+            return Err(err);
+        }
+        Ok(crate::types::SpeakReport { first_audio_ms: 120, total_ms: 900 })
+    }
+    fn stop_speaking(&self) {}
+    fn is_speaking(&self) -> bool {
+        false
+    }
+    fn start_passthrough(&self, _input: Option<&str>, _output: Option<&str>) -> crate::error::AppResult<()> {
+        if !self.passthrough_works {
+            return Err(crate::error::AppError::new(crate::error::ErrorCode::SpeechFailed, "no microphone"));
+        }
+        self.passthrough.store(true, std::sync::atomic::Ordering::SeqCst);
+        Ok(())
+    }
+    fn stop_passthrough(&self) {
+        self.passthrough.store(false, std::sync::atomic::Ordering::SeqCst);
+    }
+    fn is_passthrough(&self) -> bool {
+        self.passthrough.load(std::sync::atomic::Ordering::SeqCst)
+    }
+}

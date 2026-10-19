@@ -47,6 +47,7 @@ import { LearnedCorrections } from "./LearnedCorrections";
 import { MicTestPanel } from "./MicTestPanel";
 import { ModelManager } from "./ModelManager";
 import { PermissionNotice } from "./PermissionNotice";
+import { VoicePanel } from "./VoicePanel";
 
 /** Everything a row needs to render and write — shared by every page. */
 export interface SettingsContext {
@@ -153,6 +154,7 @@ export function SettingsPageBody({ page, defs, allDefs, context, dataVersion, on
     }
     if (page.id === "transcription") cards.push({ title: "Models", body: <ModelManager kind="SPEECH" /> });
     if (page.id === "output") cards.push({ title: "Grammar model", body: <ModelManager kind="GRAMMAR" /> });
+    if (page.id === "voice") cards.push({ title: "Setup and safety", body: <VoicePanel /> });
     if (page.id === "vocabulary") {
       cards.push({ title: "Dictionary", body: <DictionaryManager key={dataVersion} /> });
       cards.push({ title: "Learned corrections", body: <LearnedCorrections key={dataVersion} /> });

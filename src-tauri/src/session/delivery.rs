@@ -74,6 +74,8 @@ pub struct PendingDelivery {
      */
     pub heard_nothing_at_all: bool,
     pub peak_amplitude: f32,
+    /// Voice mode: speak the result into the chosen device instead of pasting it.
+    pub speak: bool,
 }
 
 /// A recording with everything decoded, queued for its turn to be delivered.
@@ -118,6 +120,7 @@ async fn deliver(ctx: &SessionContext, pending: PendingDelivery) {
         finalize_started,
         heard_nothing_at_all,
         peak_amplitude,
+        speak,
     } = pending;
 
     let raw = {
@@ -192,6 +195,7 @@ async fn deliver(ctx: &SessionContext, pending: PendingDelivery) {
      * is still saved to Dictations: previewing must never be a way to lose words.
      */
     if settings.preview_before_paste
+        && !speak
         && super::preview::hold(ctx, &final_text, settings.preview_ms).await
             == super::preview::PreviewOutcome::Withheld
     {
@@ -208,29 +212,42 @@ async fn deliver(ctx: &SessionContext, pending: PendingDelivery) {
         return;
     }
 
-    let outcome = {
+    // Voice mode speaks the words; everything else pastes them. Both are timed as
+    // the "output" stage, because to the person that is what each of them is.
+    let delivery = if speak {
         let _timer = latency.stage_timer(LatencyStage::Inject);
-        ctx.ports.injector.deliver(&InjectionRequest {
-            text: final_text.clone(),
-            auto_paste: settings.auto_paste,
-            restore_clipboard: settings.restore_clipboard,
-            paste_delay_ms: settings.paste_delay_ms,
-            clipboard_restore_delay_ms: settings.clipboard_restore_delay_ms,
-        })
-    };
-
-    let delivery = match outcome {
-        Ok(outcome) => {
-            if let Some(reason) = &outcome.reason {
-                tracing::info!(reason, "delivery degraded to clipboard only");
+        match speak_text(ctx, &settings, &final_text, language.as_ref()).await {
+            Ok(()) => DeliveryKind::Spoken,
+            Err(err) => {
+                tracing::warn!(error = %err, "speaking the dictation failed");
+                report_failure(ctx, err).await;
+                DeliveryKind::None
             }
-            latency.record(LatencyStage::ClipboardWrite, outcome.clipboard_write_ms);
-            outcome.delivery
         }
-        Err(err) => {
-            tracing::warn!(error = %err, "delivery failed");
-            report_failure(ctx, err).await;
-            DeliveryKind::None
+    } else {
+        let outcome = {
+            let _timer = latency.stage_timer(LatencyStage::Inject);
+            ctx.ports.injector.deliver(&InjectionRequest {
+                text: final_text.clone(),
+                auto_paste: settings.auto_paste,
+                restore_clipboard: settings.restore_clipboard,
+                paste_delay_ms: settings.paste_delay_ms,
+                clipboard_restore_delay_ms: settings.clipboard_restore_delay_ms,
+            })
+        };
+        match outcome {
+            Ok(outcome) => {
+                if let Some(reason) = &outcome.reason {
+                    tracing::info!(reason, "delivery degraded to clipboard only");
+                }
+                latency.record(LatencyStage::ClipboardWrite, outcome.clipboard_write_ms);
+                outcome.delivery
+            }
+            Err(err) => {
+                tracing::warn!(error = %err, "delivery failed");
+                report_failure(ctx, err).await;
+                DeliveryKind::None
+            }
         }
     };
 
@@ -262,6 +279,31 @@ async fn deliver(ctx: &SessionContext, pending: PendingDelivery) {
         Some((raw, final_text, language)),
     );
     super::learning::record_session_edits(&ctx.db, &session_id, &grammar_edits);
+}
+
+/**
+ * WHAT:  Speaks a finished dictation, on the blocking pool.
+ * WHY:   Speech blocks for as long as it takes to say, and the delivery worker is
+ *        ONE task for every recording — it must not stall on a long sentence any
+ *        longer than it already does for the paste. The language is passed so the
+ *        voice matches what was said.
+ */
+async fn speak_text(
+    ctx: &SessionContext,
+    settings: &SessionSettings,
+    text: &str,
+    language: Option<&LanguageCode>,
+) -> Result<(), AppError> {
+    let speak = Arc::clone(&ctx.speak);
+    let settings = settings.clone();
+    let text = text.to_string();
+    let language = language.map(|l| l.as_str().to_string());
+    tokio::task::spawn_blocking(move || speak.speak(&settings, &text, language.as_deref()))
+        .await
+        .map_err(AppError::internal)?
+        .map(|report| {
+            tracing::info!(first_audio_ms = report.first_audio_ms, total_ms = report.total_ms, "spoke a dictation");
+        })
 }
 
 /**

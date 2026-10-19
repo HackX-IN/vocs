@@ -184,6 +184,7 @@ impl EventSink for RecordingEventSink {
         _state: crate::types::ModelState,
     ) {
     }
+    fn speak_status_changed(&self, _status: crate::types::SpeakStatus) {}
 }
 
 struct AlwaysGranted;
@@ -307,6 +308,7 @@ fn build_with(
         }),
         enhancer: Arc::new(RuleEnhancer::new()),
         grammar,
+        speech: crate::testing::ScriptedSpeech::working(vec![]),
         injector: Arc::clone(&injector) as Arc<dyn TextInjector>,
         models: Arc::new(UnusedModelStore),
         permissions,

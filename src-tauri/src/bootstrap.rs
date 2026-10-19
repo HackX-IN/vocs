@@ -272,7 +272,7 @@ pub fn setup(app: &AppHandle) -> AppResult<()> {
         tracing::error!(error = %err, "could not register the dictation hotkey; the app will start without it");
     }
     watch_settings_for_rebinds(app);
-    crate::copy_last_hotkey::apply(app);
+    crate::extra_hotkeys::apply(app);
     prepare_engine(
         app,
         Arc::clone(&ports.engine),
@@ -311,6 +311,7 @@ fn build_ports(app: &AppHandle, paths: &AppPaths) -> AppResult<Ports> {
         audio: Arc::new(CpalAudioSource::new()),
         enhancer: Arc::new(RuleEnhancer::new()),
         grammar: adapters::build_grammar_model(),
+        speech: adapters::build_speech(),
         injector: Arc::new(MacosInjector::new(MacosPermissions::new())),
         models,
         permissions: Arc::new(MacosPermissions::new()),
@@ -696,7 +697,7 @@ static MODIFIER_TAP: parking_lot::Mutex<Option<crate::adapters::macos::ModifierT
  *        listeners must also stay quiet while it is set, or they would register
  *        the key again the moment the new value is saved.
  * WHERE: Written by `pause_hotkeys`; read by `rebind_dictation_hotkey` and
- *        copy_last_hotkey::apply through `hotkeys_paused`.
+ *        extra_hotkeys::apply through `hotkeys_paused`.
  */
 static HOTKEYS_PAUSED: std::sync::atomic::AtomicBool = std::sync::atomic::AtomicBool::new(false);
 
@@ -716,10 +717,10 @@ pub fn pause_hotkeys(app: &AppHandle, paused: bool) {
     HOTKEYS_PAUSED.store(paused, std::sync::atomic::Ordering::SeqCst);
     if paused {
         release_dictation_binding(app);
-        crate::copy_last_hotkey::release(app);
+        crate::extra_hotkeys::release(app);
     } else {
         rebind_dictation_hotkey(app);
-        crate::copy_last_hotkey::apply(app);
+        crate::extra_hotkeys::apply(app);
     }
 }
 
@@ -849,13 +850,16 @@ fn watch_settings_for_rebinds(app: &AppHandle) {
         if touched(keys::LAUNCH_AT_LOGIN) {
             apply_launch_at_login(&handler_app);
         }
-        // The copy-last chord must also be re-checked when dictation moves,
-        // because the two may not share a key.
+        // The extra chords must also be re-checked when dictation moves,
+        // because they may not share a key with it.
         if touched(keys::COPY_LAST_ENABLED)
             || touched(keys::COPY_LAST_HOTKEY)
+            || touched(keys::SPEAK_ENABLED)
+            || touched(keys::SPEAK_HOTKEY)
+            || touched(keys::SPEAK_SAFE_HOTKEY)
             || touched(keys::DICTATION_HOTKEY)
         {
-            crate::copy_last_hotkey::apply(&handler_app);
+            crate::extra_hotkeys::apply(&handler_app);
         }
     });
 }

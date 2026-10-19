@@ -223,6 +223,35 @@ fn copy_last_default_hotkey() -> HotkeyBinding {
     }
 }
 
+fn speak_default_hotkey() -> HotkeyBinding {
+    HotkeyBinding {
+        modifiers: vec![KeyModifier::Control, KeyModifier::Option],
+        key: text("Space"),
+    }
+}
+
+fn speak_safe_default_hotkey() -> HotkeyBinding {
+    HotkeyBinding {
+        modifiers: vec![KeyModifier::Control, KeyModifier::Option],
+        key: text("KeyM"),
+    }
+}
+
+/// A hotkey setting that is a plain chord (a bare modifier cannot be one).
+fn chord_setting(key: &str, label: &str, description: &str, section: SettingSection, default: HotkeyBinding) -> SettingDef {
+    SettingDef {
+        key: text(key),
+        label: text(label),
+        description: text(description),
+        section,
+        kind: SettingKind::Hotkey,
+        default: SettingValue::Hotkey(default),
+        requires_engine: vec![],
+        requires_permission: vec![],
+        advanced: false,
+    }
+}
+
 // ── The table ────────────────────────────────────────────────────────────
 
 fn build_capabilities() -> Vec<Capability> {
@@ -668,6 +697,81 @@ fn build_capabilities() -> Vec<Capability> {
             settings: vec![],
         },
         Capability {
+            key: CapabilityKey::Speak,
+            name: text("Voice mode"),
+            description: text("Speak your corrected dictation into a meeting in your own voice."),
+            // Safe mode passes the microphone through, which needs the grant; speaking does not.
+            requires: vec![],
+            engine_needs: vec![],
+            nav: None,
+            hotkey: None,
+            metrics: vec![],
+            settings: vec![
+                toggle(
+                    keys::SPEAK_ENABLED,
+                    "Voice mode",
+                    "Turns on the two shortcuts below. Press the Speak shortcut, say what you mean, press it again: Vocs fixes it up and SPEAKS it, in your own voice if you have made a Personal Voice, into the audio device you choose — instead of pasting it. Choose that device as the microphone in Zoom, Meet or Teams.",
+                    SettingSection::Voice,
+                    false,
+                ),
+                chord_setting(
+                    keys::SPEAK_HOTKEY,
+                    "Speak shortcut",
+                    "Press to start talking, press again to have it spoken. A key combination such as \u{2303}\u{2325}Space.",
+                    SettingSection::Voice,
+                    speak_default_hotkey(),
+                ),
+                chord_setting(
+                    keys::SPEAK_SAFE_HOTKEY,
+                    "Meeting safe mode shortcut",
+                    "One key that passes your real microphone straight through to the meeting, in case speech ever fails or lags. Press again to go back to speaking.",
+                    SettingSection::Voice,
+                    speak_safe_default_hotkey(),
+                ),
+                dynamic_choice(
+                    keys::SPEAK_VOICE,
+                    "Voice",
+                    "Which voice speaks. Your Personal Voice appears first once you have allowed it below. Automatic picks a good voice for the language you spoke.",
+                    SettingSection::Voice,
+                    ChoiceSource::Voices,
+                    "auto",
+                ),
+                dynamic_choice(
+                    keys::SPEAK_OUTPUT_DEVICE,
+                    "Speak into",
+                    "The audio device the speech goes to. Automatic prefers a virtual device such as BlackHole, which a meeting app can use as a microphone, and otherwise your speakers.",
+                    SettingSection::Voice,
+                    ChoiceSource::OutputDevices,
+                    "auto",
+                ),
+                number(
+                    keys::SPEAK_RATE,
+                    "Speaking speed",
+                    "How fast it speaks, where 1 is the voice\u{2019}s natural pace.",
+                    SettingSection::Voice,
+                    (0.6, 1.6, 0.05),
+                    Some("\u{00d7}"),
+                    1.0,
+                ),
+                toggle(
+                    keys::SPEAK_FALLBACK,
+                    "If speaking fails, let my microphone through",
+                    "When the voice errors or takes too long to start, Vocs switches on meeting safe mode by itself so the meeting hears you directly instead of silence. Turn it off to keep speech as the only thing the meeting ever hears.",
+                    SettingSection::Voice,
+                    true,
+                ),
+                advanced(number(
+                    keys::SPEAK_LAG_MS,
+                    "How long speech may take to start",
+                    "If no sound has come out this long after you stop, speaking is treated as failed.",
+                    SettingSection::Voice,
+                    (1000.0, 10000.0, 250.0),
+                    Some("ms"),
+                    3000.0,
+                )),
+            ],
+        },
+        Capability {
             key: CapabilityKey::Onboarding,
             name: text("Setup"),
             description: text("First-run permissions, model download, and a hotkey test."),
@@ -852,6 +956,14 @@ mod tests {
             keys::FIX_GRAMMAR,
             keys::AI_GRAMMAR,
             keys::LEARN_CORRECTIONS,
+            keys::SPEAK_ENABLED,
+            keys::SPEAK_HOTKEY,
+            keys::SPEAK_SAFE_HOTKEY,
+            keys::SPEAK_VOICE,
+            keys::SPEAK_OUTPUT_DEVICE,
+            keys::SPEAK_RATE,
+            keys::SPEAK_FALLBACK,
+            keys::SPEAK_LAG_MS,
             keys::TONE,
             keys::RETENTION_DAYS,
             keys::LAUNCH_AT_LOGIN,

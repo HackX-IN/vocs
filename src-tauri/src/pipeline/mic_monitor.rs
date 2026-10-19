@@ -276,6 +276,7 @@ mod tests {
             _state: crate::types::ModelState,
         ) {
         }
+        fn speak_status_changed(&self, _status: crate::types::SpeakStatus) {}
         fn set_cancel_key_active(&self, _active: bool) {}
     }
 

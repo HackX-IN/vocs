@@ -21,6 +21,7 @@ pub mod models;
 pub mod profiles;
 pub mod session;
 pub mod settings;
+pub mod speak;
 pub mod stats;
 pub mod system;
 pub mod updates;

@@ -33,7 +33,7 @@ use cpal::{Device, SampleFormat, Stream, StreamConfig, SupportedStreamConfig};
 
 /// cpal 0.18 exposes a device's human name through `description()`, and a
 /// device that cannot describe itself is one that has just been unplugged.
-fn device_name(device: &Device) -> Option<String> {
+pub(super) fn device_name(device: &Device) -> Option<String> {
     device.description().ok().map(|d| d.name().to_string())
 }
 use ringbuf::traits::{Consumer, Producer, Split};
@@ -68,7 +68,7 @@ impl CpalAudioSource {
         cpal::default_host()
     }
 
-    fn find_device(device_id: Option<&str>) -> AppResult<(Device, SupportedStreamConfig)> {
+    pub(super) fn find_device(device_id: Option<&str>) -> AppResult<(Device, SupportedStreamConfig)> {
         let host = Self::host();
 
         let device = match device_id {
@@ -425,7 +425,7 @@ fn is_fatal(kind: cpal::ErrorKind) -> bool {
  *        allocates.
  * WHERE: Called once per capture session.
  */
-fn build_stream<F, E>(
+pub(super) fn build_stream<F, E>(
     device: &Device,
     config: &StreamConfig,
     format: SampleFormat,

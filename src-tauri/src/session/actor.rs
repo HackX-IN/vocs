@@ -74,6 +74,10 @@ pub struct SessionActor {
     assembler: Assembler,
     /// Live captions for the recording being captured. See session/captions.rs.
     captions: LiveCaptions,
+    /// The Voice-mode flag read from the handle at the most recent start.
+    next_is_speak: bool,
+    /// The recording being captured will be SPOKEN rather than pasted.
+    speak_session: bool,
     worker: AsrWorker,
     latency: Arc<LatencyRecorder>,
 
@@ -170,6 +174,8 @@ impl SessionActor {
             deliveries,
             machine: SessionMachine::new(settings.cancel_countdown_ms),
             chunker: Chunker::new(),
+            next_is_speak: false,
+            speak_session: false,
             assembler: Assembler::new(),
             captions: LiveCaptions::new(),
             latency: Arc::new(LatencyRecorder::new()),
@@ -276,6 +282,11 @@ impl SessionActor {
             _ => None,
         };
         let was_stop = matches!(event, SessionEvent::StopRequested);
+        // Read on EVERY start, accepted or not, so a refused one cannot leave the
+        // flag armed for the next dictation. See SessionHandle::speak_next.
+        if matches!(event, SessionEvent::StartRequested) {
+            self.next_is_speak = self.ctx.session.take_speak();
+        }
 
         match self.machine.handle(event) {
             Ok(transition) => {
@@ -362,6 +373,13 @@ impl SessionActor {
         // and so the app that had focus when the hotkey fired is the one whose
         // profile applies.
         self.settings = SessionSettings::load_for_app(&self.ctx.db, app_bundle_id.as_deref());
+        // A Voice-mode session speaks its words, with the cleanup a voice needs.
+        // Only when Voice mode is on: a flag armed while it is off must not turn
+        // an ordinary dictation into one that never pastes.
+        self.speak_session = std::mem::take(&mut self.next_is_speak) && self.settings.speak_enabled;
+        if self.speak_session {
+            self.settings = self.settings.clone().for_speaking();
+        }
         self.machine.set_cancel_countdown_ms(self.settings.cancel_countdown_ms);
         self.machine
             .set_discard_on_escape(self.settings.discard_on_escape);
@@ -705,6 +723,7 @@ impl SessionActor {
             finalize_started: self.finalize_started.take(),
             heard_nothing_at_all,
             peak_amplitude,
+            speak: std::mem::take(&mut self.speak_session),
         };
 
         // A fresh recorder for the next recording. Sharing one across

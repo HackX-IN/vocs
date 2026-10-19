@@ -328,6 +328,7 @@ mod tests {
             CapabilityKey::Settings,
             CapabilityKey::Onboarding,
             CapabilityKey::Updates,
+            CapabilityKey::Speak,
         ] {
             assert!(
                 registry::capability(key).is_some(),

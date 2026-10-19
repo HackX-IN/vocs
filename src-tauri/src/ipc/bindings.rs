@@ -95,6 +95,14 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             commands::backup::export_backup,
             commands::backup::import_backup,
             commands::files::open_text_file,
+            // Voice mode
+            commands::speak::list_voices,
+            commands::speak::list_output_devices,
+            commands::speak::get_speak_status,
+            commands::speak::set_safe_mode,
+            commands::speak::request_personal_voice,
+            commands::speak::get_personal_voice_status,
+            commands::speak::test_voice,
             // Microphone check
             commands::mic_test::start_mic_test,
             commands::mic_test::stop_mic_test,
@@ -111,6 +119,7 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             events::MicTestChanged,
             events::ModelDownloadProgress,
             events::ModelStateChanged,
+            events::SpeakStatusChanged,
             events::OnboardingProgress,
             events::SettingsChanged,
             events::UpdateAvailable,

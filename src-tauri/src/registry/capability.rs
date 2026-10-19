@@ -45,6 +45,8 @@ pub enum CapabilityKey {
     Updates,
     /// A page that exists to say there is nothing to pay for.
     Billing,
+    /// Voice mode: speak corrected dictation into a meeting, and meeting safe mode.
+    Speak,
 }
 
 impl CapabilityKey {
@@ -60,6 +62,7 @@ impl CapabilityKey {
             CapabilityKey::Settings => "settings",
             CapabilityKey::Onboarding => "onboarding",
             CapabilityKey::Updates => "updates",
+            CapabilityKey::Speak => "speak",
         }
     }
 }
@@ -80,6 +83,8 @@ pub enum SettingSection {
     Transcription,
     Output,
     Vocabulary,
+    /// Voice mode: speaking into meetings.
+    Voice,
     Privacy,
     General,
 }

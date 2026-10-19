@@ -122,6 +122,20 @@ pub struct ModelStateChanged {
 }
 
 /**
+ * SOURCE OF TRUTH KEYWORDS: SpeakStatusChanged
+ * WHAT:  Whether Vocs is speaking, and whether meeting safe mode is on.
+ * WHY:   Safe mode can switch on without the user touching anything — speech
+ *        failed and the microphone was let through — so the state is pushed, with
+ *        the reason, rather than read when a page happens to be open.
+ * WHERE: Emitted by the TauriEventSink; shown on the Voice settings page and in
+ *        the menu bar.
+ */
+#[derive(Debug, Clone, Serialize, Deserialize, Type, Event)]
+pub struct SpeakStatusChanged {
+    pub status: crate::types::SpeakStatus,
+}
+
+/**
  * SOURCE OF TRUTH KEYWORDS: OnboardingProgress
  * WHAT:  Long-running first-run work, reported honestly.
  * WHY:   The Neural Engine compile takes 15-60 seconds once per machine, and a

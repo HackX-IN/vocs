@@ -19,8 +19,7 @@ use tauri_specta::Event;
 
 use crate::ipc::events::{
     AudioLevelChanged, CaptionChanged, MicTestChanged, ModelDownloadProgress, ModelStateChanged,
-    SessionStateChanged, TranscriptDelivered,
-};
+    SessionStateChanged, TranscriptDelivered, SpeakStatusChanged};
 use crate::ports::events::EventSink;
 use crate::types::{
     AudioLevel, Caption, DownloadProgress, MicTestUpdate, ModelId, ModelState, SessionState,
@@ -114,6 +113,14 @@ impl EventSink for TauriEventSink {
     fn model_state_changed(&self, model_id: ModelId, state: ModelState) {
         if let Err(err) = (ModelStateChanged { model_id, state }).emit(&self.app) {
             tracing::warn!(error = %err, "could not emit model state");
+        }
+    }
+
+    fn speak_status_changed(&self, status: crate::types::SpeakStatus) {
+        // The menu bar shows safe mode too, so it is updated beside the event.
+        crate::tray::show_safe_mode(&self.app, status.safe_mode);
+        if let Err(err) = (SpeakStatusChanged { status }).emit(&self.app) {
+            tracing::warn!(error = %err, "could not emit the speak status");
         }
     }
 }

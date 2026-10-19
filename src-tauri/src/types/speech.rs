@@ -51,16 +51,26 @@ pub struct AudioOutputDevice {
     pub is_default: bool,
 }
 
+/// The `detail` an adapter puts on the error of a speech that was cut off on
+/// purpose (a newer one replaced it, or the person stopped it). Not a failure
+/// worth reacting to, so callers check for it before engaging safe mode.
+pub const SPEECH_CANCELLED: &str = "cancelled";
+
 /// What to say, in whose voice, and where.
 #[derive(Debug, Clone)]
 pub struct SpeakRequest {
     pub text: String,
-    /// None means the best available voice for the text's language.
+    /// None means the best available voice for `language`.
     pub voice_id: Option<String>,
+    /// The text's language ("en", "en-US"), used to pick a voice when none is named.
+    pub language: Option<String>,
     /// None means the system default output.
     pub device_id: Option<String>,
     /// 1.0 is the voice's natural pace.
     pub rate: f32,
+    /// How long the first sound may take before speaking is declared too slow
+    /// to be useful. Dead air in a meeting is worse than no speech.
+    pub first_audio_timeout: std::time::Duration,
 }
 
 /// How a spoken delivery went.

@@ -91,6 +91,10 @@ objc2 = "0.6.4"
 objc2-app-kit = "0.3.2"
 objc2-av-foundation = { version = "0.3.2", features = ["AVCaptureDevice", "AVMediaFormat"] }
 objc2-foundation = "0.3.2"
+# Voice mode: AVSpeechSynthesizer (speaking in the user's Personal Voice).
+objc2-avf-audio = { version = "0.3.2", default-features = false, features = [
+    "std", "block2", "AVSpeechSynthesis", "AVAudioBuffer", "AVAudioFormat", "AVAudioTypes",
+] }
 
 [dev-dependencies]
 tokio = { version = "1.53.1", features = ["rt", "macros"] }

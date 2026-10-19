@@ -50,6 +50,16 @@ pub const AI_GRAMMAR: &str = "enhance.ai_grammar";
 pub const LEARN_CORRECTIONS: &str = "enhance.learn_corrections";
 pub const TONE: &str = "enhance.tone";
 
+// ── Voice mode ───────────────────────────────────────────────────────────
+pub const SPEAK_ENABLED: &str = "speak.enabled";
+pub const SPEAK_HOTKEY: &str = "speak.hotkey";
+pub const SPEAK_SAFE_HOTKEY: &str = "speak.safe_hotkey";
+pub const SPEAK_VOICE: &str = "speak.voice";
+pub const SPEAK_OUTPUT_DEVICE: &str = "speak.output_device";
+pub const SPEAK_RATE: &str = "speak.rate";
+pub const SPEAK_FALLBACK: &str = "speak.fallback_to_mic";
+pub const SPEAK_LAG_MS: &str = "speak.lag_ms";
+
 // ── Privacy ──────────────────────────────────────────────────────────────
 pub const RETENTION_DAYS: &str = "privacy.retention_days";
 // `privacy.store_audio` was here. Removed rather than wired: nothing in this

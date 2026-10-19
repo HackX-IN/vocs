@@ -37,9 +37,10 @@ pub trait SpeechOutput: Send + Sync {
 
     fn is_speaking(&self) -> bool;
 
-    /// Sends the microphone straight to `device_id` (None: the system default)
-    /// until `stop_passthrough`. Replaces any speech in progress.
-    fn start_passthrough(&self, device_id: Option<&str>) -> AppResult<()>;
+    /// Sends the microphone `input_id` (None: the default) straight to
+    /// `output_id` (None: the system default) until `stop_passthrough`. Replaces
+    /// any speech in progress.
+    fn start_passthrough(&self, input_id: Option<&str>, output_id: Option<&str>) -> AppResult<()>;
 
     fn stop_passthrough(&self);
 
