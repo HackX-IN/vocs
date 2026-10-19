@@ -1,6 +1,6 @@
 <!--
   SOURCE OF TRUTH KEYWORDS: icon.svg, app-icon, bundle-icon, identity-icon, whisper-head, quote-marks
-  WHAT:  The Vocs app icon — a black, head-shaped blob on a pale squircle with two
+  WHAT:  The Vocs app icon — a black, head-shaped blob on an orange (the theme accent) squircle with two
          white quote marks "whispered" from its crown. 1024x1024, Apple icon grid
          (824pt squircle, 100pt margin, soft shadow).
   WHY:   Authored as a vector so every size is rendered from one drawing instead of
@@ -14,8 +14,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
   <defs>
     <linearGradient id="paper" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#f7f7f6"/>
-      <stop offset="1" stop-color="#e7e7e5"/>
+      <stop offset="0" stop-color="#f26a30"/>
+      <stop offset="1" stop-color="#d9440f"/>
     </linearGradient>
     <linearGradient id="ink" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0" stop-color="#232323"/>
@@ -41,7 +41,7 @@
         <use href="#quote" transform="translate(60.9 42) rotate(-4) scale(0.126)"/>
       </g>
       <!-- three small sound bars rising from the crown: what it whispers -->
-      <g fill="#171717">
+      <g fill="#fff">
         <rect x="75" y="18" width="3.4" height="8" rx="1.7"/>
         <rect x="81.4" y="13" width="3.4" height="17" rx="1.7"/>
         <rect x="87.8" y="17" width="3.4" height="10" rx="1.7"/>

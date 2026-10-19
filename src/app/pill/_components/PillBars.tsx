@@ -32,7 +32,7 @@ import { useTauriEvent } from "@/lib/use-event";
 import { Waveform, type WaveformHandle } from "@/components/global";
 
 /** Resting heights as a share of the full bar: short, tall, medium. */
-const REST_SHAPE = [0.38, 0.72, 0.52] as const;
+const REST_SHAPE = [0.3, 0.5, 0.38] as const;
 /** How much of the previous levels each flank borrows, so the bars do not move
  *  in lock-step — the flanks trail the centre, which is what makes it breathe. */
 const FLANK_WEIGHT = [0.7, 0.85] as const;
@@ -65,6 +65,7 @@ export function PillBars({ className }: { className?: string }) {
       ref={bars}
       bars={3}
       align="center"
+      smooth
       className={`[--waveform-bar-width:var(--pill-bar-width)] [--waveform-bar-gap:var(--pill-bar-gap)] [--waveform-bar-max:var(--pill-bar-max)] ${className ?? ""}`}
     />
   );

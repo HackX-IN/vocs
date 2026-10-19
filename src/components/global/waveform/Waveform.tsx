@@ -36,13 +36,16 @@ export interface WaveformProps {
   bars?: number;
   /** Where the bars grow from. "end" is a baseline; "center" grows both ways. */
   align?: "end" | "center";
+  /** Ease each bar between levels instead of snapping, so a fast-changing
+   *  signal reads as motion rather than flicker. */
+  smooth?: boolean;
   className?: string;
   ref?: Ref<WaveformHandle>;
 }
 
 const clamp01 = (value: number): number => (value < 0 ? 0 : value > 1 ? 1 : value);
 
-export function Waveform({ values, bars, align = "end", className, ref }: WaveformProps) {
+export function Waveform({ values, bars, align = "end", smooth = false, className, ref }: WaveformProps) {
   const [tokenBars] = useState(() => readNumberToken("--waveform-bars"));
   const [minScale] = useState(() => readPxToken("--waveform-bar-min") / readPxToken("--waveform-bar-max"));
 
@@ -113,6 +116,7 @@ export function Waveform({ values, bars, align = "end", className, ref }: Wavefo
           className={cn(
             "w-[var(--waveform-bar-width)] h-full rounded-full bg-current",
             align === "center" ? "origin-center" : "origin-bottom",
+            smooth && "transition-transform duration-[var(--motion-duration-fast)] ease-[var(--motion-ease-standard)]",
           )}
           style={{ transform: `scaleY(${minScale})` }}
         />
