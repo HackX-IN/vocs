@@ -334,6 +334,8 @@ pub struct ScriptedSpeech {
     failure: Option<(String, Option<&'static str>)>,
     passthrough_works: bool,
     passthrough: std::sync::atomic::AtomicBool,
+    /// How many times the voice was warmed.
+    pub warmed: std::sync::atomic::AtomicUsize,
 }
 
 impl ScriptedSpeech {
@@ -345,6 +347,7 @@ impl ScriptedSpeech {
             failure: None,
             passthrough_works: true,
             passthrough: std::sync::atomic::AtomicBool::new(false),
+            warmed: std::sync::atomic::AtomicUsize::new(0),
         }
     }
 
@@ -382,6 +385,9 @@ impl crate::ports::SpeechOutput for ScriptedSpeech {
     }
     fn request_personal_voice(&self, done: Box<dyn FnOnce(crate::types::PersonalVoiceStatus) + Send>) {
         done(crate::types::PersonalVoiceStatus::Unsupported);
+    }
+    fn warm(&self, _request: &crate::types::SpeakRequest) {
+        self.warmed.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
     }
     fn speak(&self, request: &crate::types::SpeakRequest) -> crate::error::AppResult<crate::types::SpeakReport> {
         self.requests.lock().push(request.clone());

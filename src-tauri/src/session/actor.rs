@@ -379,6 +379,10 @@ impl SessionActor {
         self.speak_session = std::mem::take(&mut self.next_is_speak) && self.settings.speak_enabled;
         if self.speak_session {
             self.settings = self.settings.clone().for_speaking();
+            // Load the voice now, behind the recording, so the first word out is not slow.
+            let (speak, settings) = (Arc::clone(&self.ctx.speak), self.settings.clone());
+            let language = settings.language.as_ref().map(|l| l.as_str().to_string());
+            tokio::task::spawn_blocking(move || speak.warm(&settings, language.as_deref()));
         }
         self.machine.set_cancel_countdown_ms(self.settings.cancel_countdown_ms);
         self.machine

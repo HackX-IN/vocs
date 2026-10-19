@@ -60,7 +60,7 @@ vocs/
     └── src/
         ├── main.rs · lib.rs         # wiring only, no logic
         ├── bootstrap.rs             # ★ the ONLY file naming a concrete adapter
-        ├── copy_last_hotkey.rs      # optional global shortcut: copy the last transcript
+        ├── extra_hotkeys.rs         # optional global shortcuts: copy last · speak · safe mode
         ├── tray.rs                  # menu bar item; pill and caption show/hide
         ├── menu.rs                  # the application menu bar (Vocs, File, Edit, View, Window, Help)
         │
@@ -94,18 +94,20 @@ vocs/
         │   ├── assembler.rs         # join segments, de-duplicate seams
         │   ├── mic_monitor.rs       # Settings microphone check: levels + watchdog
         │   ├── diff.rs              # said-vs-fixed word diff for History
+        │   ├── speak.rs             # Voice mode: SpeakControl, safe mode, device choice
         │   └── grammar/             # on-device grammar: sentences · tokens · guard · cache · pass · learned
         │                            #   guard.rs keeps only SAFE word edits from the model
         │
         ├── ports/                   # ★ traits only — zero implementation
-        │   └── engine · audio · enhancer · grammar · injector · models · permissions
+        │   └── engine · audio · enhancer · grammar · speech · injector · models · permissions
         │
         ├── adapters/                # mod.rs is the factory; one impl per port
         │   ├── whisper/             #   engine, params, prompt, blocklist,
         │   │                        #   hallucination, coreml, state_pool,
         │   │                        #   benchmark, live_tests
-        │   ├── cpal/                #   source (realtime callback) + resample
-        │   ├── macos/               #   injector, permissions, sound
+        │   ├── cpal/                #   source (realtime callback) + resample, and the output
+        │   │                        #   side: output (ring-fed device), convert, passthrough
+        │   ├── macos/               #   injector, permissions, sound, speech/ (voices, synth)
         │   ├── t5/                  #   GrammarModel over T5-small via candle (tokenizer
         │   │                        #   and config embedded; weights downloaded)
         │   ├── rules/               #   text.rs (commands, dictionary, punctuation),

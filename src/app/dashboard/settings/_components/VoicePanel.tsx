@@ -108,9 +108,9 @@ export function VoicePanel() {
             {personal.data ? PERSONAL_VOICE_COPY[personal.data] : "Checking…"}
           </p>
         </div>
-        {personal.data === "NOT_DETERMINED" ? (
+        {personal.data === "NOT_DETERMINED" || personal.data === "DENIED" ? (
           <Button onClick={() => void allow()} disabled={asking}>
-            Allow
+            {personal.data === "DENIED" ? "Ask again" : "Allow"}
           </Button>
         ) : null}
       </div>

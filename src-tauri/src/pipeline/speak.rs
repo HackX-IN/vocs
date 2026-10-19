@@ -86,6 +86,29 @@ impl SpeakControl {
         self.events.speak_status_changed(snapshot);
     }
 
+    fn request_for(&self, settings: &SessionSettings, text: &str, language: Option<&str>) -> SpeakRequest {
+        let devices = self.speech.output_devices();
+        SpeakRequest {
+            text: text.to_string(),
+            voice_id: settings.speak_voice.clone(),
+            language: language.map(str::to_string),
+            device_id: resolve_output_device(&settings.speak_output_device, &devices),
+            rate: settings.speak_rate,
+            first_audio_timeout: Duration::from_millis(settings.speak_lag_ms),
+        }
+    }
+
+    /**
+     * WHAT:  Loads the chosen voice while the person is still talking. Blocking.
+     * WHY:   The first sentence in a voice measured 1.1 s to first sound against
+     *        0.4 s for every later one; the difference is the voice loading. In a
+     *        meeting that is the gap before anyone hears you, so it is paid
+     *        during the recording, where it costs nobody anything.
+     */
+    pub fn warm(&self, settings: &SessionSettings, language: Option<&str>) {
+        self.speech.warm(&self.request_for(settings, "Ready.", language));
+    }
+
     /// Speaks a dictation. Blocking. On a real failure, lets the microphone
     /// through when the person has asked for that.
     pub fn speak(&self, settings: &SessionSettings, text: &str, language: Option<&str>) -> AppResult<SpeakReport> {
@@ -111,15 +134,7 @@ impl SpeakControl {
             ));
         }
 
-        let devices = self.speech.output_devices();
-        let request = SpeakRequest {
-            text: text.to_string(),
-            voice_id: settings.speak_voice.clone(),
-            language: language.map(str::to_string),
-            device_id: resolve_output_device(&settings.speak_output_device, &devices),
-            rate: settings.speak_rate,
-            first_audio_timeout: Duration::from_millis(settings.speak_lag_ms),
-        };
+        let request = self.request_for(settings, text, language);
 
         self.publish(|status| status.speaking = true);
         let result = self.speech.speak(&request);

@@ -92,6 +92,23 @@ impl SpeechOutput for MacosSpeech {
         voices::request_personal_voice(done);
     }
 
+    fn warm(&self, request: &SpeakRequest) {
+        let (tx, rx) = channel();
+        let warm = SpeakRequest { text: "Ready.".into(), ..request.clone() };
+        let Ok(synth) = Synth::start(&warm, tx) else {
+            return;
+        };
+        // Drain until the end marker; nothing is played and no device is opened.
+        let deadline = Instant::now() + Duration::from_secs(4);
+        while Instant::now() < deadline {
+            match rx.recv_timeout(Duration::from_millis(100)) {
+                Ok(Chunk::End) | Err(RecvTimeoutError::Disconnected) => break,
+                Ok(Chunk::Audio { .. }) | Err(RecvTimeoutError::Timeout) => {}
+            }
+        }
+        synth.stop();
+    }
+
     fn speak(&self, request: &SpeakRequest) -> AppResult<SpeakReport> {
         if self.passthrough.lock().is_some() {
             return Err(failed(

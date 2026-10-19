@@ -28,6 +28,12 @@ pub trait SpeechOutput: Send + Sync {
     /// `done`, because the person may take as long as they like.
     fn request_personal_voice(&self, done: Box<dyn FnOnce(PersonalVoiceStatus) + Send>);
 
+    /// Loads the voice ahead of time by rendering a throwaway utterance that is
+    /// never played. Blocking; best effort. The first sentence in a voice costs
+    /// several hundred milliseconds more than the rest, and this moves that cost
+    /// to while the person is still talking.
+    fn warm(&self, request: &SpeakRequest);
+
     /// Speaks and returns when the last sound has played, the request failed,
     /// or `stop_speaking` was called. Blocking.
     fn speak(&self, request: &SpeakRequest) -> AppResult<SpeakReport>;
