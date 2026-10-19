@@ -198,6 +198,78 @@ pub fn latest_with_text(db: &Database) -> AppResult<Option<SessionSummary>> {
     })
 }
 
+/**
+ * SOURCE OF TRUTH KEYWORDS: set_grammar_edits, EditState, unsettled_edits,
+ *   set_learned_settled, learned_settled
+ * WHAT:  Stores the fixes a dictation received, and reads back the sessions
+ *        whose fixes have not yet been counted as kept or undone.
+ * WHY:   Kept apart from `finalize_session` so the many callers of that (and its
+ *        tests) do not each have to say "no edits". The JSON is opaque here: what
+ *        an edit means, and when it is settled, is session/learning.rs's business.
+ * WHERE: Written by session/delivery.rs; read by session/learning.rs.
+ */
+pub fn set_grammar_edits(db: &Database, id: &SessionId, edits_json: Option<&str>) -> AppResult<()> {
+    db.with_connection(|conn| {
+        conn.execute(
+            "UPDATE sessions SET grammar_edits = ?2, learned_settled = 0 WHERE id = ?1",
+            params![id.as_str(), edits_json],
+        )?;
+        Ok(())
+    })
+}
+
+/// What the learning step needs to judge one session's fixes.
+#[derive(Debug, Clone)]
+pub struct EditState {
+    pub id: SessionId,
+    pub edits_json: String,
+    /// 0 not counted, 1 counted as kept, 2 counted as undone.
+    pub settled: i64,
+    pub final_text: String,
+    pub reverted: bool,
+}
+
+fn row_to_edit_state(row: &Row<'_>) -> rusqlite::Result<EditState> {
+    Ok(EditState {
+        id: SessionId(row.get(0)?),
+        edits_json: row.get(1)?,
+        settled: row.get(2)?,
+        final_text: row.get::<_, Option<String>>(3)?.unwrap_or_default(),
+        reverted: row.get(4)?,
+    })
+}
+
+const EDIT_STATE_COLUMNS: &str =
+    "SELECT id, grammar_edits, learned_settled, final_text, reverted FROM sessions";
+
+/// Sessions with fixes that nobody has counted yet and that ended before `cutoff`.
+pub fn unsettled_edits(db: &Database, ended_before: i64, limit: i64) -> AppResult<Vec<EditState>> {
+    db.with_connection(|conn| {
+        let mut stmt = conn.prepare(&format!(
+            "{EDIT_STATE_COLUMNS} WHERE grammar_edits IS NOT NULL AND learned_settled = 0 \
+             AND ended_at IS NOT NULL AND ended_at <= ?1 ORDER BY ended_at LIMIT ?2"
+        ))?;
+        let rows = stmt.query_map(params![ended_before, limit], row_to_edit_state)?;
+        rows.collect::<Result<Vec<_>, _>>().map_err(Into::into)
+    })
+}
+
+pub fn get_edit_state(db: &Database, id: &SessionId) -> AppResult<Option<EditState>> {
+    db.with_connection(|conn| {
+        let mut stmt =
+            conn.prepare(&format!("{EDIT_STATE_COLUMNS} WHERE id = ?1 AND grammar_edits IS NOT NULL"))?;
+        let mut rows = stmt.query_map(params![id.as_str()], row_to_edit_state)?;
+        rows.next().transpose().map_err(Into::into)
+    })
+}
+
+pub fn set_learned_settled(db: &Database, id: &SessionId, settled: i64) -> AppResult<()> {
+    db.with_connection(|conn| {
+        conn.execute("UPDATE sessions SET learned_settled = ?2 WHERE id = ?1", params![id.as_str(), settled])?;
+        Ok(())
+    })
+}
+
 /// Records whether the user chose the original wording. Returns false when no
 /// such session exists, so the caller can say so instead of pretending.
 pub fn set_reverted(db: &Database, id: &SessionId, reverted: bool) -> AppResult<bool> {

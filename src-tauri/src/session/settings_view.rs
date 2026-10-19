@@ -53,6 +53,8 @@ pub struct SessionSettings {
     pub fix_grammar: bool,
     /// Run the on-device grammar model after the rules. Needs the model installed.
     pub ai_grammar: bool,
+    /// Remember fixes the user keeps, and apply the ones kept three times.
+    pub learn_corrections: bool,
     pub tone: crate::types::Tone,
     /// Show the finished text in the caption HUD for `preview_ms` before pasting.
     pub preview_before_paste: bool,
@@ -137,6 +139,7 @@ impl SessionSettings {
         // One line, for the same reachability reason as the one above.
         let fix_grammar = read_bool(stored, keys::FIX_GRAMMAR).unwrap_or(false);
         let ai_grammar = read_bool(stored, keys::AI_GRAMMAR).unwrap_or(false);
+        let learn_corrections = read_bool(stored, keys::LEARN_CORRECTIONS).unwrap_or(true);
 
         // One line each, for the same reachability reason as the ones above.
         let preview_before_paste = read_bool(stored, keys::PREVIEW_BEFORE_PASTE).unwrap_or(false);
@@ -171,6 +174,7 @@ impl SessionSettings {
             apply_corrections: read_bool(stored, keys::APPLY_CORRECTIONS).unwrap_or(false),
             fix_grammar,
             ai_grammar,
+            learn_corrections,
             tone,
             preview_before_paste,
             preview_ms: read_number(stored, keys::PREVIEW_MS)

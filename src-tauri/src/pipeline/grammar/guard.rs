@@ -34,6 +34,9 @@
 
 use std::collections::HashSet;
 
+use super::tokens::{tokenise, Tok};
+use crate::types::CorrectionEdit;
+
 /// If accepted edits touch more than this share of a sentence's words (and
 /// more than `MIN_EDIT_ALLOWANCE` words), the model rewrote instead of fixed.
 const MAX_CHANGED_SHARE: f32 = 0.35;
@@ -81,61 +84,8 @@ pub struct Merged {
     pub text: String,
     pub accepted: usize,
     pub rejected: usize,
-}
-
-/// One whitespace-separated word, split so punctuation can be kept apart from
-/// the letters that are compared.
-#[derive(Debug, Clone)]
-struct Tok {
-    lead: String,
-    core: String,
-    trail: String,
-    /// Lowercased core with curly apostrophes straightened: what is compared.
-    norm: String,
-}
-
-impl Tok {
-    fn parse(raw: &str) -> Self {
-        let chars: Vec<char> = raw.chars().collect();
-        let start = chars.iter().position(|c| c.is_alphanumeric()).unwrap_or(chars.len());
-        let end = chars.iter().rposition(|c| c.is_alphanumeric()).map_or(start, |i| i + 1);
-        let lead: String = chars[..start].iter().collect();
-        let core: String = chars[start..end].iter().collect();
-        let trail: String = chars[end..].iter().collect();
-        let norm = core.replace('\u{2019}', "'").to_lowercase();
-        Self { lead, core, trail, norm }
-    }
-
-    fn text(&self) -> String {
-        format!("{}{}{}", self.lead, self.core, self.trail)
-    }
-}
-
-/// Splits into tokens and the whitespace around them: `gaps.len() == toks.len() + 1`.
-fn tokenise(text: &str) -> (Vec<Tok>, Vec<String>) {
-    let mut toks = Vec::new();
-    let mut gaps = vec![String::new()];
-    let mut word = String::new();
-    for ch in text.chars() {
-        if ch.is_whitespace() {
-            if word.is_empty() {
-                if let Some(gap) = gaps.last_mut() {
-                    gap.push(ch);
-                }
-            } else {
-                toks.push(Tok::parse(&word));
-                word.clear();
-                gaps.push(ch.to_string());
-            }
-        } else {
-            word.push(ch);
-        }
-    }
-    if !word.is_empty() {
-        toks.push(Tok::parse(&word));
-        gaps.push(String::new());
-    }
-    (toks, gaps)
+    /// The accepted fixes in a form that can be remembered and matched later.
+    pub edits: Vec<CorrectionEdit>,
 }
 
 /// One differing stretch: original tokens `a0..a1` became candidate tokens `b0..b1`.
@@ -341,7 +291,7 @@ pub fn merge_safe_edits(
 ) -> Merged {
     let (a, gaps) = tokenise(original);
     let (b, _) = tokenise(candidate);
-    let unchanged = || Merged { text: original.to_string(), accepted: 0, rejected: 0 };
+    let unchanged = || Merged { text: original.to_string(), accepted: 0, rejected: 0, edits: Vec::new() };
     if a.is_empty() || b.is_empty() {
         return unchanged();
     }
@@ -360,7 +310,12 @@ pub fn merge_safe_edits(
     let changed: usize = accepted.iter().map(|h| (h.a1 - h.a0).max(h.b1 - h.b0)).sum();
     let allowance = MIN_EDIT_ALLOWANCE.max((a.len() as f32 * MAX_CHANGED_SHARE) as usize);
     if changed > allowance {
-        return Merged { text: original.to_string(), accepted: 0, rejected: rejected + accepted.len() };
+        return Merged {
+            text: original.to_string(),
+            accepted: 0,
+            rejected: rejected + accepted.len(),
+            edits: Vec::new(),
+        };
     }
 
     // The standalone pronoun "i" is the one case-only change worth taking.
@@ -421,7 +376,66 @@ pub fn merge_safe_edits(
         out = out.trim_start().to_string();
     }
 
-    Merged { text: out, accepted: accepted.len(), rejected }
+    let edits = accepted.iter().filter_map(|hunk| learnable_edit(&a, &b, *hunk)).collect();
+    Merged { text: out, accepted: accepted.len(), rejected, edits }
+}
+
+/**
+ * WHAT:  An accepted hunk as a phrase pair that can be remembered ("he go" ->
+ *        "he goes"), or None when it is too thin to be safe to repeat.
+ * WHY:   A bare "go" -> "goes" learned and replayed would rewrite every "go" the
+ *        person ever says, so a fix needs a neighbouring word to be a fix. A
+ *        neighbour only counts if no punctuation sits between it and the change:
+ *        "yes, go" and "he go" are different contexts. An insertion needs BOTH
+ *        neighbours ("is best" -> "is the best"), because one side alone would
+ *        match everywhere. A single-word fix is allowed only when the word is
+ *        long enough and specific ("dont" -> "don't").
+ * WHERE: merge_safe_edits.
+ */
+fn learnable_edit(a: &[Tok], b: &[Tok], hunk: Hunk) -> Option<CorrectionEdit> {
+    let removed = &a[hunk.a0..hunk.a1];
+    let added = &b[hunk.b0..hunk.b1];
+    // Words inside the change must run together; only the last may carry punctuation.
+    let joined = |toks: &[Tok]| toks.iter().rev().skip(1).all(|t| t.trail.is_empty());
+    if !joined(removed) || !joined(added) {
+        return None;
+    }
+    let left = hunk
+        .a0
+        .checked_sub(1)
+        .filter(|&i| a[i].trail.is_empty())
+        .map(|i| a[i].norm.clone());
+    let right = a.get(hunk.a1).filter(|_| removed.last().is_none_or(|t| t.trail.is_empty())).map(|t| t.norm.clone());
+
+    fn words(toks: &[Tok]) -> impl Iterator<Item = String> + '_ {
+        toks.iter().map(|t| t.norm.clone())
+    }
+    let (before, after): (Vec<String>, Vec<String>) = if removed.is_empty() {
+        let (l, r) = (left?, right?);
+        (vec![l.clone(), r.clone()], std::iter::once(l).chain(words(added)).chain(std::iter::once(r)).collect())
+    } else if let Some(l) = left {
+        (
+            std::iter::once(l.clone()).chain(words(removed)).collect(),
+            std::iter::once(l).chain(words(added)).collect(),
+        )
+    } else if added.is_empty() {
+        let r = right?;
+        (words(removed).chain(std::iter::once(r.clone())).collect(), vec![r])
+    } else {
+        (words(removed).collect(), words(added).collect())
+    };
+
+    let single_word_ok = before.len() == 1
+        && before[0].chars().count() >= 4
+        && !is_function_word(&before[0])
+        && after.len() == 1;
+    if (before.len() < 2 && !single_word_ok) || before.len() > 5 || after.len() > 6 || before == after {
+        return None;
+    }
+    if before.iter().chain(after.iter()).any(|w| w.chars().any(|c| c.is_ascii_digit()) || w.is_empty()) {
+        return None;
+    }
+    Some(CorrectionEdit { pattern: before.join(" "), replacement: after.join(" "), auto: false })
 }
 
 /// The aligned (original, candidate) index pairs, for case-only adjustments.
@@ -607,6 +621,31 @@ mod tests {
         assert_eq!(merge("All good here.", "All good here."), "All good here.");
         assert_eq!(merge("All good here.", ""), "All good here.");
         assert_eq!(merge("", "Something."), "");
+    }
+
+    #[test]
+    fn accepted_fixes_are_reported_as_phrases_with_a_neighbour() {
+        let edits = |o: &str, c: &str| merge_safe_edits(o, c, &HashSet::new(), false).edits;
+        let one = edits("He go home.", "He goes home.");
+        assert_eq!((one[0].pattern.as_str(), one[0].replacement.as_str()), ("he go", "he goes"));
+
+        // An insertion is remembered with both neighbours.
+        let inserted = edits("She is best player.", "She is the best player.");
+        assert_eq!(inserted[0].pattern, "is best");
+        assert_eq!(inserted[0].replacement, "is the best");
+
+        // A long, specific single word needs no neighbour.
+        let single = edits("Dont go.", "Don't go.");
+        assert_eq!((single[0].pattern.as_str(), single[0].replacement.as_str()), ("dont", "don't"));
+    }
+
+    #[test]
+    fn a_fix_with_no_safe_context_is_not_remembered() {
+        let edits = |o: &str, c: &str| merge_safe_edits(o, c, &HashSet::new(), false).edits;
+        // A two-letter word at the start of a sentence has no neighbour to anchor it.
+        assert!(edits("Go home now.", "Goes home now.").is_empty());
+        // A comma between the neighbour and the change makes it a different context.
+        assert!(edits("Yes, go home.", "Yes, goes home.").is_empty());
     }
 
     #[test]

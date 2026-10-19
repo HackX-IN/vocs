@@ -15,6 +15,7 @@ pub mod dictionary;
 pub mod engine;
 pub mod files;
 pub mod history;
+pub mod learned;
 pub mod mic_test;
 pub mod models;
 pub mod profiles;

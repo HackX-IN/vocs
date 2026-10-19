@@ -36,7 +36,9 @@ and no audio ever leaves your machine.
 - **Smart grammar, on your Mac.** Turn on an optional on-device model (a ~120 MB
   download, then offline) for the agreement and tense slips rules cannot see.
   It never rewrites you: only safe word-level fixes are kept, and names,
-  numbers, code and your dictionary are off limits.
+  numbers, code and your dictionary are off limits. It also learns: a fix you
+  keep three times and never undo starts applying itself, and you can see,
+  switch off or delete everything it has learned.
 - **A context line for the model** — jargon, product names, the topic — that it
   listens for ahead of your dictionary.
 - **A live microphone meter** in Settings → Recording, on the device dictation

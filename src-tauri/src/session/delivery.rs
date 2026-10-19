@@ -161,6 +161,7 @@ async fn deliver(ctx: &SessionContext, pending: PendingDelivery) {
 
     let context = enhance_context(&settings, language.clone(), dictionary);
 
+    let grammar_edits;
     let final_text = {
         let _timer = latency.stage_timer(LatencyStage::Enhance);
         let ruled = ctx
@@ -177,7 +178,10 @@ async fn deliver(ctx: &SessionContext, pending: PendingDelivery) {
         // The optional on-device model runs AFTER the rules, on their output,
         // and inside the same stage timer: its cost is part of "enhance", and
         // the latency view should say so rather than hide it.
-        grammar_step::correct(ctx, &settings, language.as_ref(), context.dictionary.clone(), ruled).await
+        let corrected =
+            grammar_step::correct(ctx, &settings, language.as_ref(), context.dictionary.clone(), ruled).await;
+        grammar_edits = corrected.edits;
+        corrected.text
     };
 
     /*
@@ -200,6 +204,7 @@ async fn deliver(ctx: &SessionContext, pending: PendingDelivery) {
             started_at,
             Some((raw, final_text, language)),
         );
+        super::learning::record_session_edits(&ctx.db, &session_id, &grammar_edits);
         return;
     }
 
@@ -256,6 +261,7 @@ async fn deliver(ctx: &SessionContext, pending: PendingDelivery) {
         started_at,
         Some((raw, final_text, language)),
     );
+    super::learning::record_session_edits(&ctx.db, &session_id, &grammar_edits);
 }
 
 /**

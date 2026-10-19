@@ -34,7 +34,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use crate::ports::grammar::GrammarModel;
-use crate::types::{DictionaryEntry, LanguageCode};
+use crate::types::{CorrectionEdit, DictionaryEntry, LanguageCode};
 
 use super::cache::RewriteCache;
 use super::guard::merge_safe_edits;
@@ -62,6 +62,8 @@ pub struct PassOutcome {
     pub model_calls: usize,
     pub cache_hits: usize,
     pub left_alone: usize,
+    /// The model's accepted fixes, as phrases that can be remembered.
+    pub edits: Vec<CorrectionEdit>,
 }
 
 /**
@@ -91,7 +93,7 @@ pub struct GrammarPass {
 }
 
 /// Words the person's dictionary owns, which the guard must never alter.
-fn protected_terms(dictionary: &[DictionaryEntry]) -> HashSet<String> {
+pub fn protected_terms(dictionary: &[DictionaryEntry]) -> HashSet<String> {
     dictionary
         .iter()
         .filter(|entry| entry.enabled)
@@ -157,6 +159,7 @@ impl GrammarPass {
             model_calls: 0,
             cache_hits: 0,
             left_alone: 0,
+            edits: Vec::new(),
         };
 
         let mut cursor = 0;
@@ -191,6 +194,7 @@ impl GrammarPass {
                     let merged = merge_safe_edits(sentence, &rewrite, &protected, formal);
                     outcome.edits_kept += merged.accepted;
                     outcome.edits_refused += merged.rejected;
+                    outcome.edits.extend(merged.edits);
                     outcome.text.push_str(&merged.text);
                 }
                 None => {

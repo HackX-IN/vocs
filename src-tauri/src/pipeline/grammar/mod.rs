@@ -13,7 +13,9 @@
 
 pub mod cache;
 pub mod guard;
+pub mod learned;
 pub mod pass;
 pub mod sentences;
+pub mod tokens;
 
-pub use pass::{GrammarPass, PassOptions, PassOutcome, GRAMMAR_BUDGET};
+pub use pass::{protected_terms, GrammarPass, PassOptions, PassOutcome, GRAMMAR_BUDGET};

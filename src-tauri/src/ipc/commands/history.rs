@@ -110,6 +110,8 @@ pub async fn set_history_reverted(
 ) -> Result<(), AppError> {
     execute(&state, SET_REVERTED, input, |ctx, input| async move {
         if sessions::set_reverted(ctx.db(), &input.id, input.reverted)? {
+            // The clearest "no" a person can give a fix, counted at once.
+            crate::session::learning::on_reverted(ctx.db(), &input.id, input.reverted);
             Ok(())
         } else {
             Err(AppError::new(ErrorCode::SessionNotFound, "That transcript no longer exists."))

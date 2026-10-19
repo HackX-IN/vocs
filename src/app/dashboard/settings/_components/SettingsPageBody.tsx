@@ -43,6 +43,7 @@ import { BackupPanel } from "./BackupPanel";
 import { ClearHistoryControl } from "./ClearHistoryControl";
 import { DictionaryManager } from "./DictionaryManager";
 import { DiagnosticsPanel } from "./DiagnosticsPanel";
+import { LearnedCorrections } from "./LearnedCorrections";
 import { MicTestPanel } from "./MicTestPanel";
 import { ModelManager } from "./ModelManager";
 import { PermissionNotice } from "./PermissionNotice";
@@ -152,7 +153,10 @@ export function SettingsPageBody({ page, defs, allDefs, context, dataVersion, on
     }
     if (page.id === "transcription") cards.push({ title: "Models", body: <ModelManager kind="SPEECH" /> });
     if (page.id === "output") cards.push({ title: "Grammar model", body: <ModelManager kind="GRAMMAR" /> });
-    if (page.id === "vocabulary") cards.push({ title: "Dictionary", body: <DictionaryManager key={dataVersion} /> });
+    if (page.id === "vocabulary") {
+      cards.push({ title: "Dictionary", body: <DictionaryManager key={dataVersion} /> });
+      cards.push({ title: "Learned corrections", body: <LearnedCorrections key={dataVersion} /> });
+    }
     if (page.id === "privacy") {
       cards.push({
         title: "Your data",

@@ -14,6 +14,7 @@ pub mod enhance_context;
 pub mod captions;
 pub mod grammar_runtime;
 pub mod grammar_step;
+pub mod learning;
 pub mod machine;
 pub mod preview;
 pub mod prompt;

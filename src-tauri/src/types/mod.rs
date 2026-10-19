@@ -16,11 +16,13 @@ pub mod dictionary;
 pub mod diff;
 pub mod engine;
 pub mod language;
+pub mod learned;
 pub mod metrics;
 pub mod numeric;
 pub mod profile;
 pub mod session;
 pub mod settings;
+pub mod speech;
 pub mod transcript;
 
 pub use audio::{
@@ -30,8 +32,12 @@ pub use audio::{
 pub use caption::Caption;
 pub use backup::{BackupDictionaryEntry, BackupFile, ImportSummary, BACKUP_FORMAT, BACKUP_VERSION};
 pub use diff::{DiffKind, DiffSegment};
+pub use learned::{CorrectionEdit, LearnedCorrection, LearnedId, AUTO_APPLY_AFTER};
 pub use dictionary::{DictionaryEntry, DictionaryId, MatchKind};
 pub use profile::AppProfile;
+pub use speech::{
+    AudioOutputDevice, PersonalVoiceStatus, SpeakReport, SpeakRequest, SpeakStatus, VoiceInfo,
+};
 pub use language::{language_label, language_options, LanguageOption, AUTO_LANGUAGE};
 pub use engine::{
     DownloadProgress, EngineCapabilities, EngineFeature, EngineId, LanguageSupport,

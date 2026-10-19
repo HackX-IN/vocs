@@ -89,6 +89,10 @@ export const commands = {
 	createDictionaryEntry: (input: CreateDictionaryEntryInput) => typedError<DictionaryId, AppError>(__TAURI_INVOKE("create_dictionary_entry", { input })),
 	updateDictionaryEntry: (input: UpdateDictionaryEntryInput) => typedError<null, AppError>(__TAURI_INVOKE("update_dictionary_entry", { input })),
 	deleteDictionaryEntry: (input: DeleteDictionaryEntryInput) => typedError<null, AppError>(__TAURI_INVOKE("delete_dictionary_entry", { input })),
+	listLearned: () => typedError<LearnedCorrection[], AppError>(__TAURI_INVOKE("list_learned")),
+	setLearnedAuto: (input: SetLearnedAutoInput) => typedError<null, AppError>(__TAURI_INVOKE("set_learned_auto", { input })),
+	deleteLearned: (input: LearnedIdInput) => typedError<null, AppError>(__TAURI_INVOKE("delete_learned", { input })),
+	clearLearned: () => typedError<null, AppError>(__TAURI_INVOKE("clear_learned")),
 	getEngineCapabilities: () => typedError<EngineCapabilities, AppError>(__TAURI_INVOKE("get_engine_capabilities")),
 	listLanguages: () => typedError<LanguageOption[], AppError>(__TAURI_INVOKE("list_languages")),
 	copyText: (input: CopyTextInput) => typedError<null, AppError>(__TAURI_INVOKE("copy_text", { input })),
@@ -645,6 +649,26 @@ export type LatencySummary = {
 	sample_count: number,
 };
 
+export type LearnedCorrection = {
+	id: LearnedId,
+	/**  Lowercased words as they were said, with one word of context. */
+	pattern: string,
+	replacement: string,
+	accepted: number,
+	rejected: number,
+	/**  Applied without asking the model. */
+	auto_apply: boolean,
+	/**  The user set `auto_apply` themselves; the tallies leave it alone. */
+	manual: boolean,
+	updated_at: number,
+};
+
+export type LearnedId = number;
+
+export type LearnedIdInput = {
+	id: LearnedId,
+};
+
 export type ListHistoryInput = {
 	filter?: HistoryFilter,
 	limit: number,
@@ -1053,6 +1077,11 @@ export type SessionSummary = {
 	title: string | null,
 	/**  When the user last edited the text by hand, if they ever did. */
 	edited_at_ms: number | null,
+};
+
+export type SetLearnedAutoInput = {
+	id: LearnedId,
+	auto_apply: boolean,
 };
 
 export type SetRevertedInput = {

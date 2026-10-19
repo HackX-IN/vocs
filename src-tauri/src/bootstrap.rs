@@ -238,6 +238,8 @@ pub fn setup(app: &AppHandle) -> AppResult<()> {
 
     let actor = SessionActor::new(state.session_context(), worker, decode_rx, settings.clone());
     tauri::async_runtime::spawn(actor.run(event_rx));
+    // Judges settled dictations to learn which fixes the user keeps.
+    tauri::async_runtime::spawn(crate::session::learning::run_learning_housekeeping(db.clone()));
     // The optional grammar model: registered if it is on disk, freed when idle.
     tauri::async_runtime::spawn(crate::session::grammar_runtime::run_grammar_housekeeping(
         Arc::clone(&state.grammar),

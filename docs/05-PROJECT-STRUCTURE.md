@@ -84,6 +84,7 @@ vocs/
         │   ├── settings_view.rs     #   typed per-session settings snapshot
         │   ├── grammar_step.rs      #   when the grammar model runs: warm, prefetch, correct
         │   ├── grammar_runtime.rs   #   register the verified model at launch; free it when idle
+        │   ├── learning.rs          #   learn from kept / undone fixes (F4); settle + promote
         │   └── prompt.rs            #   context line + dictionary → recognition prompt
         │
         ├── pipeline/
@@ -93,7 +94,7 @@ vocs/
         │   ├── assembler.rs         # join segments, de-duplicate seams
         │   ├── mic_monitor.rs       # Settings microphone check: levels + watchdog
         │   ├── diff.rs              # said-vs-fixed word diff for History
-        │   └── grammar/             # on-device grammar: sentences · guard · cache · pass
+        │   └── grammar/             # on-device grammar: sentences · tokens · guard · cache · pass · learned
         │                            #   guard.rs keeps only SAFE word edits from the model
         │
         ├── ports/                   # ★ traits only — zero implementation
@@ -113,7 +114,7 @@ vocs/
         │   └── http_models/         #   catalog, download, store, disk (free space)
         │
         ├── services/                # ★ pure SQLite. one verb, one table.
-        │   └── sessions · settings · dictionary · metrics · stats · profiles
+        │   └── sessions · settings · dictionary · learned · metrics · stats · profiles
         │
         ├── db/                      # connection (WAL, pragmas) + migrations/
         ├── types/                   # ★ every shared type. specta-derived.

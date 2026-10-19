@@ -542,6 +542,13 @@ fn build_capabilities() -> Vec<Capability> {
                     false,
                 ),
                 toggle(
+                    keys::LEARN_CORRECTIONS,
+                    "Learn from my corrections",
+                    "When Smart grammar fixes something and you leave it, Vocs remembers. After you have kept the same fix three times and never undone it, Vocs applies it itself, instantly and without the model. \u{201c}Use original\u{201d} or editing the fix away counts as a no and switches it off. Everything it learns is listed under Vocabulary, where you can turn any of it off or delete it.",
+                    SettingSection::Output,
+                    true,
+                ),
+                toggle(
                     keys::LAUNCH_AT_LOGIN,
                     "Launch at login",
                     "Start Vocs automatically when you log in.",
@@ -844,6 +851,7 @@ mod tests {
             keys::APPLY_CORRECTIONS,
             keys::FIX_GRAMMAR,
             keys::AI_GRAMMAR,
+            keys::LEARN_CORRECTIONS,
             keys::TONE,
             keys::RETENTION_DAYS,
             keys::LAUNCH_AT_LOGIN,

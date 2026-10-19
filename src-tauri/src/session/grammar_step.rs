@@ -1,9 +1,10 @@
 /*!
  * SOURCE OF TRUTH KEYWORDS: grammar_step, warm_grammar, prefetch_grammar,
  *   correct_grammar, GrammarEligibility, ai_grammar
- * WHAT:  The session's three touch points with the on-device grammar model:
- *        warm it when a recording starts, prefetch finished sentences while the
- *        person talks, and correct the finished transcript before it is pasted.
+ * WHAT:  The session's touch points with the grammar layer: warm the on-device
+ *        model when a recording starts, prefetch finished sentences while the
+ *        person talks, and correct the finished transcript before it is pasted —
+ *        first with the fixes the user has taught Vocs, then with the model.
  * WHY:   One module so "when does the model run" has one answer. All three ask
  *        the same eligibility question first — the setting is on, the style is
  *        not Literal, the language is English, the model file is installed —
@@ -22,15 +23,37 @@
  */
 
 use crate::ipc::context::SessionContext;
-use crate::pipeline::grammar::{GrammarPass, PassOptions};
+use crate::pipeline::grammar::learned::apply_learned;
+use crate::pipeline::grammar::{protected_terms, GrammarPass, PassOptions};
 use crate::session::enhance_context::enhance_context;
 use crate::session::SessionSettings;
 use crate::services;
-use crate::types::{DictionaryEntry, LanguageCode, Tone};
+use crate::types::{CorrectionEdit, DictionaryEntry, LanguageCode, Tone};
 
 /// Whether this session should use the model at all, before the language is known.
 fn wanted(ctx: &SessionContext, settings: &SessionSettings) -> bool {
     settings.ai_grammar && settings.tone != Tone::Literal && ctx.grammar.is_available()
+}
+
+/**
+ * WHAT:  Applies the fixes the user has taught Vocs, returning the text and
+ *        which fixes it applied.
+ * WHY:   Runs before the model and for the prefetch too, so the cache is keyed
+ *        by the text the model will really be asked about. English only and
+ *        never in the Literal style, for the same reasons as the model.
+ */
+fn apply_taught(
+    ctx: &SessionContext,
+    settings: &SessionSettings,
+    language: Option<&LanguageCode>,
+    dictionary: &[DictionaryEntry],
+    text: String,
+) -> (String, Vec<CorrectionEdit>) {
+    if !settings.learn_corrections || settings.tone == Tone::Literal || !reads(language) {
+        return (text, Vec::new());
+    }
+    let learned = services::learned::auto_applied(&ctx.db).unwrap_or_default();
+    apply_learned(&text, &learned, &protected_terms(dictionary))
 }
 
 /// Whether the transcript's language is one the model reads.
@@ -83,10 +106,11 @@ pub fn prefetch(
     let settings = settings.clone();
     tokio::task::spawn_blocking(move || {
         let dictionary = services::dictionary::enabled_entries(&ctx.db).unwrap_or_default();
-        let context = enhance_context(&settings, language, dictionary);
-        let Ok(text) = ctx.ports.enhancer.enhance(&partial_raw, &context) else {
+        let context = enhance_context(&settings, language.clone(), dictionary.clone());
+        let Ok(ruled) = ctx.ports.enhancer.enhance(&partial_raw, &context) else {
             return;
         };
+        let (text, _) = apply_taught(&ctx, &settings, language.as_ref(), &dictionary, ruled);
         let ran = ctx.grammar.prefetch(&text);
         if ran > 0 {
             tracing::debug!(sentences = ran, "prefetched grammar corrections while recording");
@@ -95,12 +119,26 @@ pub fn prefetch(
 }
 
 /**
- * WHAT:  `text` with the model's safe corrections applied, or `text` unchanged
- *        when the model is not wanted, not installed, or the language is not
- *        English.
+ * SOURCE OF TRUTH KEYWORDS: GrammarResult
+ * WHAT:  The corrected text and the fixes that produced it.
+ * WHY:   The fixes travel with the text so the delivery can store them on the
+ *        session: that record is what the user's keep-or-undo is later counted
+ *        against.
+ * WHERE: Returned by `correct`; consumed by session/delivery.rs.
+ */
+pub struct GrammarResult {
+    pub text: String,
+    pub edits: Vec<CorrectionEdit>,
+}
+
+/**
+ * WHAT:  `text` with the taught fixes and then the model's safe corrections
+ *        applied, or `text` unchanged when neither applies.
  * WHY:   Awaited by the delivery worker, which is one task for ALL recordings —
  *        the blocking pool keeps a slow sentence from stalling anything but
- *        this paste.
+ *        this paste. The taught fixes run first and cost microseconds; the model
+ *        then sees text they have already fixed, so it cannot "propose" the same
+ *        fix again and double-count it.
  */
 pub async fn correct(
     ctx: &SessionContext,
@@ -108,15 +146,14 @@ pub async fn correct(
     language: Option<&LanguageCode>,
     dictionary: Vec<DictionaryEntry>,
     text: String,
-) -> String {
+) -> GrammarResult {
+    let (text, mut edits) = apply_taught(ctx, settings, language, &dictionary, text);
+
     if !wanted(ctx, settings) || !reads(language) {
-        return text;
+        return GrammarResult { text, edits };
     }
     let grammar = ctx.grammar.clone();
-    let options = PassOptions {
-        formal: settings.tone == Tone::Formal,
-        ..PassOptions::default()
-    };
+    let options = PassOptions { formal: settings.tone == Tone::Formal, ..PassOptions::default() };
     let original = text.clone();
 
     let outcome = tokio::task::spawn_blocking(move || grammar.correct(&text, &dictionary, options)).await;
@@ -131,11 +168,14 @@ pub async fn correct(
                 left_alone = outcome.left_alone,
                 "grammar pass"
             );
-            outcome.text
+            if settings.learn_corrections {
+                edits.extend(outcome.edits);
+            }
+            GrammarResult { text: outcome.text, edits }
         }
         Err(err) => {
             tracing::warn!(error = %err, "the grammar pass did not finish; using the rules' text");
-            original
+            GrammarResult { text: original, edits }
         }
     }
 }

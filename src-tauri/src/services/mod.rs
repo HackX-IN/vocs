@@ -12,6 +12,7 @@
  */
 
 pub mod dictionary;
+pub mod learned;
 pub mod metrics;
 pub mod profiles;
 pub mod sessions;

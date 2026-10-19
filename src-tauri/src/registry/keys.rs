@@ -47,6 +47,7 @@ pub const SPOKEN_COMMANDS: &str = "enhance.spoken_commands";
 pub const APPLY_CORRECTIONS: &str = "enhance.apply_corrections";
 pub const FIX_GRAMMAR: &str = "enhance.fix_grammar";
 pub const AI_GRAMMAR: &str = "enhance.ai_grammar";
+pub const LEARN_CORRECTIONS: &str = "enhance.learn_corrections";
 pub const TONE: &str = "enhance.tone";
 
 // ── Privacy ──────────────────────────────────────────────────────────────
