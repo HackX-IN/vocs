@@ -24,7 +24,7 @@ and no audio ever leaves your machine.
   delivered, and **Use original** takes your wording instead. **Copy Last
   Transcript** in the menu bar, or an optional global shortcut (off until you
   turn it on), is the way back from a paste that went nowhere.
-- **Writing style** — natural, casual, formal or literal — globally or per app, so chat stays casual and a terminal stays exact.
+- **Writing style** — natural, casual, formal or literal, set once for everywhere.
 - **Preview before pasting** and **live captions** (both off by default): see the finished text for a moment before it lands, or watch what Vocs hears rise out of the recording pill as you speak.
 - **Filler removal that does not eat real words**, at three strengths. "I like
   pizza" is never touched; "it was, like, fine" loses the "like".
@@ -43,9 +43,8 @@ and no audio ever leaves your machine.
   listens for ahead of your dictionary.
 - **A live microphone meter** in Settings → Recording, on the device dictation
   will actually use.
-- **Back up and restore** your dictionary and per-app profiles as one JSON file,
+- **Back up and restore** your dictionary as one JSON file,
   to move them between Macs. Importing adds; it never deletes.
-- **Turn Vocs off in chosen apps**, such as a password manager.
 - **Crash-safe**: the transcript is saved as it grows, so a crash keeps what you
   had said.
 - **Honest stats**, including the p50/p95 latency the app actually achieves, per

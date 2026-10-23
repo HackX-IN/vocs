@@ -6,9 +6,10 @@ versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Added
+- **Quiet the speakers while dictating** (Settings → Recording, on): in a meeting, the other people coming out of your Mac's speakers were being picked up by the microphone and typed out with your words. Vocs now mutes the built-in speakers for the length of a recording and restores them the moment you stop, even after a crash. Headphones, AirPods and external speakers are left alone.
 - **A new look.** A warm paper light theme and an ember dark theme, the Doto dot-matrix face for titles and figures, numbered instrument cards and dot-matrix charts. New app icon (a head whispering quotes) and matching menu-bar glyph.
 - **Dictations**, the new home of the app: your history as a notebook grouped by day, with a summary strip and a floating search bar. Open a dictation to edit it like a notepad — a title you can change, text that saves itself, **⌘F** to find (⌘G for the next match) and **⌘S** to save now — while the **Said → fixed** comparison floats over the foot of the page. Filter the list by period (today, 7 or 30 days) and by status (edited, failed); searches and filters page as you scroll.
-- **Writing style** (Settings → Output, and per app): Natural, Casual (contractions stay, a one-line message ends without a full stop), Formal (contractions written out, "gonna" becomes "going to") and Literal (exactly what was heard, for terminals and code editors). Vocs suggests a style when you add an app such as Slack, Mail or Terminal.
+- **Writing style** (Settings → Writing): Natural, Casual (contractions stay, a one-line message ends without a full stop), Formal (contractions written out, "gonna" becomes "going to") and Literal (exactly what was heard, for terminals and code editors).
 - **Preview before pasting** (Settings → Output, off by default): the finished text is shown for a moment and Escape keeps it out of the document. It is still saved in Dictations.
 - **Live captions** (Settings → Recording, off by default): a small window shows what Vocs hears, and what it will write, while you speak.
 - **A real menu bar** while Vocs is in front: Settings (⌘,), start or stop a dictation, copy the last one, jump to Dictations, Stats, Settings and Support (⌘1–4), Check for Updates, and a Help menu with the documentation, issue reporting and the logs folder. Edit gives the editor undo, redo, cut, copy, paste and select all.
@@ -32,6 +33,10 @@ versions follow [Semantic Versioning](https://semver.org/).
 - **Diagnostics export**: an opt-in report with home-directory paths and free-text settings redacted. Nothing is sent anywhere.
 
 ### Changed
+- **Settings is organised by what you are doing.** Writing (punctuation, fillers, tone) and Grammar & AI (quick rule-based fixes, then the on-device model with its download and learned corrections) are now pages of their own, and Output covers only where the text goes. Per-app profiles are held back from this first release.
+- **Faster finish when the language is left on Auto.** The final decode no longer runs language detection at the full 30-second encoder size: about 650 ms instead of 1.9 s in the project's tail-decode benchmark, with a pinned language unchanged.
+- **Delete asks with a Cancel.** Deleting history or a dictation now shows Cancel and a red confirm side by side, and Escape backs out.
+- Button labels no longer end in an ellipsis.
 - The window title is larger. The Support page's Buy Me a Coffee link goes to the project's page.
 - **The recording pill is a horizontal capsule**: the mark beside three audio bars, with no timer. Live captions are gradient text that rises out of it instead of a box.
 - **A window bar** puts the title (centred) and the toolbar buttons on the same line as the traffic lights, with a proper safe area. The side rail is a rounded pill with more room.
