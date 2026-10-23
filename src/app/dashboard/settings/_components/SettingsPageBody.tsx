@@ -49,6 +49,7 @@ import { LearnedCorrections } from "./LearnedCorrections";
 import { MicTestPanel } from "./MicTestPanel";
 import { ModelManager } from "./ModelManager";
 import { PermissionNotice } from "./PermissionNotice";
+import { UpdatesPanel } from "./UpdatesPanel";
 
 /** Everything a row needs to render and write — shared by every page. */
 export interface SettingsContext {
@@ -150,7 +151,10 @@ function panelsFor(section: SettingSection, dataVersion: number, onDataImported:
         },
       ];
     case "GENERAL":
-      return [{ title: "Backup", body: <BackupPanel onImported={onDataImported} /> }];
+      return [
+        { title: "Updates", body: <UpdatesPanel /> },
+        { title: "Backup", body: <BackupPanel onImported={onDataImported} /> },
+      ];
     default:
       return [];
   }

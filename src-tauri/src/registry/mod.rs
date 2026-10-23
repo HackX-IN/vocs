@@ -574,7 +574,7 @@ fn build_capabilities() -> Vec<Capability> {
                 toggle(
                     keys::CHECK_UPDATES,
                     "Check for updates",
-                    "Check for a new version on launch and once a day. This is the only network request Vocs makes after setup.",
+                    "Check for a new version on launch and once a day. Apart from downloading models, this is the only network request Vocs makes.",
                     SettingSection::General,
                     true,
                 ),

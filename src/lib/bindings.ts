@@ -137,6 +137,7 @@ export const events = {
 	settingsChanged: makeEvent<SettingsChanged>("settings-changed"),
 	transcriptDelivered: makeEvent<TranscriptDelivered>("transcript-delivered"),
 	updateAvailable: makeEvent<UpdateAvailable>("update-available"),
+	updateProgress: makeEvent<UpdateProgress>("update-progress"),
 };
 
 /* Types */
@@ -1326,6 +1327,28 @@ export type UpdateHistoryInput = {
 	/**  None or blank clears the title. */
 	title: string | null,
 	text: string,
+};
+
+/**
+ * 
+ *  * SOURCE OF TRUTH KEYWORDS: UpdateProgress, update_download, install_update_progress
+ *  * WHAT:  How much of a newer build has been downloaded so far.
+ *  * WHY:   `install_update` is one long call: download, verify, replace, restart. Without
+ *  *        this the Updates card could only show a spinner for a download that takes as long as
+ *  *        the user's connection makes it, and an indeterminate spinner on a transfer of unknown
+ *  *        length reads as a hang (docs/04 §9). Pushed rather than polled, like every other
+ *  *        state here, and throttled at the source (about one event per percent) so a fast
+ *  *        connection does not flood the webview with thousands of chunk callbacks.
+ *  *
+ *  *        `total_bytes` is optional because the server may not announce a length; the UI then
+ *  *        falls back to the bytes received instead of inventing a percentage.
+ *  * WHERE: Emitted by ipc/commands/updates.rs while `install_update` downloads; consumed by
+ *  *        the Settings → Updates card.
+ *  
+ */
+export type UpdateProgress = {
+	received_bytes: number,
+	total_bytes: number | null,
 };
 
 /* Tauri Specta runtime */

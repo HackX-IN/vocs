@@ -114,6 +114,7 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             events::OnboardingProgress,
             events::SettingsChanged,
             events::UpdateAvailable,
+            events::UpdateProgress,
         ])
 }
 

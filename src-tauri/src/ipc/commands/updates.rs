@@ -27,10 +27,12 @@
 
 use tauri::State;
 use tauri_plugin_updater::UpdaterExt;
+use tauri_specta::Event;
 
 use crate::db::Database;
 use crate::error::{AppError, ErrorCode};
 use crate::ipc::context::AppState;
+use crate::ipc::events::UpdateProgress;
 use crate::ipc::factory::{execute, CommandSpec};
 use crate::registry::{self, keys, CapabilityKey};
 use crate::services::settings;
@@ -94,6 +96,27 @@ fn updater_error(err: tauri_plugin_updater::Error) -> AppError {
     )
     .recoverable()
     .with_detail(err)
+}
+
+/// Without a known length, report every this many bytes.
+const PROGRESS_UNKNOWN_STEP: u64 = 256 * 1024;
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: progress_step
+ * WHAT:  Whether a download chunk crossed a reporting threshold, and the threshold it crossed.
+ * WHY:   The updater calls back per network chunk, which can be thousands of times for one
+ *        bundle. One event per percent is more than a progress bar can show and a small
+ *        fraction of the chunks; with no announced length, per 256 KiB stands in for it. Pure,
+ *        so the throttle can be tested without a download.
+ * WHERE: The download callback in install_update.
+ */
+fn progress_step(received: u64, announced: Option<u64>, total: Option<u64>) -> Option<u64> {
+    let step = match total {
+        Some(total) if total > 0 => received.saturating_mul(100) / total,
+        _ => received / PROGRESS_UNKNOWN_STEP,
+    };
+    // The first chunk always reports, so the bar leaves zero promptly.
+    announced.is_none_or(|last| step > last).then_some(step)
 }
 
 const CHECK: CommandSpec = CommandSpec::new("check_for_update", CapabilityKey::Updates);
@@ -186,8 +209,26 @@ pub async fn install_update(state: State<'_, AppState>) -> Result<(), AppError> 
         };
 
         let version = update.version.clone();
+        let app = ctx.state.app.clone();
+        let mut received: u64 = 0;
+        let mut announced: Option<u64> = None;
         update
-            .download_and_install(|_chunk, _total| {}, || {})
+            .download_and_install(
+                |chunk, total| {
+                    received += chunk as u64;
+                    if let Some(step) = progress_step(received, announced, total) {
+                        announced = Some(step);
+                        let event = UpdateProgress {
+                            received_bytes: received,
+                            total_bytes: total,
+                        };
+                        if let Err(err) = event.emit(&app) {
+                            tracing::debug!(error = %err, "could not report update progress");
+                        }
+                    }
+                },
+                || {},
+            )
             .await
             .map_err(updater_error)?;
 
@@ -244,5 +285,30 @@ mod tests {
         assert_eq!(disabled.get("kind").and_then(|k| k.as_str()), Some("DISABLED"));
         assert_eq!(current.get("kind").and_then(|k| k.as_str()), Some("UP_TO_DATE"));
         assert_ne!(disabled.get("kind"), current.get("kind"));
+    }
+
+    /**
+     * WHAT:  The progress throttle reports the first chunk, then once per step, and never goes
+     *        backwards or repeats.
+     * WHY:   One callback arrives per network chunk; an event for each would flood the webview.
+     *        Reporting the first chunk matters as much as the throttle, because a bar that sits
+     *        at zero until the first percent looks like a hang.
+     * WHERE: The download callback in install_update.
+     */
+    #[test]
+    fn progress_is_reported_once_per_step_and_never_repeated() {
+        let total = Some(1_000);
+        // First chunk reports even though it is under one percent.
+        assert_eq!(progress_step(5, None, total), Some(0));
+        // Still inside the percent already announced: silence.
+        assert_eq!(progress_step(9, Some(0), total), None);
+        // Crossing into the next percent reports it.
+        assert_eq!(progress_step(10, Some(0), total), Some(1));
+        assert_eq!(progress_step(10, Some(1), total), None);
+        // An unknown length falls back to fixed byte steps.
+        assert_eq!(progress_step(1, None, None), Some(0));
+        assert_eq!(progress_step(PROGRESS_UNKNOWN_STEP, Some(0), None), Some(1));
+        // A zero length must not divide by zero.
+        assert_eq!(progress_step(10, Some(0), Some(0)), None);
     }
 }
