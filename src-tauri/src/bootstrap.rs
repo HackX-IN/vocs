@@ -25,7 +25,7 @@ use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut,
 
 use crate::adapters;
 use crate::adapters::cpal::CpalAudioSource;
-use crate::adapters::macos::{MacosInjector, MacosPermissions};
+use crate::adapters::macos::{MacosInjector, MacosPermissions, MacosSpeakerDucker};
 use crate::adapters::rules::RuleEnhancer;
 use crate::config::AppPaths;
 use crate::db::Database;
@@ -306,6 +306,12 @@ fn build_ports(app: &AppHandle, paths: &AppPaths) -> AppResult<Ports> {
         paths.model_file(model_id.as_str()),
     )?;
 
+    // A previous run that died while the speakers were muted left a marker
+    // behind; undo it before anything can record.
+    let speaker_ducker: Arc<dyn crate::ports::SpeakerDucker> =
+        Arc::new(MacosSpeakerDucker::new(paths.data_dir.join("speaker-duck.json")));
+    speaker_ducker.recover();
+
     Ok(Ports {
         engine,
         audio: Arc::new(CpalAudioSource::new()),
@@ -314,6 +320,7 @@ fn build_ports(app: &AppHandle, paths: &AppPaths) -> AppResult<Ports> {
         injector: Arc::new(MacosInjector::new(MacosPermissions::new())),
         models,
         permissions: Arc::new(MacosPermissions::new()),
+        speakers: speaker_ducker,
         events,
     })
 }

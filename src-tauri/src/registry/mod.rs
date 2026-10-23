@@ -315,6 +315,13 @@ fn build_capabilities() -> Vec<Capability> {
                     true,
                 ),
                 toggle(
+                    keys::QUIET_SPEAKERS,
+                    "Quiet the speakers while dictating",
+                    "Mutes your Mac's built-in speakers while you record, so other people's voices in a meeting are not picked up by the microphone and typed out with yours. They come back the moment you stop. Does nothing with headphones, AirPods or an external speaker.",
+                    SettingSection::Recording,
+                    true,
+                ),
+                toggle(
                     keys::LIVE_CAPTIONS,
                     "Live captions",
                     "Show what Vocs hears, and what it will write, in a small window as you speak. It transcribes a little extra while you talk, so stopping can take a moment longer on a slow Mac.",

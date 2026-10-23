@@ -64,6 +64,8 @@ pub struct SessionSettings {
     pub normalise_punctuation: bool,
     pub capitalise_sentences: bool,
     pub audio_feedback: bool,
+    /// Mute the built-in speakers for the length of a recording.
+    pub quiet_speakers: bool,
     /// The user's own recognition bias, ahead of the dictionary terms. None
     /// when blank, so the actor never builds a prompt out of whitespace.
     pub context_prompt: Option<String>,
@@ -184,6 +186,7 @@ impl SessionSettings {
             normalise_punctuation: read_bool(stored, keys::NORMALISE_PUNCTUATION).unwrap_or(true),
             capitalise_sentences: read_bool(stored, keys::CAPITALISE_SENTENCES).unwrap_or(true),
             audio_feedback: read_bool(stored, keys::AUDIO_FEEDBACK).unwrap_or(true),
+            quiet_speakers: read_bool(stored, keys::QUIET_SPEAKERS).unwrap_or(true),
             context_prompt: read_choice(stored, keys::CONTEXT_PROMPT)
                 .map(|text| text.trim().to_string())
                 .filter(|text| !text.is_empty()),

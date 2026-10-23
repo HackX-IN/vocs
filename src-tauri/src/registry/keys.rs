@@ -20,6 +20,7 @@ pub const CANCEL_COUNTDOWN_MS: &str = "dictation.cancel_countdown_ms";
 pub const DISCARD_ON_ESCAPE: &str = "dictation.discard_on_escape";
 pub const INPUT_DEVICE: &str = "dictation.input_device";
 pub const AUDIO_FEEDBACK: &str = "dictation.audio_feedback";
+pub const QUIET_SPEAKERS: &str = "dictation.quiet_speakers";
 pub const LIVE_CAPTIONS: &str = "dictation.live_captions";
 
 // ── Transcription ────────────────────────────────────────────────────────

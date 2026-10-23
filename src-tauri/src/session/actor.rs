@@ -80,6 +80,9 @@ pub struct SessionActor {
     /// Live microphone stream, present only while capturing.
     capture: Option<Box<dyn CaptureSession>>,
     capture_rx: Option<mpsc::Receiver<CaptureEvent>>,
+    /// Holds the built-in speakers quiet while recording; dropping it restores
+    /// them, so every path out of a capture gives them back.
+    speaker_guard: Option<Box<dyn crate::ports::DuckGuard>>,
     decode_rx: mpsc::Receiver<DecodeResult>,
 
     /// Wall clock for the current session.
@@ -175,6 +178,7 @@ impl SessionActor {
             latency: Arc::new(LatencyRecorder::new()),
             capture: None,
             capture_rx: None,
+            speaker_guard: None,
             decode_rx,
             started_at: None,
             cancel_deadline: None,
@@ -461,6 +465,12 @@ impl SessionActor {
             mode: self.settings.capture_mode,
         };
 
+        // Quiet BEFORE the microphone opens, so none of the meeting is captured.
+        // A mute is a few milliseconds, well inside the device-open budget.
+        if self.settings.quiet_speakers {
+            self.speaker_guard = self.ctx.ports.speakers.duck();
+        }
+
         match self.ctx.ports.audio.start(&config, tx) {
             Ok(session) => {
                 drop(timer);
@@ -471,6 +481,7 @@ impl SessionActor {
             Err(err) => {
                 drop(timer);
                 tracing::warn!(error = %err, "could not open the microphone");
+                self.speaker_guard = None;
                 let _ = self
                     .ctx
                     .session
@@ -482,6 +493,7 @@ impl SessionActor {
 
     fn stop_capture(&mut self) {
         self.capture_rx = None;
+        self.speaker_guard = None;
         if let Some(session) = self.capture.take() {
             if let Err(err) = session.stop() {
                 tracing::warn!(error = %err, "could not stop the microphone cleanly");

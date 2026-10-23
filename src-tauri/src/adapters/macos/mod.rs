@@ -1,6 +1,6 @@
 /*!
  * SOURCE OF TRUTH KEYWORDS: macos_adapter, MacosInjector, MacosPermissions,
- *   PasteTiming
+ *   PasteTiming, MacosSpeakerDucker
  * WHAT:  Everything platform-specific: TCC permissions and text injection.
  * WHY:   This is the only directory that knows macOS exists. Windows and Linux
  *        need a sibling of it and nothing else — which is what makes the
@@ -14,8 +14,10 @@ pub mod injector;
 pub mod modifier_tap;
 mod sound;
 pub mod permissions;
+mod speaker_duck;
 
 pub use injector::{MacosInjector, PasteTiming};
 pub use sound::{play_feedback, FeedbackSound};
 pub use modifier_tap::{watch_modifier_tap, ModifierTap, TAPS_REQUIRED};
 pub use permissions::MacosPermissions;
+pub use speaker_duck::MacosSpeakerDucker;

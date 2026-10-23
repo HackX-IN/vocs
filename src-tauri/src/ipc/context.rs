@@ -26,8 +26,8 @@ use crate::db::Database;
 use crate::error::{AppError, AppResult, ErrorCode};
 use crate::pipeline::{GrammarPass, MicMonitor};
 use crate::ports::{
-    AudioSource, EventSink, GrammarModel, ModelStore, PermissionProvider, TextEnhancer,
-    TextInjector, TranscriptionEngine,
+    AudioSource, EventSink, GrammarModel, ModelStore, PermissionProvider, SpeakerDucker,
+    TextEnhancer, TextInjector, TranscriptionEngine,
 };
 use crate::registry::CapabilityKey;
 use crate::session::preview::PreviewGate;
@@ -52,6 +52,9 @@ pub struct Ports {
     pub injector: Arc<dyn TextInjector>,
     pub models: Arc<dyn ModelStore>,
     pub permissions: Arc<dyn PermissionProvider>,
+    /// Quiets the built-in speakers while recording so a meeting is not heard by
+    /// the microphone. See ports/speaker.rs.
+    pub speakers: Arc<dyn SpeakerDucker>,
     /// How the domain pushes state outward. See ports/events.rs — this is what
     /// keeps `session/` free of any dependency on the UI framework.
     pub events: Arc<dyn EventSink>,

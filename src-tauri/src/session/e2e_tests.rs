@@ -310,6 +310,7 @@ fn build_with(
         injector: Arc::clone(&injector) as Arc<dyn TextInjector>,
         models: Arc::new(UnusedModelStore),
         permissions,
+        speakers: Arc::new(crate::ports::NullSpeakerDucker),
         events: Arc::clone(&events) as Arc<dyn EventSink>,
     };
 
