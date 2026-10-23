@@ -266,6 +266,24 @@ jobs:
           args: --target universal-apple-darwin --config '{"bundle":{"createUpdaterArtifacts":true}}'
 
 
+      # The website's Download button links to ONE permanent URL,
+      # releases/latest/download/Vocs-macOS.dmg, which GitHub redirects to the newest published
+      # release. The bundler names the DMG with the version in it (Vocs_1.2.3_universal.dmg), so
+      # that URL needs a copy under a name that never changes. Done here, on the draft, so every
+      # release carries it from the moment it is published. With it the download needs no API
+      # lookup, no rate limit and no JavaScript: it is a link to a file.
+      - name: Add the permanent-name copy of the DMG
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          DMG=$(find src-tauri/target -type f -name "*.dmg" -path "*/bundle/dmg/*" | head -1)
+          if [ -z "$DMG" ]; then
+            echo "::error::no DMG was produced"; exit 1
+          fi
+          cp "$DMG" "$RUNNER_TEMP/Vocs-macOS.dmg"
+          gh release upload "$TAG" "$RUNNER_TEMP/Vocs-macOS.dmg" --clobber
+
       # A bundle whose signature does not VERIFY is not a signable failure —
       # it builds, it launches, and macOS quietly refuses to trust it. That is
       # not hypothetical: every build for a day signed only the inner
