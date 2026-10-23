@@ -93,7 +93,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEJBOTgyMjc1RjE3RUVENTgKUldSWTdYN3hkU0tZdWxuS1QxWDdvUHIvQzk3dVc3Vm1hNkRvZERWcUJ2NFhxeTBJNWdxWlp2RDgK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEE0NDIwOUFEQjlFRDE0OTUKUldTVkZPMjVyUWxDcE1NV2FtT0V6SE54YUdMQUtvbURkT2NmM0RUSS94Ui9IemZacnMyRWt6V2YK",
       "endpoints": [
         "https://github.com/HackX-IN/vocs/releases/latest/download/latest.json"
       ]
