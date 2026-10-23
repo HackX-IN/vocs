@@ -3406,7 +3406,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "13a380031deed8e99db00065c45937da434ca987c034e13b87e4441f9e4090be"
 dependencies = [
  "bitflags 2.13.1",
- "block2",
  "objc2",
  "objc2-foundation",
 ]
@@ -6558,7 +6557,6 @@ dependencies = [
  "objc2",
  "objc2-app-kit",
  "objc2-av-foundation",
- "objc2-avf-audio",
  "objc2-foundation",
  "once_cell",
  "parking_lot",

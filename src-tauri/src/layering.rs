@@ -49,7 +49,7 @@ const LAYER_ORDER: &[&[&str]] = &[
     // Domain.
     &["pipeline", "services", "session"],
     // Boundary: allowed to see everything.
-    &["bootstrap", "extra_hotkeys", "ipc", "menu", "tray"],
+    &["bootstrap", "copy_last_hotkey", "ipc", "menu", "tray"],
 ];
 
 /**

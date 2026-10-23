@@ -47,8 +47,6 @@ export function SettingsView({ registry, section }: SettingsViewProps) {
   const devices = useCommand(commands.listInputDevices, []);
   const models = useCommand(commands.listModels, []);
   const languages = useCommand(commands.listLanguages, []);
-  const voices = useCommand(commands.listVoices, []);
-  const outputDevices = useCommand(commands.listOutputDevices, []);
   const engine = useCommand(commands.getEngineCapabilities, []);
   // Re-checked on window focus: the user grants this in System Settings, in
   // another app, and comes back expecting these controls to have noticed.
@@ -86,34 +84,8 @@ export function SettingsView({ registry, section }: SettingsViewProps) {
       description: language.supported ? undefined : `${engineName} cannot transcribe ${language.label}.`,
       disabled: !language.supported,
     }));
-    // "Automatic" leads both Voice pickers: it is the answer for nearly everyone,
-    // and it keeps working when a device is unplugged or a voice is removed.
-    const voiceOptions: SettingOption[] = [
-      { value: "auto", label: "Automatic", description: "A good voice for the language you spoke." },
-      ...(voices.data ?? []).map((voice) => ({
-        value: voice.id,
-        label: voice.is_personal ? `${voice.name} — your Personal Voice` : `${voice.name} (${voice.language})`,
-      })),
-    ];
-    const outputOptions: SettingOption[] = [
-      {
-        value: "auto",
-        label: "Automatic",
-        description: "A virtual device such as BlackHole if there is one, otherwise your speakers.",
-      },
-      ...(outputDevices.data ?? []).map((device) => ({
-        value: device.id,
-        label: device.is_virtual ? `${device.name} — virtual` : device.name,
-      })),
-    ];
-    return {
-      INPUT_DEVICES: deviceOptions,
-      MODELS: modelOptions,
-      LANGUAGES: languageOptions,
-      VOICES: voiceOptions,
-      OUTPUT_DEVICES: outputOptions,
-    };
-  }, [devices.data, engine.data, languages.data, models.data, voices.data, outputDevices.data]);
+    return { INPUT_DEVICES: deviceOptions, MODELS: modelOptions, LANGUAGES: languageOptions };
+  }, [devices.data, engine.data, languages.data, models.data]);
 
   const write = useCallback((key: string, value: SettingValue) => {
     // No reload here: settings-changed brings the new map back on its own.

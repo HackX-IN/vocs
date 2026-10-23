@@ -18,7 +18,7 @@
 
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use tauri::menu::{CheckMenuItem, Menu, MenuItem, PredefinedMenuItem};
+use tauri::menu::{Menu, MenuItem, PredefinedMenuItem};
 use tauri::tray::{TrayIconBuilder, TrayIconEvent};
 use tauri::{AppHandle, Manager};
 
@@ -28,30 +28,6 @@ use crate::error::{AppError, AppResult};
 const MENU_DASHBOARD: &str = "dashboard";
 const MENU_QUIT: &str = "quit";
 const MENU_COPY_LAST: &str = "copy_last";
-const MENU_SPEAK: &str = "speak";
-const MENU_SAFE_MODE: &str = "safe_mode";
-
-/**
- * SOURCE OF TRUTH KEYWORDS: TrayItems, SafeModeItem, show_safe_mode
- * WHAT:  The menu-bar items whose state changes after the menu is built.
- * WHY:   Meeting safe mode can switch on by itself, mid-meeting, so its checkmark
- *        has to follow the real state rather than only the last click. The item
- *        handle is kept in managed state because a built menu gives no way back
- *        to one of its items.
- * WHERE: Created by install_tray; updated by show_safe_mode.
- */
-struct TrayItems {
-    safe_mode: CheckMenuItem<tauri::Wry>,
-}
-
-/// Makes the menu bar's Meeting Safe Mode checkmark match the real state.
-pub fn show_safe_mode(app: &AppHandle, on: bool) {
-    if let Some(items) = app.try_state::<TrayItems>() {
-        if let Err(err) = items.safe_mode.set_checked(on) {
-            tracing::warn!(error = %err, "could not update the safe mode menu item");
-        }
-    }
-}
 
 /**
  * SOURCE OF TRUTH KEYWORDS: install_tray
@@ -64,16 +40,11 @@ pub fn install_tray(app: &AppHandle) -> AppResult<()> {
     let copy_last =
         MenuItem::with_id(app, MENU_COPY_LAST, "Copy Last Transcript", true, None::<&str>)
             .map_err(menu_error)?;
-    let speak = MenuItem::with_id(app, MENU_SPEAK, "Speak into a Meeting", true, None::<&str>)
-        .map_err(menu_error)?;
-    let safe_mode = CheckMenuItem::with_id(app, MENU_SAFE_MODE, "Meeting Safe Mode", true, false, None::<&str>)
-        .map_err(menu_error)?;
-    app.manage(TrayItems { safe_mode: safe_mode.clone() });
     let separator = PredefinedMenuItem::separator(app).map_err(menu_error)?;
     let quit = MenuItem::with_id(app, MENU_QUIT, "Quit Vocs", true, Some("Cmd+Q"))
         .map_err(menu_error)?;
 
-    let menu = Menu::with_items(app, &[&dashboard, &copy_last, &speak, &safe_mode, &separator, &quit]).map_err(menu_error)?;
+    let menu = Menu::with_items(app, &[&dashboard, &copy_last, &separator, &quit]).map_err(menu_error)?;
 
     TrayIconBuilder::with_id("vocs")
         // The identity mark (docs/04 §12), not the app icon. A menu-bar glyph
@@ -93,8 +64,6 @@ pub fn install_tray(app: &AppHandle) -> AppResult<()> {
         .on_menu_event(|app, event| match event.id().as_ref() {
             MENU_DASHBOARD => show_dashboard(app),
             MENU_COPY_LAST => copy_last_transcript(app),
-            MENU_SPEAK => crate::extra_hotkeys::start_or_stop_speaking(app),
-            MENU_SAFE_MODE => crate::extra_hotkeys::toggle_safe_mode(app),
             MENU_QUIT => app.exit(0),
             other => tracing::debug!(id = other, "unhandled tray menu item"),
         })

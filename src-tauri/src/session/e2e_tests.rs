@@ -184,7 +184,6 @@ impl EventSink for RecordingEventSink {
         _state: crate::types::ModelState,
     ) {
     }
-    fn speak_status_changed(&self, _status: crate::types::SpeakStatus) {}
 }
 
 struct AlwaysGranted;
@@ -287,13 +286,7 @@ fn build_with_permissions(
     engine: Arc<dyn crate::ports::TranscriptionEngine>,
     permissions: Arc<dyn PermissionProvider>,
 ) -> AppResult<(Harness, mpsc::Receiver<SessionEvent>)> {
-    build_with(
-        samples,
-        engine,
-        permissions,
-        crate::adapters::build_grammar_model(),
-        crate::testing::ScriptedSpeech::working(vec![]),
-    )
+    build_with(samples, engine, permissions, crate::adapters::build_grammar_model())
 }
 
 /// The full harness: every port that a test may want to replace.
@@ -302,7 +295,6 @@ fn build_with(
     engine: Arc<dyn crate::ports::TranscriptionEngine>,
     permissions: Arc<dyn PermissionProvider>,
     grammar: Arc<dyn crate::ports::GrammarModel>,
-    speech: Arc<dyn crate::ports::SpeechOutput>,
 ) -> AppResult<(Harness, mpsc::Receiver<SessionEvent>)> {
     let db = Database::open_in_memory()?;
     let injector = Arc::new(CapturingInjector::default());
@@ -315,7 +307,6 @@ fn build_with(
         }),
         enhancer: Arc::new(RuleEnhancer::new()),
         grammar,
-        speech,
         injector: Arc::clone(&injector) as Arc<dyn TextInjector>,
         models: Arc::new(UnusedModelStore),
         permissions,
@@ -569,7 +560,6 @@ mod tests {
             engine,
             Arc::new(AlwaysGranted),
             Arc::clone(&grammar),
-            crate::testing::ScriptedSpeech::working(vec![]),
         )
         .expect("harness");
         services::settings::set_setting(
@@ -976,7 +966,6 @@ mod scripted {
             ScriptedEngine::saying(SAID),
             Arc::new(AlwaysGranted),
             Arc::clone(&model) as Arc<dyn crate::ports::GrammarModel>,
-            crate::testing::ScriptedSpeech::working(vec![]),
         )
         .expect("harness");
         configure(&harness.db);
@@ -1012,71 +1001,6 @@ mod scripted {
         let (pasted, asked) = dictate_with_grammar("off", |_| {}).await.expect("speech");
         assert_eq!(pasted, RULED, "off means the rules' text, untouched");
         assert!(asked.is_empty(), "the model must not be consulted when the setting is off");
-    }
-
-    /**
-     * WHAT:  A Voice-mode session speaks its cleaned-up words and pastes nothing;
-     *        an ordinary session after it still pastes.
-     * WHY:   The three-way wiring that makes the feature safe: armed flag -> speak
-     *        session -> spoken delivery, and the flag being CONSUMED so the next
-     *        dictation is not hijacked. Asserted on what reached the speech engine
-     *        (the corrected text, the right voice settings, the voice warmed
-     *        behind the recording) and on what did NOT reach the injector.
-     */
-    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
-    async fn a_voice_mode_session_speaks_cleaned_up_words_and_pastes_nothing() {
-        let Some(samples) = speech("scripted-speak") else {
-            eprintln!("skipped: could not synthesise speech");
-            return;
-        };
-        let speech_out = crate::testing::ScriptedSpeech::working(vec![]);
-        let (harness, rx) = build_with(
-            samples,
-            ScriptedEngine::saying("um so we should ship it comma today"),
-            Arc::new(AlwaysGranted),
-            crate::adapters::build_grammar_model(),
-            Arc::clone(&speech_out) as Arc<dyn crate::ports::SpeechOutput>,
-        )
-        .expect("harness");
-        set(&harness.db, crate::registry::keys::SPEAK_ENABLED, SettingValue::Bool(true));
-        set(&harness.db, crate::registry::keys::SPEAK_RATE, SettingValue::Number(1.2));
-        harness.ctx.session.arm_speak();
-
-        run_session(&harness, rx, Duration::from_secs(3)).await;
-
-        let spoken = speech_out.requests.lock().clone();
-        assert_eq!(spoken.len(), 1, "exactly one thing is spoken");
-        assert_eq!(spoken[0].text, "So we should ship it, today.", "fillers gone, punctuation set: a voice repeats stumbles");
-        assert!((spoken[0].rate - 1.2).abs() < 0.001);
-        assert!(harness.injector.delivered.lock().is_none(), "a spoken dictation is never pasted");
-        assert!(speech_out.warmed.load(std::sync::atomic::Ordering::SeqCst) >= 1, "the voice is loaded behind the recording");
-        let deliveries = harness.events.deliveries.lock().clone();
-        assert_eq!(deliveries.last().map(|d| d.1), Some(crate::types::DeliveryKind::Spoken));
-        assert!(!harness.ctx.session.take_speak(), "the flag is consumed by the start");
-    }
-
-    /// An armed flag with Voice mode OFF must not turn a dictation into a silent one.
-    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
-    async fn the_speak_flag_does_nothing_while_voice_mode_is_off() {
-        let Some(samples) = speech("scripted-speak-off") else {
-            eprintln!("skipped: could not synthesise speech");
-            return;
-        };
-        let speech_out = crate::testing::ScriptedSpeech::working(vec![]);
-        let (harness, rx) = build_with(
-            samples,
-            ScriptedEngine::saying("hello there"),
-            Arc::new(AlwaysGranted),
-            crate::adapters::build_grammar_model(),
-            Arc::clone(&speech_out) as Arc<dyn crate::ports::SpeechOutput>,
-        )
-        .expect("harness");
-        harness.ctx.session.arm_speak();
-
-        run_session(&harness, rx, Duration::from_secs(3)).await;
-
-        assert!(speech_out.requests.lock().is_empty(), "nothing may be spoken");
-        assert!(harness.injector.delivered.lock().is_some(), "it is an ordinary, pasted dictation");
     }
 
     /// Literal is "exactly what was heard"; a model that rewrites it is a bug.

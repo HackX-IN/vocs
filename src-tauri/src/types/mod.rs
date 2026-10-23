@@ -22,7 +22,6 @@ pub mod numeric;
 pub mod profile;
 pub mod session;
 pub mod settings;
-pub mod speech;
 pub mod transcript;
 
 pub use audio::{
@@ -35,10 +34,6 @@ pub use diff::{DiffKind, DiffSegment};
 pub use learned::{CorrectionEdit, LearnedCorrection, LearnedId, AUTO_APPLY_AFTER};
 pub use dictionary::{DictionaryEntry, DictionaryId, MatchKind};
 pub use profile::AppProfile;
-pub use speech::{
-    AudioOutputDevice, PersonalVoiceStatus, SpeakReport, SpeakRequest, SpeakStatus, VoiceInfo,
-    SPEECH_CANCELLED,
-};
 pub use language::{language_label, language_options, LanguageOption, AUTO_LANGUAGE};
 pub use engine::{
     DownloadProgress, EngineCapabilities, EngineFeature, EngineId, LanguageSupport,

@@ -14,10 +14,8 @@ pub mod injector;
 pub mod modifier_tap;
 mod sound;
 pub mod permissions;
-pub mod speech;
 
 pub use injector::{MacosInjector, PasteTiming};
 pub use sound::{play_feedback, FeedbackSound};
 pub use modifier_tap::{watch_modifier_tap, ModifierTap, TAPS_REQUIRED};
 pub use permissions::MacosPermissions;
-pub use speech::MacosSpeech;

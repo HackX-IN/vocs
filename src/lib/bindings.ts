@@ -118,18 +118,6 @@ export const commands = {
 	 *  
 	 */
 	openTextFile: (input: OpenTextFileInput) => typedError<string | null, AppError>(__TAURI_INVOKE("open_text_file", { input })),
-	listVoices: () => typedError<VoiceInfo[], AppError>(__TAURI_INVOKE("list_voices")),
-	listOutputDevices: () => typedError<AudioOutputDevice[], AppError>(__TAURI_INVOKE("list_output_devices")),
-	getSpeakStatus: () => typedError<SpeakStatus, AppError>(__TAURI_INVOKE("get_speak_status")),
-	setSafeMode: (input: SetSafeModeInput) => typedError<SpeakStatus, AppError>(__TAURI_INVOKE("set_safe_mode", { input })),
-	/**  Shows the system's Personal Voice prompt and returns the answer. */
-	requestPersonalVoice: () => typedError<PersonalVoiceStatus, AppError>(__TAURI_INVOKE("request_personal_voice")),
-	getPersonalVoiceStatus: () => typedError<PersonalVoiceStatus, AppError>(__TAURI_INVOKE("get_personal_voice_status")),
-	/**
-	 *  Says a test sentence with the chosen voice and device. Returns how long the
-	 *  first sound took, the number a meeting feels as dead air.
-	 */
-	testVoice: () => typedError<number, AppError>(__TAURI_INVOKE("test_voice")),
 	startMicTest: () => typedError<null, AppError>(__TAURI_INVOKE("start_mic_test")),
 	stopMicTest: () => typedError<null, AppError>(__TAURI_INVOKE("stop_mic_test")),
 	checkForUpdate: () => typedError<UpdateCheck, AppError>(__TAURI_INVOKE("check_for_update")),
@@ -147,7 +135,6 @@ export const events = {
 	permissionsChanged: makeEvent<PermissionsChanged>("permissions-changed"),
 	sessionStateChanged: makeEvent<SessionStateChanged>("session-state-changed"),
 	settingsChanged: makeEvent<SettingsChanged>("settings-changed"),
-	speakStatusChanged: makeEvent<SpeakStatusChanged>("speak-status-changed"),
 	transcriptDelivered: makeEvent<TranscriptDelivered>("transcript-delivered"),
 	updateAvailable: makeEvent<UpdateAvailable>("update-available"),
 };
@@ -222,15 +209,6 @@ export type AudioLevelChanged = {
 	level: AudioLevel,
 };
 
-export type AudioOutputDevice = {
-	/**  The device's UID. */
-	id: string,
-	name: string,
-	/**  A loopback / virtual device, the kind a meeting app can take as a mic. */
-	is_virtual: boolean,
-	is_default: boolean,
-};
-
 /**
  * 
  *  * SOURCE OF TRUTH KEYWORDS: Capability
@@ -268,9 +246,7 @@ export type CapabilityKey =
 /**  The core loop: hotkey, record, transcribe, deliver. */
 "DICTATION" | "HISTORY" | "STATS" | "DICTIONARY" | "MODELS" | "SETTINGS" | "ONBOARDING" | "UPDATES" | 
 /**  A page that exists to say there is nothing to pay for. */
-"BILLING" | 
-/**  Voice mode: speak corrected dictation into a meeting, and meeting safe mode. */
-"SPEAK";
+"BILLING";
 
 export type Caption = 
 /**  Words appearing as you speak. */
@@ -315,11 +291,7 @@ export type ChoiceSource = "INPUT_DEVICES" | "MODELS" |
  *  Languages the SELECTED engine declares support for — which is what stops
  *  the UI offering Hindi on an engine that cannot speak it.
  */
-"LANGUAGES" | 
-/**  The voices Voice mode can speak with, the person's own first. */
-"VOICES" | 
-/**  Audio devices Voice mode can speak into, loopback devices marked. */
-"OUTPUT_DEVICES";
+"LANGUAGES";
 
 export type CopyTextInput = {
 	text: string,
@@ -354,11 +326,6 @@ export type DeliveryKind =
 "PASTED" | 
 /**  Clipboard written; paste skipped or refused. Still a success. */
 "CLIPBOARD_ONLY" | 
-/**
- *  Voice mode: the text was spoken into the chosen audio device instead of
- *  being pasted.
- */
-"SPOKEN" | 
 /**  Nothing was delivered. */
 "NONE";
 
@@ -499,12 +466,7 @@ export type ErrorCode = "MICROPHONE_DENIED" | "ACCESSIBILITY_DENIED" |
  *  The frontmost app has a profile that turns Vocs off. A choice the user
  *  made, so the message names the app and where to change it.
  */
-"APP_EXCLUDED" | "SECURE_INPUT_ACTIVE" | "INJECTION_FAILED" | "CLIPBOARD_UNAVAILABLE" | 
-/**
- *  Voice mode could not speak: no audio device, the voice would not load,
- *  or the first sound was too slow to be useful in a meeting.
- */
-"SPEECH_FAILED" | "HOTKEY_CONFLICT" | "HOTKEY_REGISTRATION_FAILED" | "INVALID_INPUT" | "NOT_FOUND" | "DATABASE" | "IO" | "NETWORK" | "INTERNAL";
+"APP_EXCLUDED" | "SECURE_INPUT_ACTIVE" | "INJECTION_FAILED" | "CLIPBOARD_UNAVAILABLE" | "HOTKEY_CONFLICT" | "HOTKEY_REGISTRATION_FAILED" | "INVALID_INPUT" | "NOT_FOUND" | "DATABASE" | "IO" | "NETWORK" | "INTERNAL";
 
 /**
  * 
@@ -964,11 +926,6 @@ export type PermissionsChanged = {
 	reports: PermissionReport[],
 };
 
-/**  Whether the person has allowed apps to speak with their Personal Voice. */
-export type PersonalVoiceStatus = 
-/**  This Mac or macOS version has no Personal Voice (it needs macOS 14). */
-"UNSUPPORTED" | "NOT_DETERMINED" | "DENIED" | "AUTHORIZED";
-
 /**
  * 
  *  * SOURCE OF TRUTH KEYWORDS: PrivacyPane
@@ -1132,10 +1089,6 @@ export type SetRevertedInput = {
 	reverted: boolean,
 };
 
-export type SetSafeModeInput = {
-	on: boolean,
-};
-
 export type SetSettingInput = {
 	key: string,
 	value: SettingValue,
@@ -1214,9 +1167,7 @@ export type SettingKind = { kind: "TOGGLE" } | { kind: "TEXT"; placeholder: stri
  *  * WHERE: On every SettingDef; used by the Settings view to build its sections.
  *  
  */
-export type SettingSection = "RECORDING" | "TRANSCRIPTION" | "OUTPUT" | "VOCABULARY" | 
-/**  Voice mode: speaking into meetings. */
-"VOICE" | "PRIVACY" | "GENERAL";
+export type SettingSection = "RECORDING" | "TRANSCRIPTION" | "OUTPUT" | "VOCABULARY" | "PRIVACY" | "GENERAL";
 
 /**
  * 
@@ -1234,31 +1185,6 @@ export type SettingValue = { type: "BOOL"; value: boolean } | { type: "NUMBER"; 
 export type SettingsChanged = {
 	/**  The setting that changed, or None when many changed at once. */
 	key: string | null,
-};
-
-/**  What the speaking side is doing, pushed to the UI whenever it changes. */
-export type SpeakStatus = {
-	speaking: boolean,
-	/**  The microphone is being passed straight through to the output device. */
-	safe_mode: boolean,
-	/**  Why safe mode came on by itself, when it did; None when the person chose it. */
-	safe_mode_reason: string | null,
-	changed_at: number,
-};
-
-/**
- * 
- *  * SOURCE OF TRUTH KEYWORDS: SpeakStatusChanged
- *  * WHAT:  Whether Vocs is speaking, and whether meeting safe mode is on.
- *  * WHY:   Safe mode can switch on without the user touching anything — speech
- *  *        failed and the microphone was let through — so the state is pushed, with
- *  *        the reason, rather than read when a page happens to be open.
- *  * WHERE: Emitted by the TauriEventSink; shown on the Voice settings page and in
- *  *        the menu bar.
- *  
- */
-export type SpeakStatusChanged = {
-	status: SpeakStatus,
 };
 
 export type StartRecordingInput = {
@@ -1389,16 +1315,6 @@ export type UpdateHistoryInput = {
 	/**  None or blank clears the title. */
 	title: string | null,
 	text: string,
-};
-
-export type VoiceInfo = {
-	/**  The system's identifier, stable across launches. */
-	id: string,
-	name: string,
-	/**  BCP-47, e.g. "en-US". */
-	language: string,
-	/**  The person's own voice, made in Accessibility → Personal Voice. */
-	is_personal: boolean,
 };
 
 /* Tauri Specta runtime */

@@ -41,8 +41,6 @@ const MENU_SETTINGS: &str = "menu.settings";
 const MENU_CHECK_UPDATES: &str = "menu.check_updates";
 const MENU_TOGGLE_DICTATION: &str = "menu.toggle_dictation";
 const MENU_COPY_LAST: &str = "menu.copy_last";
-const MENU_SPEAK: &str = "menu.speak";
-const MENU_SAFE_MODE: &str = "menu.safe_mode";
 const MENU_GO_DICTATIONS: &str = "menu.go.history";
 const MENU_GO_STATS: &str = "menu.go.stats";
 const MENU_GO_SETTINGS: &str = "menu.go.settings";
@@ -67,8 +65,6 @@ pub fn install_menu(app: &AppHandle) -> AppResult<()> {
         MENU_GO_SUPPORT => navigate_dashboard(app, "billing"),
         MENU_TOGGLE_DICTATION => toggle_dictation(app),
         MENU_COPY_LAST => crate::tray::copy_last_transcript(app),
-        MENU_SPEAK => crate::extra_hotkeys::start_or_stop_speaking(app),
-        MENU_SAFE_MODE => crate::extra_hotkeys::toggle_safe_mode(app),
         MENU_CHECK_UPDATES => check_for_updates(app),
         MENU_HELP_DOCS => open_url(app, &format!("{REPOSITORY_URL}/tree/main/docs")),
         MENU_HELP_ISSUE => open_url(app, &format!("{REPOSITORY_URL}/issues/new")),
@@ -122,9 +118,6 @@ fn build(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
         &[
             &MenuItem::with_id(app, MENU_TOGGLE_DICTATION, "Start or Stop Dictation", true, None::<&str>)?,
             &MenuItem::with_id(app, MENU_COPY_LAST, "Copy Last Dictation", true, Some("CmdOrCtrl+Shift+C"))?,
-            &separator()?,
-            &MenuItem::with_id(app, MENU_SPEAK, "Speak into a Meeting", true, None::<&str>)?,
-            &MenuItem::with_id(app, MENU_SAFE_MODE, "Toggle Meeting Safe Mode", true, None::<&str>)?,
             &separator()?,
             &PredefinedMenuItem::close_window(app, None)?,
         ],
@@ -185,7 +178,7 @@ fn build(app: &AppHandle) -> tauri::Result<Menu<tauri::Wry>> {
 }
 
 /// Brings the dashboard forward on `route`.
-pub(crate) fn navigate_dashboard(app: &AppHandle, route: &str) {
+fn navigate_dashboard(app: &AppHandle, route: &str) {
     crate::tray::show_dashboard(app);
     let payload = serde_json::json!({ "route": route });
     if let Err(err) = app.emit_to(DASHBOARD_WINDOW, NAV_SELECTED_EVENT, payload) {

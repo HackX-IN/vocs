@@ -56,17 +56,6 @@ pub struct SessionSettings {
     /// Remember fixes the user keeps, and apply the ones kept three times.
     pub learn_corrections: bool,
     pub tone: crate::types::Tone,
-    /// Voice mode: the two shortcuts are registered and a Speak session may start.
-    pub speak_enabled: bool,
-    /// None means pick a voice for the language spoken.
-    pub speak_voice: Option<String>,
-    /// A device name, "auto" (prefer a virtual device) or "default" (the speakers).
-    pub speak_output_device: String,
-    /// 1.0 is the voice's natural pace.
-    pub speak_rate: f32,
-    /// When speaking fails or lags, let the raw microphone through.
-    pub speak_fallback: bool,
-    pub speak_lag_ms: u64,
     /// Show the finished text in the caption HUD for `preview_ms` before pasting.
     pub preview_before_paste: bool,
     pub preview_ms: u64,
@@ -126,25 +115,6 @@ impl SessionSettings {
         Self { excluded_app, ..Self::from_stored(&stored) }
     }
 
-    /**
-     * SOURCE OF TRUTH KEYWORDS: for_speaking, speak_overrides
-     * WHAT:  These settings with the cleanup a spoken sentence needs forced on.
-     * WHY:   Text on a screen forgives an "um" and a slip; a voice repeats them to
-     *        a room. Whatever the person chose for pasting, a SPOKEN dictation
-     *        always has fillers removed, spoken self-corrections applied and the
-     *        grammar rules on — otherwise Voice mode would faithfully voice every
-     *        stumble. The AI grammar model keeps following its own setting.
-     * WHERE: Applied by the session actor when a Speak session starts.
-     */
-    pub fn for_speaking(mut self) -> Self {
-        self.strip_fillers = true;
-        self.apply_corrections = true;
-        self.fix_grammar = true;
-        // The preview pauses a paste; there is no paste to pause.
-        self.preview_before_paste = false;
-        self
-    }
-
     fn from_stored(stored: &Stored) -> Self {
         let language = match read_choice(stored, keys::LANGUAGE) {
             // "auto" is a sentinel, not a language code.
@@ -174,12 +144,6 @@ impl SessionSettings {
         // One line each, for the same reachability reason as the ones above.
         let preview_before_paste = read_bool(stored, keys::PREVIEW_BEFORE_PASTE).unwrap_or(false);
         let live_captions = read_bool(stored, keys::LIVE_CAPTIONS).unwrap_or(false);
-
-        // One line each, for the same reachability reason as the ones above.
-        let speak_enabled = read_bool(stored, keys::SPEAK_ENABLED).unwrap_or(false);
-        let speak_fallback = read_bool(stored, keys::SPEAK_FALLBACK).unwrap_or(true);
-        let speak_voice = read_choice(stored, keys::SPEAK_VOICE).filter(|v| !v.is_empty() && v != "auto");
-        let speak_output_device = read_choice(stored, keys::SPEAK_OUTPUT_DEVICE).unwrap_or_else(|| "auto".into());
 
         // One line, for the same reachability reason as the two above.
         let tone = crate::types::Tone::from_stored(&read_choice(stored, keys::TONE).unwrap_or_default());
@@ -212,12 +176,6 @@ impl SessionSettings {
             ai_grammar,
             learn_corrections,
             tone,
-            speak_enabled,
-            speak_voice,
-            speak_output_device,
-            speak_rate: read_number(stored, keys::SPEAK_RATE).unwrap_or(1.0).clamp(0.6, 1.6) as f32,
-            speak_fallback,
-            speak_lag_ms: read_number(stored, keys::SPEAK_LAG_MS).unwrap_or(3_000.0).clamp(1_000.0, 10_000.0) as u64,
             preview_before_paste,
             preview_ms: read_number(stored, keys::PREVIEW_MS)
                 .unwrap_or(1_500.0)

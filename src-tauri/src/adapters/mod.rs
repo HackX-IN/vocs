@@ -19,7 +19,7 @@ use std::sync::Arc;
 
 use crate::config::AppPaths;
 use crate::error::{AppError, AppResult, ErrorCode};
-use crate::ports::{EventSink, GrammarModel, ModelStore, SpeechOutput, TranscriptionEngine};
+use crate::ports::{EventSink, GrammarModel, ModelStore, TranscriptionEngine};
 use crate::types::EngineId;
 
 pub mod cpal;
@@ -101,19 +101,6 @@ pub fn build_model_store(
  */
 pub fn build_grammar_model() -> Arc<dyn GrammarModel> {
     Arc::new(T5GrammarModel::new())
-}
-
-/**
- * SOURCE OF TRUTH KEYWORDS: build_speech
- * WHAT:  Constructs the Voice-mode speech output, idle: nothing opened, no voice
- *        loaded, no microphone touched.
- * WHY:   Free to build for the same reason as the grammar model: whether anyone
- *        uses Voice mode is a runtime choice, and an app that never speaks must
- *        not open an audio device at launch.
- * WHERE: App bootstrap; the handle goes into Ports.
- */
-pub fn build_speech() -> Arc<dyn SpeechOutput> {
-    Arc::new(macos::MacosSpeech::new())
 }
 
 #[cfg(test)]

@@ -71,15 +71,6 @@ pub trait EventSink: Send + Sync {
     fn model_state_changed(&self, model_id: ModelId, state: ModelState);
 
     /**
-     * WHAT:  Voice mode started or stopped speaking, or meeting safe mode
-     *        switched on or off.
-     * WHY:   Safe mode can come on by itself — when speech fails mid-meeting —
-     *        and the person has to be told at once and in every place that shows
-     *        it (the Voice page, the menu bar), not discover it by asking.
-     */
-    fn speak_status_changed(&self, status: crate::types::SpeakStatus);
-
-    /**
      * WHAT:  Grab or release the Escape key.
      * WHY:   Escape belongs to whatever app the user is actually working in. A
      *        global grab held for the process lifetime would break Escape
@@ -113,6 +104,5 @@ impl EventSink for NullEventSink {
     fn caption_changed(&self, _caption: Option<&Caption>) {}
     fn download_progress(&self, _progress: DownloadProgress) {}
     fn model_state_changed(&self, _model_id: ModelId, _state: ModelState) {}
-    fn speak_status_changed(&self, _status: crate::types::SpeakStatus) {}
     fn set_cancel_key_active(&self, _active: bool) {}
 }

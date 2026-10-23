@@ -24,10 +24,10 @@ use tokio::sync::mpsc;
 use crate::config::AppPaths;
 use crate::db::Database;
 use crate::error::{AppError, AppResult, ErrorCode};
-use crate::pipeline::{GrammarPass, MicMonitor, SpeakControl};
+use crate::pipeline::{GrammarPass, MicMonitor};
 use crate::ports::{
-    AudioSource, EventSink, GrammarModel, ModelStore, PermissionProvider, SpeechOutput,
-    TextEnhancer, TextInjector, TranscriptionEngine,
+    AudioSource, EventSink, GrammarModel, ModelStore, PermissionProvider, TextEnhancer,
+    TextInjector, TranscriptionEngine,
 };
 use crate::registry::CapabilityKey;
 use crate::session::preview::PreviewGate;
@@ -49,8 +49,6 @@ pub struct Ports {
     pub enhancer: Arc<dyn TextEnhancer>,
     /// The optional on-device grammar model. Empty until its file is installed.
     pub grammar: Arc<dyn GrammarModel>,
-    /// Voice mode: speaking into a meeting, and the raw-microphone passthrough.
-    pub speech: Arc<dyn SpeechOutput>,
     pub injector: Arc<dyn TextInjector>,
     pub models: Arc<dyn ModelStore>,
     pub permissions: Arc<dyn PermissionProvider>,
@@ -100,19 +98,6 @@ pub struct SessionHandle {
      *        consumed by SessionActor::dispatch.
      */
     requested_at: Arc<Mutex<Option<Instant>>>,
-    /**
-     * SOURCE OF TRUTH KEYWORDS: speak_next, arm_speak, take_speak, voice_mode_session
-     * WHAT:  "The next recording's words are to be SPOKEN, not pasted."
-     * WHY:   Whether a session speaks is decided by which shortcut started it, and
-     *        the FSM's vocabulary is deliberately about what happened, not about
-     *        which key — the same reason `requested_at` is not on the event.
-     *        Armed immediately before a StartRequested and cleared by the actor
-     *        on EVERY start it processes, accepted or refused, so a refused
-     *        start cannot leave it set to hijack the next ordinary dictation.
-     * WHERE: Armed by extra_hotkeys, the menu bar and ipc/commands/speak.rs;
-     *        taken by SessionActor::dispatch.
-     */
-    speak_next: Arc<std::sync::atomic::AtomicBool>,
 }
 
 impl SessionHandle {
@@ -120,18 +105,7 @@ impl SessionHandle {
         Self {
             sender,
             requested_at: Arc::new(Mutex::new(None)),
-            speak_next: Arc::new(std::sync::atomic::AtomicBool::new(false)),
         }
-    }
-
-    /// The next start is a Voice-mode session. See `speak_next`.
-    pub fn arm_speak(&self) {
-        self.speak_next.store(true, std::sync::atomic::Ordering::SeqCst);
-    }
-
-    /// Reads and clears the Voice-mode flag.
-    pub fn take_speak(&self) -> bool {
-        self.speak_next.swap(false, std::sync::atomic::Ordering::SeqCst)
     }
 
     /// Marks "the user just pressed the key". Call immediately before sending
@@ -184,8 +158,6 @@ pub struct AppState {
     /// The grammar pass and its sentence cache. One for the whole app so the
     /// rewrites prefetched during a recording are the ones the delivery finds.
     pub grammar: Arc<GrammarPass>,
-    /// Voice mode's control: speaking, and the meeting-safe-mode switch.
-    pub speak: Arc<SpeakControl>,
     /// Capabilities with a command currently executing. See InflightGuard.
     inflight: Arc<Mutex<HashSet<CapabilityKey>>>,
     /// Last state the actor published. See `current_state`.
@@ -209,7 +181,6 @@ impl AppState {
             db,
             mic_monitor: MicMonitor::new(Arc::clone(&ports.audio), Arc::clone(&ports.events)),
             grammar: Arc::new(GrammarPass::new(Arc::clone(&ports.grammar))),
-            speak: Arc::new(SpeakControl::new(Arc::clone(&ports.speech), Arc::clone(&ports.events))),
             ports,
             session,
             app,
@@ -254,7 +225,6 @@ impl AppState {
             published_state: Arc::clone(&self.published_state),
             preview: self.preview.clone(),
             grammar: Arc::clone(&self.grammar),
-            speak: Arc::clone(&self.speak),
         }
     }
 
@@ -318,8 +288,6 @@ pub struct SessionContext {
     pub preview: PreviewGate,
     /// See AppState::grammar.
     pub grammar: Arc<GrammarPass>,
-    /// See AppState::speak.
-    pub speak: Arc<SpeakControl>,
 }
 
 impl SessionContext {
@@ -328,7 +296,6 @@ impl SessionContext {
         Self {
             db,
             grammar: Arc::new(GrammarPass::new(Arc::clone(&ports.grammar))),
-            speak: Arc::new(SpeakControl::new(Arc::clone(&ports.speech), Arc::clone(&ports.events))),
             ports,
             session,
             published_state: Arc::new(Mutex::new(SessionState::Idle)),
@@ -388,10 +355,6 @@ impl CommandContext {
 
     pub fn grammar(&self) -> &Arc<GrammarPass> {
         &self.state.grammar
-    }
-
-    pub fn speak(&self) -> &Arc<SpeakControl> {
-        &self.state.speak
     }
 
     /// The last state the session actor published. See AppState::current_state.

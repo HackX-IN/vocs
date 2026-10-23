@@ -173,7 +173,7 @@ impl Resampler16k {
  *        out quieter than the audio around it.
  * WHERE: The first step of every push.
  */
-pub(super) fn downmix_to_mono(interleaved: &[f32], channels: usize, out: &mut Vec<f32>) {
+fn downmix_to_mono(interleaved: &[f32], channels: usize, out: &mut Vec<f32>) {
     if channels == 1 {
         out.extend_from_slice(interleaved);
         return;

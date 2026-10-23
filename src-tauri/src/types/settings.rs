@@ -161,10 +161,6 @@ pub enum ChoiceSource {
     /// Languages the SELECTED engine declares support for — which is what stops
     /// the UI offering Hindi on an engine that cannot speak it.
     Languages,
-    /// The voices Voice mode can speak with, the person's own first.
-    Voices,
-    /// Audio devices Voice mode can speak into, loopback devices marked.
-    OutputDevices,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Type)]

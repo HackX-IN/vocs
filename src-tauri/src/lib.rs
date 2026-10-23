@@ -39,7 +39,7 @@ pub mod session;
 
 // ── Boundary ─────────────────────────────────────────────────────────────
 pub mod bootstrap;
-pub mod extra_hotkeys;
+pub mod copy_last_hotkey;
 pub mod ipc;
 pub mod menu;
 pub mod tray;

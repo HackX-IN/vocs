@@ -14,7 +14,7 @@
  * WHERE: SettingsView (navigation + routing) and SettingsPage (the cards).
  */
 
-import { AppWindow, AudioLines, BookMarked, Languages, Mic, ShieldCheck, SlidersHorizontal, Type } from "lucide-react";
+import { AppWindow, BookMarked, Languages, Mic, ShieldCheck, SlidersHorizontal, Type } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { SettingSection } from "@/lib/bindings";
 
@@ -23,7 +23,6 @@ export type SettingsPageId =
   | "transcription"
   | "output"
   | "vocabulary"
-  | "voice"
   | "profiles"
   | "privacy"
   | "general";
@@ -69,13 +68,6 @@ export const SETTINGS_PAGES: readonly SettingsPage[] = [
     section: "VOCABULARY",
   },
   {
-    id: "voice",
-    label: "Voice",
-    blurb: "Speak what you dictate into a meeting, in your own voice.",
-    icon: AudioLines,
-    section: "VOICE",
-  },
-  {
     id: "profiles",
     label: "Per-app",
     blurb: "Settings that apply only while a particular app is in front.",
@@ -103,7 +95,6 @@ const BY_SECTION: Readonly<Record<SettingSection, SettingsPageId>> = {
   TRANSCRIPTION: "transcription",
   OUTPUT: "output",
   VOCABULARY: "vocabulary",
-  VOICE: "voice",
   PRIVACY: "privacy",
   GENERAL: "general",
 };

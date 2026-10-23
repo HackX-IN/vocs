@@ -1,6 +1,6 @@
 /*!
  * SOURCE OF TRUTH KEYWORDS: ports, TranscriptionEngine, AudioSource,
- *   TextEnhancer, GrammarModel, SpeechOutput, TextInjector, ModelStore, PermissionProvider
+ *   TextEnhancer, GrammarModel, TextInjector, ModelStore, PermissionProvider
  * WHAT:  Barrel for every swappable contract in the app. Traits only.
  * WHY:   This layer holds no logic at all — that is the rule that keeps a port
  *        from quietly becoming a second implementation. A port never knows an
@@ -17,7 +17,6 @@ pub mod grammar;
 pub mod injector;
 pub mod models;
 pub mod permissions;
-pub mod speech;
 
 pub use audio::{AudioSource, CaptureConfig, CaptureEvent, CaptureSession, SampleSender};
 pub use engine::{TranscribeRequest, TranscriptionEngine};
@@ -27,4 +26,3 @@ pub use grammar::GrammarModel;
 pub use injector::{FrontmostApp, InjectionOutcome, InjectionRequest, TextInjector};
 pub use models::{ModelStatus, ModelStore};
 pub use permissions::{OsPermission, PermissionProvider, PermissionState};
-pub use speech::SpeechOutput;

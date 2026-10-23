@@ -14,12 +14,10 @@ pub mod chunker;
 pub mod diff;
 pub mod grammar;
 pub mod mic_monitor;
-pub mod speak;
 pub mod vad;
 pub mod worker;
 
 pub use chunker::Chunker;
 pub use grammar::GrammarPass;
 pub use mic_monitor::MicMonitor;
-pub use speak::SpeakControl;
 pub use vad::SpeechDetector;
