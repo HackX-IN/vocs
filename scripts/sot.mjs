@@ -10,8 +10,9 @@
  *        could this live" in one screen instead of forty, which is what keeps
  *        context cost flat as the codebase grows. Read-only by design, so it is
  *        the one authorised exception to the no-scripts rule in CLAUDE.md §8.
- * WHERE: Invoked via the `sot` / `sot:show` package scripts. Reads src/ and
- *        src-tauri/src/. Depends on nothing outside the Node standard library.
+ * WHERE: Invoked via the `sot` / `sot:show` package scripts. Reads src/, src-tauri/src/,
+ *        scripts/ and the launch page in site/.
+ *        Depends on nothing outside the Node standard library.
  */
 
 import { readdirSync, readFileSync, statSync } from 'node:fs'
@@ -22,8 +23,8 @@ import { dirname } from 'node:path'
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..')
 
 /** Directories that hold authored source. Generated output is excluded below. */
-const SEARCH_ROOTS = ['src', 'src-tauri/src', 'scripts']
-const SOURCE_EXTENSIONS = new Set(['.rs', '.ts', '.tsx', '.mjs', '.js', '.css', '.sql'])
+const SEARCH_ROOTS = ['src', 'src-tauri/src', 'scripts', 'site']
+const SOURCE_EXTENSIONS = new Set(['.rs', '.ts', '.tsx', '.mjs', '.js', '.css', '.sql', '.html'])
 const IGNORED_DIRS = new Set(['node_modules', 'target', 'dist', '.git', 'gen'])
 
 /**
