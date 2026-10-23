@@ -79,7 +79,7 @@ tauri-plugin-single-instance = "2"
 # model's safetensors directly, so there is no second C++ runtime to sit beside
 # whisper.cpp's ggml and no ONNX conversion step between the repo and the app.
 candle-core = "0.9.2"
-candle-nn = "0.9.2"
+candle-nn = "0.11.0"
 candle-transformers = "0.9.2"
 tokenizers = { version = "0.21.4", default-features = false, features = ["onig"] }
 
