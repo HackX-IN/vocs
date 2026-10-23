@@ -97,10 +97,10 @@ export function BackupPanel({ onImported }: { onImported: () => void }) {
           </p>
         </div>
         <Button disabled={busy !== null} onClick={() => void exportBackup()}>
-          {busy === "export" ? "Exporting…" : "Export…"}
+          {busy === "export" ? "Exporting" : "Export"}
         </Button>
         <Button disabled={busy !== null} onClick={() => void importBackup()}>
-          {busy === "import" ? "Importing…" : "Import…"}
+          {busy === "import" ? "Importing" : "Import"}
         </Button>
       </div>
       {error ? <ErrorSurface size="compact" error={error} /> : null}

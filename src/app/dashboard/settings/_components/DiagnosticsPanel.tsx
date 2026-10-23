@@ -55,7 +55,7 @@ export function DiagnosticsPanel() {
           </p>
         </div>
         <Button disabled={busy} onClick={() => void exportReport()}>
-          {busy ? "Exporting…" : "Export…"}
+          {busy ? "Exporting" : "Export"}
         </Button>
       </div>
       {error ? <ErrorSurface size="compact" error={error} /> : null}

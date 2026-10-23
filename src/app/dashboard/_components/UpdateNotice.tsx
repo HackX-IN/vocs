@@ -92,7 +92,7 @@ export function UpdateNotice() {
 
       <div className="flex shrink-0 items-center gap-1">
         <Button onClick={install} disabled={installing} className="h-[var(--control-height-sm)] text-label">
-          {installing ? "Installing…" : error ? "Try again" : "Install and restart"}
+          {installing ? "Installing" : error ? "Try again" : "Install and restart"}
         </Button>
         <button
           type="button"

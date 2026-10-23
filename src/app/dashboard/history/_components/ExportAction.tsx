@@ -80,7 +80,7 @@ export function ExportAction({ onError }: { onError: (error: AppError | null) =>
           onClick={() => run(format)}
           className={BUTTON_CLASS}
         >
-          {busy === format ? "Exporting…" : FORMAT_META[format].label}
+          {busy === format ? "Exporting" : FORMAT_META[format].label}
         </button>
       ))}
       <button type="button" onClick={() => setOpen(false)} className={cn(BUTTON_CLASS, "text-text-secondary")}>
