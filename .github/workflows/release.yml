@@ -190,6 +190,30 @@ jobs:
           echo "identities available to codesign:"
           security find-identity -v -p codesigning "$KC"
 
+      # The notes people see in Settings -> Updates and on the Releases page come from
+      # CHANGELOG.md, so writing the changelog IS writing the release notes. The section named for
+      # the tag wins; "Unreleased" is the fallback so a tag cut before the changelog was renamed
+      # still ships real notes; a fixed sentence is the last resort so the build never fails over
+      # prose. The tag is passed through env rather than interpolated into the script.
+      - name: Take the release notes from the changelog
+        id: notes
+        env:
+          TAG: ${{ inputs.tag || github.ref_name }}
+        run: |
+          VERSION="${TAG#v}"
+          NOTES="$RUNNER_TEMP/notes.md"
+          awk -v v="$VERSION" '
+            /^## \[/ { if (on) exit; on = (index($0, "[" v "]") == 4); next }
+            on { print }
+          ' CHANGELOG.md > "$NOTES"
+          if [ ! -s "$NOTES" ]; then
+            awk '/^## \[Unreleased\]/ { on = 1; next } /^## \[/ { if (on) exit } on { print }' CHANGELOG.md > "$NOTES"
+          fi
+          if [ ! -s "$NOTES" ]; then
+            echo "See the assets below to download and install." > "$NOTES"
+          fi
+          { echo "body<<NOTES_EOF"; cat "$NOTES"; echo "NOTES_EOF"; } >> "$GITHUB_OUTPUT"
+
       - name: Build, sign and publish
         uses: tauri-apps/tauri-action@v0
         env:
@@ -214,7 +238,7 @@ jobs:
         with:
           tagName: ${{ inputs.tag || github.ref_name }}
           releaseName: "Vocs __VERSION__"
-          releaseBody: "See the assets below to download and install."
+          releaseBody: ${{ steps.notes.outputs.body }}
           # Published as a draft: the DMG should be opened and launched once
           # before anyone is told it exists. Publishing the release is what
           # points latest.json at it, so a broken build is never something

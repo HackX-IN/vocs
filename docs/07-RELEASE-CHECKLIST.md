@@ -49,7 +49,10 @@ For each, dictate a short sentence and a 5-minute passage; text lands in the rig
 
 ## 5. Updates
 
-- [ ] Install `v1.0.0-rc1`, publish `rc2`; **Check for updates** finds it, installs it, relaunches, signature verified
+- [ ] Install `v1.0.0-rc1`, publish `rc2`; **Settings → General → Updates → Check for updates** finds it, shows the release notes, installs it with a progress bar, relaunches, signature verified
+- [ ] With Wi-Fi off, **Check for updates** says Vocs could not reach the update server (and does not say "up to date"); back online it finds the update
+- [ ] With **Check for updates** turned off in Settings, the card says checks are turned off
+- [ ] Pressing **Install and restart** mid-dictation is refused with a clear message
 - [ ] After the update, permissions are still granted (the signing identity did not change) and Gatekeeper does not block the updated app
 
 ## 6. Soak and performance
@@ -72,3 +75,13 @@ For each, dictate a short sentence and a 5-minute passage; text lands in the rig
 | Sections 1–5 | | | |
 | Section 6 | | | |
 | Section 7 | | | |
+
+## Cutting a release
+
+1. Make the three version numbers equal: `src-tauri/tauri.conf.json`, `src-tauri/Cargo.toml`, `package.json` (then `cargo check` so `Cargo.lock` follows). The tag must be `v` plus that number.
+2. In `CHANGELOG.md`, rename `[Unreleased]` to `[x.y.z] - YYYY-MM-DD` and open a fresh `[Unreleased]` above it. The release workflow publishes that section as the release notes, which are also what the in-app Updates card shows, so trim it to what a user should read.
+3. Push the tag: `git tag vX.Y.Z && git push origin vX.Y.Z`. The Release workflow builds, signs and creates a **draft** release.
+4. Download the DMG from the draft, open it and launch it once (sections 1–2 above).
+5. **Publish** the draft. This is the moment updates go live: `latest.json` only resolves once the release is published, and the website's download button picks the new DMG up by itself.
+6. On an older install, **Check for updates** finds it.
+

@@ -1,7 +1,7 @@
 /**
  * SOURCE OF TRUTH KEYWORDS: formatDuration, formatClock, formatRelativeTime,
  *   formatBytes, formatRate, formatCompactDuration, formatLatency, formatLanguage,
- *   formatTimeOfDay, formatDayHeading, formatDateTime, dayStart
+ *   formatTimeOfDay, formatDayHeading, formatDateTime, dayStart, plainReleaseNotes
  * WHAT:  Every number-to-string the UI needs: clocks, durations, relative
  *        times, byte sizes, transfer rates and latencies.
  * WHY:   One place, because the same duration appearing as "1:23" in the pill
@@ -168,4 +168,22 @@ const longDateTime = new Intl.DateTimeFormat(undefined, {
 /** "Wed, Oct 15, 11:04" — the date chip on an open dictation. */
 export function formatDateTime(epochMs: number): string {
   return longDateTime.format(new Date(epochMs));
+}
+
+/**
+ * WHAT:  Release notes as plain text: markdown emphasis, code ticks, links and heading marks
+ *        removed, list dashes turned into bullets.
+ * WHY:   The notes arrive as the release's markdown body and are shown in a small card with no
+ *        markdown renderer. Raw `**bold**` and `[text](url)` in an update prompt reads as
+ *        broken, and pulling in a renderer for a dozen lines of notes would be a dependency
+ *        for a cosmetic. Deliberately lossy: it never has to be perfect, only readable.
+ */
+export function plainReleaseNotes(markdown: string): string {
+  return markdown
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
+    .replace(/\*\*([^*]+)\*\*/g, "$1")
+    .replace(/`([^`]+)`/g, "$1")
+    .replace(/^#{1,6}\s+/gm, "")
+    .replace(/^\s*[-*]\s+/gm, "• ")
+    .trim();
 }

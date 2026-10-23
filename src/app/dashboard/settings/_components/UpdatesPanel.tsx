@@ -28,7 +28,7 @@ import { useCallback, useEffect, useState } from "react";
 import { getVersion } from "@tauri-apps/api/app";
 import { commands, events, type AppError, type UpdateCheck, type UpdateProgress } from "@/lib/bindings";
 import { unwrapCommand } from "@/lib/ipc";
-import { formatBytes, formatTimeOfDay } from "@/lib/format";
+import { formatBytes, formatTimeOfDay, plainReleaseNotes } from "@/lib/format";
 import { useTauriEvent } from "@/lib/use-event";
 import { Button, ErrorSurface, ProgressBar } from "@/components/global";
 
@@ -156,7 +156,7 @@ function publishedSuffix(update: Available): string {
 }
 
 function ReleaseNotes({ update }: { update: Available }) {
-  const notes = update.notes?.trim();
+  const notes = update.notes ? plainReleaseNotes(update.notes) : "";
   if (!notes) return null;
   return (
     <div className="max-h-48 overflow-y-auto rounded-input bg-sunken px-3 py-2">
