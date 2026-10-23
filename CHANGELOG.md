@@ -5,64 +5,29 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-### Added
-- **Updates in Settings** (Settings → General → Updates): see which version you are on, press **Check for updates**, and get a plain answer — you are up to date, Vocs could not reach the server (offline), update checks are turned off, or a newer version is available with its release notes. Install it from the same card, with a download progress bar. Vocs still never installs in the middle of a dictation.
-- **Quiet the speakers while dictating** (Settings → Recording, on): in a meeting, the other people coming out of your Mac's speakers were being picked up by the microphone and typed out with your words. Vocs now mutes the built-in speakers for the length of a recording and restores them the moment you stop, even after a crash. Headphones, AirPods and external speakers are left alone.
-- **A new look.** A warm paper light theme and an ember dark theme, the Doto dot-matrix face for titles and figures, numbered instrument cards and dot-matrix charts. New app icon (a head whispering quotes) and matching menu-bar glyph.
-- **Dictations**, the new home of the app: your history as a notebook grouped by day, with a summary strip and a floating search bar. Open a dictation to edit it like a notepad — a title you can change, text that saves itself, **⌘F** to find (⌘G for the next match) and **⌘S** to save now — while the **Said → fixed** comparison floats over the foot of the page. Filter the list by period (today, 7 or 30 days) and by status (edited, failed); searches and filters page as you scroll.
-- **Writing style** (Settings → Writing): Natural, Casual (contractions stay, a one-line message ends without a full stop), Formal (contractions written out, "gonna" becomes "going to") and Literal (exactly what was heard, for terminals and code editors).
-- **Preview before pasting** (Settings → Output, off by default): the finished text is shown for a moment and Escape keeps it out of the document. It is still saved in Dictations.
-- **Live captions** (Settings → Recording, off by default): a small window shows what Vocs hears, and what it will write, while you speak.
-- **A real menu bar** while Vocs is in front: Settings (⌘,), start or stop a dictation, copy the last one, jump to Dictations, Stats, Settings and Support (⌘1–4), Check for Updates, and a Help menu with the documentation, issue reporting and the logs folder. Edit gives the editor undo, redo, cut, copy, paste and select all.
-- **A startup screen**: the mark, breathing bars and a dot-matrix wordmark while the window loads.
-- **Hover tooltips on the Stats charts** (activity, streak and languages).
-- **Per-app profiles as cards**, with one-click suggestions for the apps you have dictated into. Turning Vocs off in an app hides the settings that no longer apply.
-- **Onboarding** has a four-step progress row and a picture for each tour slide.
-- **Context prompt** (Settings → Transcription): tell the recogniser what you usually talk about so jargon and names are heard correctly. It leads the prompt, ahead of your dictionary terms.
-- **Microphone level meter** (Settings → Recording): test the selected microphone with the same level curve as the pill. It closes itself after 60 seconds.
-- **Back up and restore** your dictionary and per-app profiles as a single file. Importing merges, never deletes, and every entry is re-validated; bad entries are skipped and counted.
-- **Said vs fixed** in History: see what you said next to what was delivered, with a reversible **Use original** that Copy and Export respect.
-- **Smart grammar** (Settings → Output, off by default): an on-device model (T5-small, about 120 MB, downloaded once from the same screen) fixes agreement, tense and wrong word forms the rules cannot see — "she don't know what we was doing" becomes "she doesn't know what we were doing". Every proposed change is judged on its own and only safe word-level fixes are kept: names, numbers, code, acronyms and your dictionary words are never touched, a word is only swapped for another form of itself, and a rewrite that changes too much is discarded whole. Finished sentences are corrected while you are still talking, so the stop adds roughly a tenth of a second; past a time budget the rest is pasted as the rules wrote it. English only, skipped in the Literal style, and History shows every change.
-- **Learn from my corrections** (Settings → Output, on): when Smart grammar fixes something and you leave it, Vocs remembers. A fix you have kept three times and never undone applies itself — instantly, without the model. "Use original", or editing the fix out, counts as a no and switches it off straight away. Everything learned is listed under Settings → Vocabulary → Learned corrections, with how often you kept or undid each one, where you can turn any of it on or off, delete it, or forget everything.
-- **Fix common grammar slips** (Settings → Output, off by default): "a idea" → "an idea", "she don't" → "she doesn't", "we was" → "we were", "they has" → "they have", "their going to" → "they're going to", "its a" → "it's a", "could of been" → "could have been". English only; skips quoted speech and dictionary words.
-- **Filler removal strength** (Light / Standard / Strict). Hesitations ("um", "uh") always go; ambiguous words ("like", "you know") only when punctuation marks them as filler.
-- **Excluded apps**: turn Vocs off in chosen apps. Recording is refused before the microphone is touched.
-- **Copy Last Transcript** in the menu bar, and an optional global shortcut (off by default).
-- **Crash-safe recording**: the transcript is checkpointed as you speak, so a crash mid-dictation no longer loses it.
-- **Free-disk check** before the model download.
-- **Latency view by stage**: capture, recognition, correction, output, and stop-to-pasted.
-- **Diagnostics export**: an opt-in report with home-directory paths and free-text settings redacted. Nothing is sent anywhere.
+## [1.0.0] - 2026-10-24
 
-### Changed
-- **Settings is organised by what you are doing.** Writing (punctuation, fillers, tone) and Grammar & AI (quick rule-based fixes, then the on-device model with its download and learned corrections) are now pages of their own, and Output covers only where the text goes. Per-app profiles are held back from this first release.
-- **Faster finish when the language is left on Auto.** The final decode no longer runs language detection at the full 30-second encoder size: about 650 ms instead of 1.9 s in the project's tail-decode benchmark, with a pinned language unchanged.
-- **Delete asks with a Cancel.** Deleting history or a dictation now shows Cancel and a red confirm side by side, and Escape backs out.
-- Button labels no longer end in an ellipsis.
-- The window title is larger. The Support page's Buy Me a Coffee link goes to the project's page.
-- **The recording pill is a horizontal capsule**: the mark beside three audio bars, with no timer. Live captions are gradient text that rises out of it instead of a box.
-- **A window bar** puts the title (centred) and the toolbar buttons on the same line as the traffic lights, with a proper safe area. The side rail is a rounded pill with more room.
-- **Keep history for** is a choice (forever, 1 week, 1 month, 3 months, 1 year) rather than a number of days; long text settings such as Context get the full width; a select shows what its chosen option means.
-- The app icon has three small sound bars beside the head.
-- **Settings is seven short pages** with a section list and search instead of one long scroll.
-- **History is now called Dictations** and is the first page.
-- The Stats page is a grid of numbered cards, and its activity chart is drawn over the real calendar, zero days included.
-- Filler removal no longer deletes real words. "I like pizza" is left alone.
-- A spoken "new line" at the very end of a dictation now keeps its trailing newline. In a single-line field this presses Enter.
-- Emphatic repeats ("very very", "no no") are kept as spoken; other repeated words collapse.
-- Sentence capitalisation no longer touches file names, domains or version numbers (`main.rs`, `example.com`, `2.5.1`).
-- Quoted speech is never edited by the correction rules.
-- Text settings now enforce their declared length limit.
+The first public release.
 
-### Fixed
-- **A second launch no longer crashes the running app.** Double-clicking Vocs while it was already running asked AppKit to move a window from the wrong thread.
-- **Recording a new shortcut no longer starts a dictation.** The old shortcut is released while Settings is listening, then the new one is registered.
-- **A recording that heard nothing is not stored.** A tap of the hotkey or a silent microphone no longer leaves a blank entry in Dictations or a count in Stats; entries already stored that way are cleaned up on update.
-- **The hotkey works while a failure is still on screen.** It used to be ignored for the three seconds the reason stayed up.
-- **The first dictation after launch is as fast as the rest**: the model's short-fragment and language-detection paths are warmed at startup (the first one took 2.8 s, later ones about 0.5 s).
-- **A single audio buffer underrun no longer ends a recording** as "the microphone disconnected". CoreAudio reports one under ordinary load, most often right after a stream starts.
-- A crash when a dictionary term contained a character whose lowercase form has a different byte length (for example Turkish "İ").
-- A dangling comma or lost sentence end after a trailing hesitation ("wait um…").
-- Brackets: spacing inside them and a missing full stop after a closing bracket.
+### Highlights
+- **Talk, and it types.** Press ⌥Space anywhere (toggle it, or hold to talk), say it, press again. The text is pasted into whatever had focus and your clipboard is put back.
+- **Everything stays on your Mac.** Recognition runs on-device with Whisper. No account, no subscription, no word cap, no telemetry.
+- **Transcribes while you speak**, so finishing is as fast after a five-minute monologue as after five seconds.
+- **99 languages**, auto-detected or pinned.
+- **Quiet in meetings.** While you record, Vocs mutes your Mac's built-in speakers so the other people on a call are not typed out with your words, and restores them when you stop, even after a crash. Headphones and AirPods are left alone.
+- **Dictations**, a notebook of everything you said: searchable, filterable, editable like a note (⌘F to find, ⌘S to save). **Said → fixed** shows what the rules changed, and **Use original** takes your wording instead.
+- **Writing styles**: Natural, Casual, Formal or Literal.
+- **Filler removal that keeps real words**, at three strengths. "I like pizza" is never touched.
+- **Your dictionary and a context line** teach it the names and jargon it gets wrong.
+- **Grammar, your way.** Quick rule-based fixes for slips like "a idea" and "she don't", and an optional on-device model (about 120 MB, downloaded once) for agreement and tense. It never rewrites you, and it learns the fixes you keep.
+- **Preview before pasting** and **live captions**, both off by default.
+- **Escape to cancel**, with a three-second countdown. Press it again and the recording resumes with nothing lost.
+- **Crash-safe**: the transcript is saved as you speak.
+- **Updates you control** (Settings → General → Updates): check any time, read what changed, and install with a progress bar. Every update is signature-verified and never installs mid-dictation.
+- **Honest stats**, including the latency Vocs actually achieves at each stage.
+- **Back up and restore** your dictionary, and **export diagnostics** as a plain-text file you send yourself.
+- **A real menu bar**: start or stop dictating, copy the last transcript, and jump to any page.
 
-### Security
-- Updated `rustls`, `ringbuf` and `quinn-proto` to patched releases.
+### Notes
+- Vocs is free and independent, so it is not notarised by Apple. macOS asks you to approve the first launch once: System Settings → Privacy & Security → **Open Anyway**.
+- Requires macOS 13 or later, on Apple Silicon or Intel. Needs about 600 MB of disk for the speech model.
