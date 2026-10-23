@@ -1,0 +1,92 @@
+/**
+ * SOURCE OF TRUTH KEYWORDS: site-tokens, pages-tokens, paper-light, ember-dark, doto-display, prefers-color-scheme
+ * WHAT:  Every colour, size, radius, space and motion value of the launch page, as custom properties on :root, and the dark-scheme overrides.
+ * WHY:   The page wears the app's own look: warm paper in the light, graphite and ember in the dark, one orange accent, the Doto dot-matrix face only for the big words. Values are copied from docs/04-DESIGN-SYSTEM.md because the site cannot import the app's tokens.css, so a palette change there must be repeated here. Surfaces are solid; the app's translucency exists to carry a native window shape the web has no use for. This is the only file of the four that may hold a raw value.
+ * WHERE: Loaded first by site/index.html; read by styles.css, sections.css and responsive.css.
+ */
+
+@font-face {
+  font-family: "Doto";
+  src: url("fonts/doto-latin-wght-normal.woff2") format("woff2");
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+:root {
+  color-scheme: light dark;
+
+  --page: #f4f3ee;
+  --card: #ffffff;
+  --sunken: rgba(27, 26, 23, 0.045);
+  --sunken-strong: rgba(27, 26, 23, 0.08);
+  --hairline: rgba(27, 26, 23, 0.09);
+  --text: rgba(27, 26, 23, 0.92);
+  --text-2: rgba(27, 26, 23, 0.62);
+  --text-3: rgba(27, 26, 23, 0.4);
+  --accent: #e8501a;
+  --accent-soft: rgba(232, 80, 26, 0.12);
+  --accent-ink: #ffffff;
+  --signal: #4fa823;
+  --glow: radial-gradient(900px 480px at 8% -8%, rgba(255, 150, 90, 0.16), transparent 70%);
+  --shadow-card: 0 1px 2px rgba(28, 24, 20, 0.04), 0 8px 24px rgba(28, 24, 20, 0.06);
+  --shadow-panel: 0 24px 64px rgba(28, 24, 20, 0.14);
+
+  /* The pill is near-black in both schemes (design system §2). */
+  --pill: #1d1d1d;
+  --pill-ring: #3a3a3a;
+  --pill-ink: #e6e3dc;
+
+  /* The dark panel (privacy, closing call) reads the same in both schemes. */
+  --night: #1b1917;
+  --night-ink: rgba(246, 242, 235, 0.94);
+  --night-ink-2: rgba(246, 242, 235, 0.62);
+  --night-hairline: rgba(255, 244, 230, 0.1);
+
+  --radius-card: 20px;
+  --radius-panel: 28px;
+  --radius-input: 12px;
+  --radius-full: 999px;
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 24px;
+  --space-6: 32px;
+  --space-8: 48px;
+  --space-10: 72px;
+  --space-12: 112px;
+
+  --content: 1120px;
+  --reading: 680px;
+  --gutter: 24px;
+
+  --font-ui: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", system-ui, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", Menlo, monospace;
+  --font-display: "Doto", var(--font-mono);
+
+  --motion-fast: 120ms;
+  --motion-medium: 240ms;
+  --ease: cubic-bezier(0.32, 0.72, 0, 1);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --page: #13110f;
+    --card: #1f1d1a;
+    --sunken: rgba(255, 244, 230, 0.05);
+    --sunken-strong: rgba(255, 244, 230, 0.09);
+    --hairline: rgba(255, 244, 230, 0.09);
+    --text: rgba(246, 242, 235, 0.94);
+    --text-2: rgba(246, 242, 235, 0.62);
+    --text-3: rgba(246, 242, 235, 0.4);
+    --accent: #ff6a2b;
+    --accent-soft: rgba(255, 106, 43, 0.16);
+    --accent-ink: #1a0d06;
+    --signal: #7bc83b;
+    --glow: radial-gradient(900px 480px at 8% -10%, rgba(255, 122, 48, 0.22), transparent 70%);
+    --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.28);
+    --shadow-panel: 0 24px 64px rgba(0, 0, 0, 0.5);
+    --night: #0c0b0a;
+  }
+}

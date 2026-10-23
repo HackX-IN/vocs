@@ -6,6 +6,8 @@ before you can look up.
 Local-first speech to text for macOS. No account, no subscription, no word cap,
 and no audio ever leaves your machine.
 
+**[Download](https://hackx-in.github.io/vocs/)** · [Releases](https://github.com/HackX-IN/vocs/releases) · [Changelog](CHANGELOG.md)
+
 ---
 
 ## What it does

@@ -1,0 +1,58 @@
+/**
+ * SOURCE OF TRUTH KEYWORDS: site-responsive, small-screens, prefers-reduced-motion
+ * WHAT:  The narrow-screen layout and the reduced-motion overrides for every stylesheet.
+ * WHY:   Last in the cascade on purpose, so a media query here wins over the base rule it adjusts. Reduced motion stops the bars and caret rather than slowing them: a looping animation has no gentler form.
+ * WHERE: Last stylesheet loaded by site/index.html.
+ */
+
+/* ── Small screens ───────────────────────────────────────────────────── */
+
+@media (max-width: 860px) {
+  :root {
+    --space-12: 80px;
+    --space-10: 56px;
+  }
+  .steps,
+  .facts {
+    grid-template-columns: 1fr;
+  }
+  .grid {
+    grid-template-columns: 1fr;
+  }
+  .tile,
+  .tile.wide {
+    grid-column: auto;
+  }
+  .install {
+    grid-template-columns: 1fr;
+    gap: var(--space-8);
+  }
+  .nav-links a:not(.btn) {
+    display: none;
+  }
+  .window-body {
+    padding: var(--space-4) var(--space-4) 96px;
+    font-size: 17px;
+  }
+  .night {
+    margin-inline: var(--space-3);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  .bars b,
+  .caret {
+    animation: none;
+  }
+  .bars b {
+    transform: scaleY(0.7);
+  }
+  .btn,
+  .nav,
+  .faq summary::after {
+    transition: none;
+  }
+}

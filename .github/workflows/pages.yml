@@ -1,0 +1,49 @@
+# SOURCE OF TRUTH KEYWORDS: github-pages, landing-page, pages-deploy, site, deploy-pages
+# WHAT:  Publishes the site/ folder to https://hackx-in.github.io/vocs/ whenever it changes on main.
+# WHY:   The page needs NO deploy per release. Its download button asks the GitHub API for the newest
+#        published release in the visitor's browser (site/main.js), so shipping v1.1 is publishing a
+#        Release and nothing else. This workflow therefore only runs when the PAGE itself changes.
+#
+#        Static files, no build step: the site is plain HTML, CSS and one script, so there is nothing
+#        to install and nothing to go stale. `pages: write` and `id-token: write` are the two
+#        permissions the official deploy action requires, scoped to this workflow only.
+#
+#        ONE-TIME SETUP, done once in the repository and not by this file: Settings -> Pages ->
+#        Build and deployment -> Source: "GitHub Actions". Until that is set, the deploy step fails
+#        with "Pages not enabled".
+# WHERE: Reads site/. Counterpart of release.yml, which builds the app the page links to.
+
+name: Pages
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "site/**"
+      - ".github/workflows/pages.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# One deploy at a time; a newer push supersedes a queued one, but never cancels a running deploy.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+      - id: deployment
+        uses: actions/deploy-pages@v4

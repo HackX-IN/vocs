@@ -1,0 +1,320 @@
+<!doctype html>
+<!--
+  SOURCE OF TRUTH KEYWORDS: landing-page, launch-page, github-pages, download-latest, open-anyway,
+    gatekeeper-steps, privacy-promise, site-index
+  WHAT:  Vocs's public launch page: what it is, how it works, the privacy promise, how to install
+         without an Apple notarisation, and one button that always downloads the newest release.
+  WHY:   Calm and editorial on purpose (big type, long breaks, one product picture), the way
+         Granola's page sells a notepad: the product does the persuading. Nothing here is
+         invented — every claim is one the README makes about the app. The install section
+         carries the Open Anyway steps because Vocs is signed with a self-signed certificate, not
+         notarised, so macOS blocks the first launch (README: "Distributing without an Apple
+         Developer account"); a download page that hid that would just produce a support issue.
+         The HTML is complete without JavaScript: the download button already points at the
+         releases page and main.js only upgrades it to the exact DMG.
+  WHERE: Deployed by .github/workflows/pages.yml to https://hackx-in.github.io/vocs/. Styled by
+         tokens.css, styles.css, sections.css and responsive.css, scripted by main.js. Every URL is
+         relative because a project page lives under /vocs/, not at the domain root.
+-->
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Vocs — talk, and it types</title>
+    <meta
+      name="description"
+      content="Free, open-source speech-to-text for macOS. Press a key, talk, and your words are pasted where you were typing. No account, no cloud, nothing leaves your Mac."
+    />
+    <meta name="theme-color" content="#f4f3ee" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#13110f" media="(prefers-color-scheme: dark)" />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Vocs — talk, and it types" />
+    <meta
+      property="og:description"
+      content="Free, open-source speech-to-text for macOS. Everything runs on your Mac."
+    />
+    <meta property="og:image" content="https://hackx-in.github.io/vocs/icon.png" />
+    <link rel="icon" type="image/png" href="icon.png" />
+    <link rel="preload" href="fonts/doto-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin />
+    <link rel="stylesheet" href="tokens.css" />
+    <link rel="stylesheet" href="styles.css" />
+    <link rel="stylesheet" href="sections.css" />
+    <link rel="stylesheet" href="responsive.css" />
+    <script src="main.js" defer></script>
+  </head>
+
+  <body>
+    <a class="skip" href="#main">Skip to content</a>
+
+    <header class="nav">
+      <div class="wrap">
+        <a class="brand" href="#top" aria-label="Vocs, home">
+          <img src="icon.png" alt="" width="30" height="30" />
+          Vocs
+        </a>
+        <nav class="nav-links" aria-label="Primary">
+          <a href="#how">How it works</a>
+          <a href="#features">Features</a>
+          <a href="#privacy">Privacy</a>
+          <a href="#faq">FAQ</a>
+          <a href="https://github.com/HackX-IN/vocs">GitHub</a>
+          <a class="btn btn-primary btn-sm" data-download href="https://github.com/HackX-IN/vocs/releases/latest">Download</a>
+        </nav>
+      </div>
+    </header>
+
+    <main id="main">
+      <!-- Hero -->
+      <div class="wrap hero" id="top">
+        <span class="chip">Free · Open source · macOS</span>
+        <h1>Talk.<br /><em>It types.</em></h1>
+        <p class="lede">
+          Press a key, say it, press it again. Your words land in whatever you were typing in,
+          before you can look up. Speech-to-text that runs entirely on your Mac.
+        </p>
+        <div class="hero-cta">
+          <a class="btn btn-primary btn-lg" data-download href="https://github.com/HackX-IN/vocs/releases/latest">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12m0 0-4.5-4.5M12 15l4.5-4.5M4 20h16" /></svg>
+            Download for macOS
+          </a>
+          <a class="btn btn-lg" href="https://github.com/HackX-IN/vocs">View the source</a>
+        </div>
+        <p class="fine">
+          <span data-version-wrap hidden><span data-version></span> · </span>macOS 13 or later ·
+          Apple Silicon and Intel · <a href="#install">First launch steps</a>
+        </p>
+
+        <!-- The product, drawn in CSS: a window being typed into, and the recording pill. -->
+        <div class="stage" role="img" aria-label="A message being dictated: the recording pill listens while the words appear in the window above it.">
+          <div class="window" aria-hidden="true">
+            <div class="window-bar"><i></i><i></i><i></i><span>New message</span></div>
+            <div class="window-body">
+              <p class="to">To: Design team</p>
+              <span data-typing>Push the launch to Thursday. Design needs one more pass on the onboarding screens.</span><span class="caret"></span>
+            </div>
+          </div>
+          <div class="pill" aria-hidden="true">
+            <svg viewBox="0 24.5 91.2 75.5" fill="currentColor">
+              <defs>
+                <path id="hq" d="M0 0H38C72 0 100 28 100 64V120H6V62H30C52 62 52 38 30 38H2Z" />
+                <mask id="hm" maskUnits="userSpaceOnUse" x="0" y="0" width="100" height="100">
+                  <rect width="100" height="100" fill="#fff" />
+                  <g fill="#000">
+                    <use href="#hq" transform="translate(44.3 43.2) rotate(-4) scale(0.126)" />
+                    <use href="#hq" transform="translate(60.9 42) rotate(-4) scale(0.126)" />
+                  </g>
+                </mask>
+              </defs>
+              <path mask="url(#hm)" d="M-6 46.5L0 45.5C12 39.5 30 26.5 47 26C63 25.5 82 36 87.4 52.5C90 60 90.8 75 91 105H-6Z" />
+            </svg>
+            <span class="bars"><b></b><b></b><b></b><b></b><b></b></span>
+            <span>Listening</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Where it works -->
+      <div class="wrap works">
+        <p class="eyebrow">Works wherever you can type</p>
+        <ul>
+          <li>Slack</li>
+          <li>Teams</li>
+          <li>Notes</li>
+          <li>Chrome</li>
+          <li>VS Code</li>
+          <li>Terminal</li>
+          <li>Mail</li>
+          <li>Everything else</li>
+        </ul>
+      </div>
+
+      <!-- How it works -->
+      <section id="how">
+        <div class="wrap">
+          <p class="eyebrow"><b>01</b> · How it works</p>
+          <h2>Three beats, and you're done.</h2>
+          <p class="sub">
+            No window to open, no text box to click into. Vocs lives in the menu bar and gets out of
+            the way.
+          </p>
+          <ol class="steps">
+            <li class="step">
+              <span class="num">1</span>
+              <h3>Press <span class="keys"><kbd>⌥</kbd><kbd>Space</kbd></span></h3>
+              <p>Anywhere, in any app. Toggle it, or hold the key to talk. A small pill shows it's listening.</p>
+            </li>
+            <li class="step">
+              <span class="num">2</span>
+              <h3>Say what you mean</h3>
+              <p>Vocs transcribes while you speak, not after, so a five-minute monologue finishes as fast as a sentence.</p>
+            </li>
+            <li class="step">
+              <span class="num">3</span>
+              <h3>Press it again</h3>
+              <p>The text is pasted into whatever had focus, and your clipboard is put back as it was.</p>
+            </li>
+          </ol>
+        </div>
+      </section>
+
+      <!-- Features -->
+      <section id="features">
+        <div class="wrap">
+          <p class="eyebrow"><b>02</b> · What you get</p>
+          <h2>Small app. Careful details.</h2>
+          <div class="grid">
+            <article class="tile wide">
+              <span class="tile-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4m0 12v4M4.9 4.9l2.8 2.8m8.6 8.6 2.8 2.8M2 12h4m12 0h4M4.9 19.1l2.8-2.8m8.6-8.6 2.8-2.8" /></svg></span>
+              <h3>Quiet in meetings</h3>
+              <p>On a call, the other people come out of your speakers and into your microphone. While you dictate, Vocs mutes the built-in speakers, and puts them back the moment you stop. Headphones are left alone.</p>
+            </article>
+            <article class="tile wide">
+              <span class="tile-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><path d="M2 12h20M12 2a15 15 0 0 1 0 20M12 2a15 15 0 0 0 0 20" /></svg></span>
+              <h3>99 languages</h3>
+              <p>Let Vocs detect the language, or pin one. Switch mid-day without touching a setting.</p>
+            </article>
+            <article class="tile">
+              <span class="tile-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1 0-5H20" /></svg></span>
+              <h3>Your dictionary</h3>
+              <p>Teach it the names and jargon it gets wrong. It biases recognition and corrects the output.</p>
+            </article>
+            <article class="tile">
+              <span class="tile-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5L20 7" /></svg></span>
+              <h3>Fixes, not rewrites</h3>
+              <p>Fillers go, real words stay. Optional on-device grammar fixes only the slips that are wrong every time.</p>
+            </article>
+            <article class="tile">
+              <span class="tile-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2" /><path d="M8 8h8M8 12h8M8 16h5" /></svg></span>
+              <h3>A notebook of everything</h3>
+              <p>Every dictation is kept locally, searchable, and editable like a note. A failed paste is never a lost thought.</p>
+            </article>
+            <article class="tile wide">
+              <span class="tile-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 8v4l3 2" /><circle cx="12" cy="12" r="10" /></svg></span>
+              <h3>Escape takes it back</h3>
+              <p>Press Escape and you get a three-second countdown to cancel. Press it again and the recording resumes with nothing lost.</p>
+            </article>
+            <article class="tile wide">
+              <span class="tile-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 4 6v6c0 5 3.5 8 8 9 4.5-1 8-4 8-9V6z" /></svg></span>
+              <h3>Crash-safe</h3>
+              <p>The transcript is saved as it grows, so even a crash mid-sentence keeps what you had said.</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
+      <!-- Privacy -->
+      <section class="night" id="privacy">
+        <div class="wrap">
+          <p class="eyebrow"><b>03</b> · Privacy</p>
+          <h2>Nothing leaves your Mac.</h2>
+          <p class="sub">
+            Recognition runs on your machine. There is no account to make, no subscription, no
+            word limit, and no telemetry. The code is open, so you can check.
+          </p>
+          <ul class="facts">
+            <li><strong>Your audio stays here</strong><span>It is never uploaded anywhere. Recognition happens on this machine.</span></li>
+            <li><strong>Two kinds of request</strong><span>Downloading a model, and an update check you can switch off. Nothing else.</span></li>
+            <li><strong>Signed updates</strong><span>Vocs refuses any update that doesn't verify against the key built into the app.</span></li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- Install -->
+      <section id="install">
+        <div class="wrap install">
+          <div>
+            <p class="eyebrow"><b>04</b> · Install</p>
+            <h2>Up and running in a minute.</h2>
+            <p class="sub">
+              Needs macOS 13 or later, Apple Silicon or Intel, and about 600 MB of disk for the
+              speech model.
+            </p>
+            <p style="margin-top: var(--space-6)">
+              <a class="btn btn-primary btn-lg" data-download href="https://github.com/HackX-IN/vocs/releases/latest">Download for macOS</a>
+            </p>
+            <p class="fine"><span data-version-wrap hidden><span data-version></span> · </span><a data-notes href="https://github.com/HackX-IN/vocs/releases">Release notes</a></p>
+          </div>
+          <div>
+            <ol class="install-steps">
+              <li>
+                <strong>Open the DMG and drag Vocs to Applications.</strong>
+                Then open it.
+              </li>
+              <li>
+                <strong>macOS will say it can't verify Vocs.</strong>
+                That's expected. Vocs is free and independent, so it isn't notarised by Apple. Click Done.
+              </li>
+              <li>
+                <strong>Open System Settings → Privacy &amp; Security.</strong>
+                Scroll to the message about Vocs and choose <b>Open Anyway</b>. You only do this once, and updates inside the app don't ask again.
+              </li>
+              <li>
+                <strong>Follow the setup.</strong>
+                Allow the microphone, download the model, and try your hotkey.
+              </li>
+            </ol>
+            <p class="note">
+              Prefer the terminal? This does the same thing:
+              <code>xattr -dr com.apple.quarantine /Applications/Vocs.app</code>
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <!-- FAQ -->
+      <section id="faq">
+        <div class="wrap center">
+          <p class="eyebrow"><b>05</b> · Questions</p>
+          <h2>Good to know.</h2>
+          <div class="faq" style="text-align: left">
+            <details>
+              <summary>Is it really free?</summary>
+              <p>Yes. No account, no subscription, no word cap. It is open source under the MIT licence.</p>
+            </details>
+            <details>
+              <summary>Does it work offline?</summary>
+              <p>Yes. After the one-time model download, dictation needs no connection at all.</p>
+            </details>
+            <details>
+              <summary>Why does macOS warn me when I open it?</summary>
+              <p>Apple notarisation requires a paid developer account, and Vocs is a free, independent project. The app is signed, and the steps above let you open it once. After that macOS remembers.</p>
+            </details>
+            <details>
+              <summary>How do updates work?</summary>
+              <p>Vocs checks quietly at launch and once a day, and Settings → Updates has a Check for updates button. Every update is verified against a signature before it is installed, and it won't install in the middle of a dictation. You can turn the check off.</p>
+            </details>
+            <details>
+              <summary>What does it need permission for?</summary>
+              <p>The microphone, to hear you. Accessibility is optional: it lets Vocs paste for you. Without it, your text goes to the clipboard instead.</p>
+            </details>
+            <details>
+              <summary>Can I help build it?</summary>
+              <p>Please do. Read the <a href="https://github.com/HackX-IN/vocs/blob/main/CONTRIBUTING.md">contributing guide</a> and open an issue or a pull request.</p>
+            </details>
+          </div>
+        </div>
+      </section>
+
+      <!-- Closing -->
+      <div class="wrap closing">
+        <h2>Stop typing. Start talking.</h2>
+        <p class="hero-cta">
+          <a class="btn btn-primary btn-lg" data-download href="https://github.com/HackX-IN/vocs/releases/latest">Download for macOS</a>
+        </p>
+      </div>
+    </main>
+
+    <footer>
+      <div class="wrap">
+        <span>Vocs · Free and open source under the MIT licence.</span>
+        <nav aria-label="Project">
+          <a href="https://github.com/HackX-IN/vocs">GitHub</a>
+          <a href="https://github.com/HackX-IN/vocs/releases">Releases</a>
+          <a href="https://github.com/HackX-IN/vocs/blob/main/CHANGELOG.md">Changelog</a>
+          <a href="https://github.com/HackX-IN/vocs/issues/new/choose">Report a bug</a>
+          <a href="https://github.com/HackX-IN/vocs/blob/main/THIRD_PARTY_NOTICES.md">Licences</a>
+        </nav>
+      </div>
+    </footer>
+  </body>
+</html>
