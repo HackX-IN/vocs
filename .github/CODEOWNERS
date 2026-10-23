@@ -1,0 +1,21 @@
+# SOURCE OF TRUTH KEYWORDS: codeowners, release-security, signing, updater-pubkey, supply-chain
+# WHAT:  Names the owner of every file that decides what ships to users or who can sign it.
+# WHY:   The signing key and certificate live in repository secrets that any workflow running on
+#        main or a tag can read, so a merged change to a workflow, the updater's public key or
+#        endpoint, or the dependency lock files is a way to ship code or leak the keys. These paths
+#        therefore ask for the owner's review by name. NOTE: GitHub only BLOCKS a merge on this
+#        when branch protection requires code-owner review; until other people have write access
+#        it is a review request, not a gate. Turn that rule on the day a collaborator is added.
+# WHERE: Read by GitHub on every pull request.
+
+/.github/                      @HackX-IN
+/src-tauri/tauri.conf.json     @HackX-IN
+/src-tauri/capabilities/       @HackX-IN
+/src-tauri/entitlements.plist  @HackX-IN
+/src-tauri/Cargo.toml          @HackX-IN
+/src-tauri/Cargo.lock          @HackX-IN
+/package.json                  @HackX-IN
+/pnpm-lock.yaml                @HackX-IN
+/site/                         @HackX-IN
+/SECURITY.md                   @HackX-IN
+/LICENSE                       @HackX-IN
