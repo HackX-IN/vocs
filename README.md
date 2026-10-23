@@ -71,8 +71,9 @@ pnpm tauri dev
 ```
 
 First launch opens setup: grant the microphone, download the model, and test the
-hotkey. After that Vocs lives in the menu bar and you will not see a window
-again unless you open one.
+hotkey. After that Vocs lives in the menu bar. Opening the app (from Finder,
+Launchpad or Spotlight) shows the dashboard; when it starts by itself at login
+it stays quietly in the menu bar.
 
 ## Building a release
 

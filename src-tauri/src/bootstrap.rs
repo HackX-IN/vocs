@@ -279,8 +279,8 @@ pub fn setup(app: &AppHandle) -> AppResult<()> {
         Arc::clone(&ports.models),
         default_model_id(),
     );
-    show_first_window(app, &db)?;
-    show_dashboard_on_launch(app);
+    let onboarding_opened = show_first_window(app, &db)?;
+    show_dashboard_on_launch(app, onboarding_opened);
 
     Ok(())
 }
@@ -1104,23 +1104,22 @@ pub(crate) fn code_from_name(name: &str) -> Option<Code> {
 
 /**
  * SOURCE OF TRUTH KEYWORDS: show_first_window
- * WHAT:  Opens onboarding on a fresh install, and nothing at all afterwards.
- * WHY:   Vocs is invisible until summoned — that is the product. So a normal
- *        launch shows NO window; the app lives in the menu bar and the only
- *        thing a user ever sees is the pill. Onboarding is the one exception,
- *        and it is gated on a setting rather than on whether a model exists, so
- *        that someone who deliberately deleted their model is not dragged back
- *        through setup.
+ * WHAT:  Opens onboarding on a fresh install and says whether it did; shows nothing otherwise.
+ * WHY:   Onboarding is gated on a setting rather than on whether a model exists, so that someone
+ *        who deliberately deleted their model is not dragged back through setup. The answer is
+ *        returned so the caller does not open the dashboard on top of it: a first launch is one
+ *        window, not two. Whether a returning launch shows the dashboard is
+ *        `show_dashboard_on_launch`'s decision, not this function's.
  * WHERE: The last step of setup.
  */
-fn show_first_window(app: &AppHandle, db: &Database) -> AppResult<()> {
+fn show_first_window(app: &AppHandle, db: &Database) -> AppResult<bool> {
     let complete = matches!(
         services::settings::get_setting(db, keys::ONBOARDING_COMPLETE).ok().flatten(),
         Some(SettingValue::Bool(true))
     );
 
     if complete {
-        return Ok(());
+        return Ok(false);
     }
 
     if let Some(window) = app.get_webview_window(ONBOARDING_WINDOW) {
@@ -1135,24 +1134,47 @@ fn show_first_window(app: &AppHandle, db: &Database) -> AppResult<()> {
         let _ = window.set_focus();
         tracing::info!("onboarding opened");
     }
-    Ok(())
+    Ok(true)
+}
+
+/// Passed to the launch-at-login agent (see lib.rs) so a start at login can be told apart from the
+/// user opening the app. The only difference between the two launches is this argument.
+pub const AUTOSTART_ARG: &str = "--autostarted";
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: is_autostart_launch, AUTOSTART_ARG, launch_at_login_hidden
+ * WHAT:  Whether this process was started by the launch-at-login agent, from its arguments.
+ * WHY:   Takes the arguments as a parameter so the rule is testable without a real process.
+ *        Opening Vocs and logging in both start the same binary through launchd, so parentage and
+ *        environment cannot tell them apart; an argument the agent adds can. An agent registered
+ *        before this existed has no argument and so looks like a manual launch: the worst result
+ *        is the dashboard appearing at login until the setting is toggled once, which is
+ *        harmless, whereas guessing the other way would hide the window from someone who just
+ *        double-clicked the app, which is the bug this fixes.
+ * WHERE: show_dashboard_on_launch.
+ */
+fn is_autostart_launch(mut args: impl Iterator<Item = String>) -> bool {
+    args.any(|arg| arg == AUTOSTART_ARG)
 }
 
 /**
  * SOURCE OF TRUTH KEYWORDS: show_dashboard_on_launch, VOCS_SHOW_DASHBOARD
- * WHAT:  Opens the dashboard at launch when the environment asks for it.
- * WHY:   Vocs is invisible until summoned, so nothing opens the dashboard on
- *        a normal run — which also means an automated session cannot get at it,
- *        because the only affordance is a tray click. This gives a way in
- *        WITHOUT changing the shipped behaviour: absent the variable, nothing
- *        happens at all.
+ * WHAT:  Opens the dashboard at launch when the user opened the app, and keeps it hidden when the
+ *        app started itself at login or onboarding already has the screen.
+ * WHY:   Vocs lives in the menu bar and is meant to be quiet, but "quiet" belongs to starting at
+ *        login, not to the user double-clicking the app. A launch that shows nothing reads as
+ *        broken: the icon bounces, no window appears, and the only way in is a menu bar item the
+ *        person does not know to look for. So an ordinary launch opens the dashboard, exactly as
+ *        a second launch of the running app already did (see the single-instance callback in
+ *        lib.rs). `VOCS_SHOW_DASHBOARD` still forces it open for automated sessions.
  * WHERE: Read once at the end of setup.
  */
-fn show_dashboard_on_launch(app: &AppHandle) {
-    if std::env::var("VOCS_SHOW_DASHBOARD").is_err() {
+fn show_dashboard_on_launch(app: &AppHandle, onboarding_opened: bool) {
+    let forced = std::env::var("VOCS_SHOW_DASHBOARD").is_ok();
+    if !forced && (onboarding_opened || is_autostart_launch(std::env::args())) {
         return;
     }
-    tracing::info!("VOCS_SHOW_DASHBOARD set — opening the dashboard");
+    tracing::info!(forced, "opening the dashboard at launch");
     crate::tray::show_dashboard(app);
 }
 
@@ -2101,5 +2123,20 @@ mod tests {
                 "window `{label}` is not declared in tauri.conf.json"
             );
         }
+    }
+
+    /**
+     * SOURCE OF TRUTH KEYWORDS: is_autostart_launch_test
+     * WHAT:  Only the launch-at-login argument marks a start as automatic.
+     * WHY:   The rule decides whether a person who double-clicks the app sees a window, so it
+     *        must not be fooled by other arguments, and must not miss its own.
+     * WHERE: bootstrap::is_autostart_launch.
+     */
+    #[test]
+    fn only_the_launch_at_login_argument_marks_an_automatic_start() {
+        let args = |list: &[&str]| list.iter().map(|s| s.to_string()).collect::<Vec<_>>().into_iter();
+        assert!(is_autostart_launch(args(&["vocs", AUTOSTART_ARG])));
+        assert!(!is_autostart_launch(args(&["vocs"])));
+        assert!(!is_autostart_launch(args(&["vocs", "--other"])));
     }
 }

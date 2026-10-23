@@ -100,9 +100,12 @@ pub fn run() {
         // this line does, and without it check_for_update compiles, exports
         // correct bindings, and panics the first time it is called.
         .plugin(tauri_plugin_updater::Builder::new().build())
+        // The argument is how a start at login is told apart from the user opening the app
+        // (bootstrap::is_autostart_launch): the first stays in the menu bar, the second shows the
+        // dashboard.
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
-            None,
+            Some(vec![bootstrap::AUTOSTART_ARG]),
         ))
         .invoke_handler(builder.invoke_handler())
         .setup(move |app| {
@@ -142,6 +145,16 @@ pub fn run() {
 
             Ok(())
         })
-        .run(tauri::generate_context!())
-        .expect("error while running Vocs");
+        .build(tauri::generate_context!())
+        .expect("error while building Vocs")
+        .run(|app, event| {
+            // Opening an already-running menu-bar app from Finder, Launchpad or `open` is a
+            // request to see it. Without this the click is swallowed and the app seems dead.
+            #[cfg(target_os = "macos")]
+            if let tauri::RunEvent::Reopen { has_visible_windows: false, .. } = event {
+                tray::show_dashboard(app);
+            }
+            #[cfg(not(target_os = "macos"))]
+            let _ = (app, event);
+        });
 }
