@@ -188,6 +188,10 @@ cargo test --manifest-path src-tauri/Cargo.toml   # also regenerates bindings
 pnpm typecheck
 ```
 
+## Contributing
+
+Issues and pull requests are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) first, and report security problems privately as described in [SECURITY.md](SECURITY.md). Everyone taking part follows the [Code of Conduct](CODE_OF_CONDUCT.md).
+
 ## Licence
 
-MIT. See `LICENSE`.
+MIT. See `LICENSE`. Third-party licences, including the models Vocs downloads, are listed in [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

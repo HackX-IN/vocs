@@ -1,0 +1,44 @@
+name: Bug report
+description: Something did not work the way it should.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time. Please do not paste dictated text you would not
+        want public. For a security problem, use the private advisory form instead:
+        https://github.com/HackX-IN/vocs/security/advisories/new
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, and what you got instead.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Vocs version
+      description: Shown under Settings → Updates.
+      placeholder: "1.0.0"
+    validations:
+      required: true
+  - type: input
+    id: macos
+    attributes:
+      label: macOS version and chip
+      placeholder: "macOS 15.1, Apple M2"
+    validations:
+      required: true
+  - type: input
+    id: app
+    attributes:
+      label: App you were dictating into
+      placeholder: "Slack, Notes, Chrome…"
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics
+      description: |
+        Settings → Your data → Export diagnostics creates a plain-text file with no
+        dictation text and no home path. Drag it in here if it helps.

@@ -1,0 +1,34 @@
+# SOURCE OF TRUTH KEYWORDS: dependabot, dependency updates, cargo, npm, github-actions
+# WHAT:  Weekly update PRs for the three dependency surfaces: Rust crates, the
+#        pnpm workspace, and the GitHub Actions the workflows pin.
+# WHY:   Grouped, so a week's minor and patch bumps arrive as one PR that CI can
+#        judge, not twenty. Majors stay separate because those are the ones that
+#        need a person to read the changelog. tauri and whisper-rs are ignored
+#        for major bumps: both are tied to the generated bindings and a native
+#        build, and move deliberately.
+# WHERE: Read by GitHub; the PRs it opens run .github/workflows/ci.yml.
+version: 2
+updates:
+  - package-ecosystem: cargo
+    directory: /src-tauri
+    schedule:
+      interval: weekly
+    groups:
+      rust-minor-and-patch:
+        update-types: [minor, patch]
+    ignore:
+      - dependency-name: "tauri*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "whisper-rs"
+        update-types: ["version-update:semver-major"]
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      js-minor-and-patch:
+        update-types: [minor, patch]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

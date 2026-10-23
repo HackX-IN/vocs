@@ -1,0 +1,26 @@
+name: Feature request
+description: An idea, described by the problem it solves.
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: Describe the situation first. The solution comes second.
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would you like Vocs to do?
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What do you do today instead?
+  - type: checkboxes
+    id: promises
+    attributes:
+      label: Fit with the product
+      options:
+        - label: It works without an account and without sending audio or text off the Mac.
+          required: true
