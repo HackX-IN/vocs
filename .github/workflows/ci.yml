@@ -22,14 +22,37 @@
 #        pipeline that is red on the day it lands teaches everyone to ignore it.
 #        Adding the gate means reformatting the crate in one commit first, which
 #        is a change worth making on its own and not alongside anything else.
+#
+#        TRIGGERS ARE NARROW ON PURPOSE. It used to run on a push to EVERY branch AND on every pull
+#        request, so a pull request's branch ran the whole suite twice, and a change to a README or
+#        the launch page ran three macOS jobs that cannot possibly be affected by it. Now: pushes to
+#        main, and pull requests (the branch push is covered by the PR itself), and neither when the
+#        change touches only documentation, the site, or repository metadata. The ignore list is
+#        shared between the two triggers by a YAML anchor so they cannot drift. release.yml is in it
+#        because it only runs on a tag, so a CI run proves nothing about it. If a "required check"
+#        is ever added in branch protection, a path-ignored PR would wait on it forever; drop
+#        paths-ignore for the pull_request trigger the day that happens.
 # WHERE: Complements release.yml, which builds and signs on a `v*` tag.
 
 name: CI
 
 on:
   push:
-    branches: ["**"]
+    branches: [main]
+    paths-ignore: &no-code
+      - "**.md"
+      - "docs/**"
+      - "site/**"
+      - "LICENSE"
+      - ".gitignore"
+      - ".github/CODEOWNERS"
+      - ".github/dependabot.yml"
+      - ".github/ISSUE_TEMPLATE/**"
+      - ".github/PULL_REQUEST_TEMPLATE.md"
+      - ".github/workflows/pages.yml"
+      - ".github/workflows/release.yml"
   pull_request:
+    paths-ignore: *no-code
   workflow_dispatch:
 
 # Cancel superseded runs on the same branch: the newest push is the one that
