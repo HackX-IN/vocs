@@ -215,7 +215,7 @@ jobs:
           { echo "body<<NOTES_EOF"; cat "$NOTES"; echo "NOTES_EOF"; } >> "$GITHUB_OUTPUT"
 
       - name: Build, sign and publish
-        uses: tauri-apps/tauri-action@v0
+        uses: tauri-apps/tauri-action@v1
         env:
           # ── Updater signing. Without these the build produces artifacts the
           # app will refuse to install, which fails silently at update time
