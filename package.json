@@ -1,7 +1,7 @@
 {
   "name": "vocs",
   "private": true,
-  "version": "0.1.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -43,5 +43,13 @@
     "vite": "^7.0.4"
   },
   "license": "MIT",
+  "homepage": "https://hackx-in.github.io/vocs/",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/HackX-IN/vocs.git"
+  },
+  "bugs": {
+    "url": "https://github.com/HackX-IN/vocs/issues"
+  },
   "description": "Local-first, free, blazing-fast speech-to-text for macOS."
 }
