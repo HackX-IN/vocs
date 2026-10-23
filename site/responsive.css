@@ -8,6 +8,18 @@
 /* ── Small screens ───────────────────────────────────────────────────── */
 
 @media (max-width: 860px) {
+  .toast {
+    left: var(--space-3);
+    right: var(--space-3);
+    bottom: var(--space-3);
+    max-width: none;
+  }
+  .release {
+    padding: var(--space-5);
+  }
+  .release-head .btn {
+    margin-left: 0;
+  }
   :root {
     --space-12: 80px;
     --space-10: 56px;
@@ -52,6 +64,7 @@
   }
   .btn,
   .nav,
+  .mac-option,
   .faq summary::after {
     transition: none;
   }

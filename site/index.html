@@ -3,7 +3,8 @@
   SOURCE OF TRUTH KEYWORDS: landing-page, launch-page, github-pages, download-latest, open-anyway,
     gatekeeper-steps, privacy-promise, site-index
   WHAT:  Vocs's public launch page: what it is, how it works, the privacy promise, how to install
-         without an Apple notarisation, and one button that always downloads the newest release.
+         without an Apple notarisation, the release history, and Download buttons that fetch the
+         newest release's DMG without leaving the page.
   WHY:   Calm and editorial on purpose (big type, long breaks, one product picture), the way
          Granola's page sells a notepad: the product does the persuading. Nothing here is
          invented — every claim is one the README makes about the app. The install section
@@ -39,11 +40,25 @@
     <link rel="stylesheet" href="tokens.css" />
     <link rel="stylesheet" href="styles.css" />
     <link rel="stylesheet" href="sections.css" />
+    <link rel="stylesheet" href="download.css" />
     <link rel="stylesheet" href="responsive.css" />
-    <script src="main.js" defer></script>
+    <script type="module" src="main.js"></script>
   </head>
 
   <body>
+    <!-- Two chip glyphs, drawn for this page (not the manufacturers' logos): a chip with an M, and a chip with a core. -->
+    <svg width="0" height="0" style="position: absolute" aria-hidden="true" focusable="false">
+      <symbol id="chip-silicon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="5" y="5" width="14" height="14" rx="3" />
+        <path d="M9 2v3M12 2v3M15 2v3M9 19v3M12 19v3M15 19v3M2 9h3M2 12h3M2 15h3M19 9h3M19 12h3M19 15h3" />
+        <path d="M9.3 15v-5.6l2.7 3.3 2.7-3.3V15" stroke-width="1.8" />
+      </symbol>
+      <symbol id="chip-intel" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="5" y="5" width="14" height="14" rx="1.5" />
+        <path d="M8 2v3M12 2v3M16 2v3M8 19v3M12 19v3M16 19v3M2 8h3M2 12h3M2 16h3M19 8h3M19 12h3M19 16h3" />
+        <rect x="9" y="9" width="6" height="6" rx="0.8" />
+      </symbol>
+    </svg>
     <a class="skip" href="#main">Skip to content</a>
 
     <header class="nav">
@@ -56,6 +71,7 @@
           <a href="#how">How it works</a>
           <a href="#features">Features</a>
           <a href="#privacy">Privacy</a>
+          <a href="#releases">Releases</a>
           <a href="#faq">FAQ</a>
           <a href="https://github.com/HackX-IN/vocs">GitHub</a>
           <a class="btn btn-primary btn-sm" data-download href="https://github.com/HackX-IN/vocs/releases/latest">Download</a>
@@ -81,7 +97,11 @@
         </div>
         <p class="fine">
           <span data-version-wrap hidden><span data-version></span> · </span>macOS 13 or later ·
-          Apple Silicon and Intel · <a href="#install">First launch steps</a>
+          <a href="#install">First launch steps</a>
+        </p>
+        <p class="chips-inline" aria-label="Runs on Apple Silicon and Intel Macs">
+          <span class="chip-mini"><svg aria-hidden="true"><use href="#chip-silicon" /></svg>Apple Silicon</span>
+          <span class="chip-mini"><svg aria-hidden="true"><use href="#chip-intel" /></svg>Intel</span>
         </p>
 
         <!-- The product, drawn in CSS: a window being typed into, and the recording pill. -->
@@ -229,10 +249,23 @@
               Needs macOS 13 or later, Apple Silicon or Intel, and about 600 MB of disk for the
               speech model.
             </p>
-            <p style="margin-top: var(--space-6)">
-              <a class="btn btn-primary btn-lg" data-download href="https://github.com/HackX-IN/vocs/releases/latest">Download for macOS</a>
+            <div class="mac-options">
+              <a class="mac-option" data-download href="https://github.com/HackX-IN/vocs/releases/latest">
+                <svg aria-hidden="true"><use href="#chip-silicon" /></svg>
+                <span class="mac-option-text"><strong>Apple Silicon</strong><small>M1, M2, M3, M4 and newer</small></span>
+                <span class="mac-option-go">Download</span>
+              </a>
+              <a class="mac-option" data-download href="https://github.com/HackX-IN/vocs/releases/latest">
+                <svg aria-hidden="true"><use href="#chip-intel" /></svg>
+                <span class="mac-option-text"><strong>Intel</strong><small>Intel-based Macs</small></span>
+                <span class="mac-option-go">Download</span>
+              </a>
+            </div>
+            <p class="fine">
+              One universal download: the same file runs natively on both. Not sure which you have?
+              Apple menu → About This Mac.
             </p>
-            <p class="fine"><span data-version-wrap hidden><span data-version></span> · </span><a data-notes href="https://github.com/HackX-IN/vocs/releases">Release notes</a></p>
+            <p class="fine"><span data-version-wrap hidden><span data-version></span> <span data-size></span> · </span><a data-notes href="https://github.com/HackX-IN/vocs/releases">Release notes</a></p>
           </div>
           <div>
             <ol class="install-steps">
@@ -261,10 +294,32 @@
         </div>
       </section>
 
+      <!-- Releases -->
+      <section id="releases">
+        <div class="wrap">
+          <p class="eyebrow"><b>05</b> · Releases</p>
+          <h2>What's new.</h2>
+          <p class="sub">
+            Every version, with what changed. The newest is always the one the Download buttons
+            fetch.
+          </p>
+          <div id="release-list" class="release-list"></div>
+          <p id="releases-empty" class="note">
+            No release is published yet. Watch
+            <a href="https://github.com/HackX-IN/vocs/releases">the releases page</a> or the
+            <a href="https://github.com/HackX-IN/vocs/blob/main/CHANGELOG.md">changelog</a>.
+          </p>
+          <p class="fine">
+            <a href="https://github.com/HackX-IN/vocs/blob/main/CHANGELOG.md">Full changelog</a> ·
+            <a href="https://github.com/HackX-IN/vocs/releases">All releases on GitHub</a>
+          </p>
+        </div>
+      </section>
+
       <!-- FAQ -->
       <section id="faq">
         <div class="wrap center">
-          <p class="eyebrow"><b>05</b> · Questions</p>
+          <p class="eyebrow"><b>06</b> · Questions</p>
           <h2>Good to know.</h2>
           <div class="faq" style="text-align: left">
             <details>
@@ -316,5 +371,15 @@
         </nav>
       </div>
     </footer>
+    <div id="started" class="toast" role="status" hidden>
+      <div>
+        <strong>Download started · <span data-toast-version></span></strong>
+        <p>
+          Open the DMG and drag Vocs to Applications. macOS will ask you to approve the first
+          launch. <a href="#install">Here's how</a>.
+        </p>
+      </div>
+      <button id="started-close" type="button" aria-label="Dismiss">×</button>
+    </div>
   </body>
 </html>
