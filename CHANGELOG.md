@@ -5,6 +5,8 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.0.1] - 2026-10-24
+
 ### Fixed
 - **Opening Vocs now shows the window.** Double-clicking the app used to start it silently in the menu bar, so it looked as if nothing had happened and you had to find **Open Vocs** in the menu bar item. The dashboard now opens when you open the app, and again if you open it while it is already running. When Vocs starts by itself at login it still stays quiet in the menu bar. (An existing launch-at-login entry made before this fix shows the window at login until you switch **Launch at login** off and on once.)
 
