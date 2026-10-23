@@ -3,8 +3,11 @@
  *   release-summary, download-url, dmg-asset
  * WHAT:  Asks GitHub for the project's published releases once and returns them as plain objects:
  *        version, date, notes, the DMG's download URL, and the release page.
- * WHY:   The download button and the Releases section are both driven by this one answer, so the
- *        page makes ONE request and the two can never disagree about what "latest" is. Looked up in
+ * WHY:   The version label beside the download buttons and the Releases section are both driven by
+ *        this one answer, so the page makes ONE request and the two can never disagree about what
+ *        "latest" is. It does NOT drive the download itself: the buttons are plain links to a
+ *        permanent file URL (see downloads.js), so a failed lookup here costs a label, never a
+ *        download. Looked up in
  *        the visitor's browser, not written into the HTML at deploy time: publishing a GitHub
  *        Release is then the whole act of shipping, with no commit and no workflow run for the site.
  *        The DMG's filename carries the version, so a stable /releases/latest/download/<name> URL
@@ -21,10 +24,10 @@
 
 const REPO = "HackX-IN/vocs";
 const API = `https://api.github.com/repos/${REPO}/releases?per_page=10`;
-const CACHE_KEY = "vocs.releases.v1";
+const CACHE_KEY = "vocs.releases.v2";
 const CACHE_MS = 10 * 60 * 1000;
 
-/** The releases page, which is where every failure lands. */
+/** The releases page; the fallback link for a release that reports no page of its own. */
 export const RELEASES_PAGE = `https://github.com/${REPO}/releases`;
 
 function readCache() {
@@ -70,7 +73,9 @@ export async function loadReleases() {
     const response = await fetch(API, { headers: { Accept: "application/vnd.github+json" } });
     if (!response.ok) return [];
     const releases = (await response.json()).map(summarise).filter(Boolean);
-    writeCache(releases);
+    // An empty answer is NOT cached: right after a release is published the page would otherwise
+    // keep showing "no release yet" for the rest of the cache window.
+    if (releases.length > 0) writeCache(releases);
     return releases;
   } catch {
     return [];

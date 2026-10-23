@@ -1,18 +1,17 @@
 /**
  * SOURCE OF TRUTH KEYWORDS: initDownloads, download-button, download-toast, releases-section,
  *   showLatest, renderReleases, data-download, direct-download
- * WHAT:  Wires every Download button to the newest release's DMG so a click downloads the app
- *        from this page, confirms it with a "download started" note, and fills the Releases
- *        section with each release's date and notes.
- * WHY:   The buttons start as plain links to the GitHub releases page so the page works with no
- *        JavaScript; once the release is known they are re-pointed at the DMG itself. GitHub serves
- *        that file as an attachment, so the browser downloads it and the visitor never leaves the
- *        page, which is what lets the page stay put and show the next step (the first-launch
- *        approval) instead of dropping them on a repository.
- *
- *        A click that arrives BEFORE the lookup resolves is held and decided when it does, not
- *        allowed to fall through to the releases page: the visitor asked for the app. If there
- *        turns out to be no published release, that fallback is the honest answer.
+ * WHAT:  Shows the "download started" note when a Download button is clicked, fills in the
+ *        version and size beside the buttons, and renders the Releases section with each
+ *        release's date and notes.
+ * WHY:   The buttons are plain links to ONE permanent URL, releases/latest/download/Vocs-macOS.dmg,
+ *        which GitHub redirects to the newest published release (release.yml uploads that copy of
+ *        the DMG with every release). They used to be re-pointed here from an API answer, and any
+ *        failed, rate-limited or stale lookup sent the visitor to the releases page instead of
+ *        downloading. A link to a file has no such failure, and GitHub serves it as an attachment,
+ *        so the browser downloads it and the visitor stays on the page. Everything this file does
+ *        is decoration around that: if the API is down the download still works and only the
+ *        version label and the Releases section are missing.
  *
  *        Releases are rendered with DOM calls, never innerHTML, because the notes are data from a
  *        release body (see notes.js).
@@ -20,7 +19,7 @@
  *        and the #started toast in index.html.
  */
 
-import { loadReleases, latestRelease, RELEASES_PAGE } from "./release.js";
+import { loadReleases, latestRelease } from "./release.js";
 import { renderNotes } from "./notes.js";
 
 const TOAST_MS = 14000;
@@ -45,9 +44,6 @@ function element(tag, className, text) {
 }
 
 function showLatest(release) {
-  document.querySelectorAll("[data-download]").forEach((link) => {
-    link.href = release.dmg;
-  });
   document.querySelectorAll("[data-version]").forEach((node) => {
     node.textContent = `v${release.version}`;
   });
@@ -111,22 +107,12 @@ function renderReleases(releases, latest) {
 function announceStarted(release) {
   const toast = document.getElementById("started");
   if (!toast) return;
-  toast.querySelector("[data-toast-version]").textContent = `v${release.version}`;
+  toast.querySelector("[data-toast-version]").textContent = release ? `v${release.version}` : "";
   toast.hidden = false;
   clearTimeout(announceStarted.timer);
   announceStarted.timer = setTimeout(() => {
     toast.hidden = true;
   }, TOAST_MS);
-}
-
-function startDownload(release) {
-  const link = element("a");
-  link.href = release.dmg;
-  link.download = "";
-  document.body.append(link);
-  link.click();
-  link.remove();
-  announceStarted(release);
 }
 
 export function initDownloads() {
@@ -143,20 +129,9 @@ export function initDownloads() {
     document.getElementById("started").hidden = true;
   });
 
-  document.addEventListener("click", async (event) => {
-    const link = event.target.closest("a[data-download]");
-    if (!link) return;
-
-    // Known: let the link do its job (it already points at the DMG) and say what happens next.
-    if (latest) {
-      announceStarted(latest);
-      return;
-    }
-
-    // Not known yet: decide when it is, rather than sending the visitor to a repository.
-    event.preventDefault();
-    const release = latestRelease(await releases);
-    if (release) startDownload(release);
-    else window.location.href = RELEASES_PAGE;
+  // The link itself downloads the file (see the module WHY); all this adds is the note saying so.
+  // It never cancels the click, so a failed lookup cannot get in the way of a download.
+  document.addEventListener("click", (event) => {
+    if (event.target.closest("a[data-download]")) announceStarted(latest);
   });
 }
