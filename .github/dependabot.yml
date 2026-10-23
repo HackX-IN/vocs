@@ -1,11 +1,14 @@
-# SOURCE OF TRUTH KEYWORDS: dependabot, dependency updates, cargo, npm, github-actions
-# WHAT:  Weekly update PRs for the three dependency surfaces: Rust crates, the
-#        pnpm workspace, and the GitHub Actions the workflows pin.
-# WHY:   Grouped, so a week's minor and patch bumps arrive as one PR that CI can
-#        judge, not twenty. Majors stay separate because those are the ones that
-#        need a person to read the changelog. tauri and whisper-rs are ignored
-#        for major bumps: both are tied to the generated bindings and a native
-#        build, and move deliberately.
+# SOURCE OF TRUTH KEYWORDS: dependabot, dependency updates, cargo, npm, github-actions, major-bumps
+# WHAT:  Weekly update PRs for the three dependency surfaces: Rust crates, the pnpm workspace, and the
+#        GitHub Actions the workflows pin. Minor and patch updates only, grouped.
+# WHY:   Major versions are IGNORED, deliberately. The first week of this file opened fifteen PRs and
+#        six of them failed CI: a three-crate jump in `candle` that powers the on-device grammar
+#        model, TypeScript 5 to 7, and a bump of `tauri-action`, which is the step that builds,
+#        signs and publishes. A major upgrade is a decision with a migration attached, not a chore
+#        to approve in a list, so it is made by hand (`cargo upgrade` / `pnpm up --latest`) when
+#        wanted. Minor and patch bumps arrive as ONE grouped PR per ecosystem so CI judges the week
+#        together, and the action pins update monthly because a changed action is a changed release
+#        pipeline and weekly is more attention than it deserves.
 # WHERE: Read by GitHub; the PRs it opens run .github/workflows/ci.yml.
 version: 2
 updates:
@@ -17,9 +20,7 @@ updates:
       rust-minor-and-patch:
         update-types: [minor, patch]
     ignore:
-      - dependency-name: "tauri*"
-        update-types: ["version-update:semver-major"]
-      - dependency-name: "whisper-rs"
+      - dependency-name: "*"
         update-types: ["version-update:semver-major"]
   - package-ecosystem: npm
     directory: /
@@ -28,7 +29,13 @@ updates:
     groups:
       js-minor-and-patch:
         update-types: [minor, patch]
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: github-actions
     directory: /
     schedule:
-      interval: weekly
+      interval: monthly
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
