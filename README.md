@@ -110,10 +110,12 @@ artifact goes unsigned. In CI both come from repository secrets.
 Vocs is distributed as a DMG from our own website, not the App Store, and
 without Apple notarisation. That works, with two consequences you must plan for.
 
-**What a user sees on the first launch.** Gatekeeper blocks the app ("Apple
-could not verify…"). The user opens **System Settings → Privacy & Security**,
-scrolls to the message about Vocs and chooses **Open Anyway** (or runs
-`xattr -dr com.apple.quarantine /Applications/Vocs.app`). This happens once.
+**What a user sees on the first launch.** Gatekeeper blocks the DMG itself
+("Vocs-macOS.dmg" Not Opened: "Apple could not verify…"), and may block the app
+again once it is copied out. The user chooses **Done** (not Move to Trash), then
+opens **System Settings → Privacy & Security**, scrolls to the message and
+chooses **Open Anyway** (or runs `xattr -dr com.apple.quarantine` on the DMG,
+and on `/Applications/Vocs.app` if asked). This happens once per file.
 In-app updates are downloaded by the app itself, so they do not trigger it
 again. The download page on the website must show these steps.
 

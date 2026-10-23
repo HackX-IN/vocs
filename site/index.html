@@ -271,16 +271,19 @@
           <div>
             <ol class="install-steps">
               <li>
-                <strong>Open the DMG and drag Vocs to Applications.</strong>
-                Then open it.
+                <strong>Open the downloaded DMG.</strong>
+                macOS will say it can't verify <b>Vocs-macOS.dmg</b>. That's expected: Vocs is free and
+                independent, so it isn't notarised by Apple. Click <b>Done</b>, not Move to Trash.
               </li>
               <li>
-                <strong>macOS will say it can't verify Vocs.</strong>
-                That's expected. Vocs is free and independent, so it isn't notarised by Apple. Click Done.
+                <strong>Approve it in System Settings.</strong>
+                Open <b>System Settings → Privacy &amp; Security</b>, scroll down to the message about
+                the DMG and choose <b>Open Anyway</b>, then enter your password. The DMG opens.
               </li>
               <li>
-                <strong>Open System Settings → Privacy &amp; Security.</strong>
-                Scroll to the message about Vocs and choose <b>Open Anyway</b>. You only do this once, and updates inside the app don't ask again.
+                <strong>Drag Vocs to Applications and open it.</strong>
+                macOS may ask once more, this time about the app. Same place, same <b>Open Anyway</b>.
+                After that it never asks again, and updates inside the app don't ask either.
               </li>
               <li>
                 <strong>Follow the setup.</strong>
@@ -288,7 +291,9 @@
               </li>
             </ol>
             <p class="note">
-              Prefer the terminal? This does the same thing:
+              Prefer the terminal? Run this before opening the DMG, and again for the app if macOS
+              asks about it:
+              <code>xattr -dr com.apple.quarantine ~/Downloads/Vocs-macOS.dmg</code>
               <code>xattr -dr com.apple.quarantine /Applications/Vocs.app</code>
             </p>
           </div>
@@ -333,7 +338,7 @@
             </details>
             <details>
               <summary>Why does macOS warn me when I open it?</summary>
-              <p>Apple notarisation requires a paid developer account, and Vocs is a free, independent project. The app is signed, and the steps above let you open it once. After that macOS remembers.</p>
+              <p>Apple notarisation requires a paid developer account, and Vocs is a free, independent project. The app is signed, and the steps above approve the DMG and the app once each. After that macOS remembers.</p>
             </details>
             <details>
               <summary>How do updates work?</summary>
@@ -376,8 +381,8 @@
       <div>
         <strong>Download started · <span data-toast-version></span></strong>
         <p>
-          Open the DMG and drag Vocs to Applications. macOS will ask you to approve the first
-          launch. <a href="#install">Here's how</a>.
+          macOS will say it can't verify the DMG. That's expected: choose Done, then Open Anyway in
+          System Settings → Privacy &amp; Security. <a href="#install">Here's how</a>.
         </p>
       </div>
       <button id="started-close" type="button" aria-label="Dismiss">×</button>
