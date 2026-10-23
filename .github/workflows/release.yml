@@ -159,6 +159,7 @@ jobs:
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
         run: |
           set -euo pipefail
           # Guarded HERE and not in `if:` — `secrets` is not a permitted context
@@ -180,9 +181,13 @@ jobs:
           # unlocked keychain. -T alone is not enough on modern macOS.
           security set-key-partition-list -S apple-tool:,apple:,codesign: \
             -s -k "$KCPASS" "$KC" >/dev/null
-          # Export the public certificate and trust it for code signing.
-          openssl pkcs12 -in /tmp/cert.p12 -clcerts -nokeys -legacy \
-            -passin pass:"$APPLE_CERTIFICATE_PASSWORD" -out /tmp/cert.pem 2>/dev/null
+          # Export the public certificate and trust it for code signing. Read back OUT OF THE
+          # KEYCHAIN that just imported it, not out of the .p12 with openssl: `openssl pkcs12
+          # -legacy` exists only in OpenSSL 3, and a runner whose `openssl` is LibreSSL rejects the
+          # flag. The previous form also sent stderr to /dev/null, so under `set -e` that rejection
+          # ended the step with exit 1 and not one word of explanation. The keychain already
+          # accepted this file, so it is the one reader guaranteed to understand it.
+          security find-certificate -c "$APPLE_SIGNING_IDENTITY" -p "$KC" > /tmp/cert.pem
           sudo security add-trusted-cert -d -r trustRoot -p codeSign \
             -k /Library/Keychains/System.keychain /tmp/cert.pem
           security list-keychains -d user -s "$KC" login.keychain
