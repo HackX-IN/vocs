@@ -418,7 +418,7 @@ impl SessionActor {
             tracing::info!(app, "refusing to record in an excluded app");
             let err = AppError::new(
                 ErrorCode::AppExcluded,
-                format!("Vocs is turned off in {app}. You can change that in Settings, under Per-app profiles."),
+                format!("Vocs is turned off in {app}."),
             );
             let _ = self.ctx.session.send(SessionEvent::ArmingFailed(err)).await;
             return;

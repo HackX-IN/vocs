@@ -7,10 +7,11 @@
  * WHY:   Nothing here lists a setting. Rows come from the registry's SettingDefs
  *        through toControlSetting, so adding a setting in Rust makes it appear on
  *        its page with no change here (CLAUDE.md §7). What this file decides is
- *        the presentation: a page is one card of rows, plus a second card for
- *        the panel that belongs with it (models under Transcription, the
- *        dictionary under Vocabulary), numbered in reading order by position —
- *        the same instrument-panel convention as Stats.
+ *        the presentation: a page is one card of rows per registry section it
+ *        shows, each followed by the panel that belongs with it (models under
+ *        Transcription, the grammar model under Smart grammar, the dictionary
+ *        under Vocabulary), numbered in reading order by position — the same
+ *        instrument-panel convention as Stats.
  *
  *        Advanced settings sit behind a disclosure at the foot of their card:
  *        they exist to unstick a specific machine, not to be browsed. A missing
@@ -31,13 +32,14 @@ import type {
   OsPermission,
   PermissionReport,
   SettingDef as RegistrySettingDef,
+  SettingSection,
   SettingValue,
 } from "@/lib/bindings";
 import { missingPermissions } from "@/lib/use-permissions";
 import { cn } from "@/lib/utils";
 import { Card, EmptyState, Eyebrow, SettingControl } from "@/components/global";
 import { toControlSetting, type DynamicOptions } from "../to-setting-def";
-import { pageForSection, SETTINGS_PAGES, type SettingsPage } from "../settings-pages";
+import { pageForSection, SECTION_TITLES, SETTINGS_PAGES, type SettingsPage } from "../settings-pages";
 import { AppProfiles } from "./AppProfiles";
 import { BackupPanel } from "./BackupPanel";
 import { ClearHistoryControl } from "./ClearHistoryControl";
@@ -55,6 +57,12 @@ export interface SettingsContext {
   engine: EngineCapabilities | null;
   permissions: readonly PermissionReport[] | null;
   onWrite: (key: string, value: SettingValue) => void;
+}
+
+/** One numbered card on a settings page. */
+interface PageCard {
+  title: string;
+  body: React.ReactNode;
 }
 
 const ROW_CLASS = "hairline-b last:border-b-0";
@@ -102,7 +110,7 @@ function AdvancedRows({ defs, context }: { defs: readonly RegistrySettingDef[]; 
 
 export interface SettingsPageBodyProps {
   page: SettingsPage;
-  /** The registry settings whose section this page shows. */
+  /** The registry settings in the sections this page shows. */
   defs: readonly RegistrySettingDef[];
   /** Every definition — per-app profiles override any of them. */
   allDefs: readonly RegistrySettingDef[];
@@ -112,17 +120,50 @@ export interface SettingsPageBodyProps {
   onDataImported: () => void;
 }
 
-export function SettingsPageBody({ page, defs, allDefs, context, dataVersion, onDataImported }: SettingsPageBodyProps) {
-  const plain = defs.filter((def) => !def.advanced);
-  const advanced = defs.filter((def) => def.advanced);
+/**
+ * The panels that belong beside a section's settings. Keyed by section rather
+ * than by page so a page holding two sections puts each panel under the card it
+ * explains — the grammar model sits under the Smart grammar switch, not under
+ * the rule-based fixes.
+ */
+function panelsFor(section: SettingSection, dataVersion: number, onDataImported: () => void): PageCard[] {
+  switch (section) {
+    case "TRANSCRIPTION":
+      return [{ title: "Models", body: <ModelManager kind="SPEECH" /> }];
+    case "SMART_GRAMMAR":
+      return [
+        { title: "Grammar model", body: <ModelManager kind="GRAMMAR" /> },
+        { title: "Learned corrections", body: <LearnedCorrections key={dataVersion} /> },
+      ];
+    case "VOCABULARY":
+      return [{ title: "Dictionary", body: <DictionaryManager key={dataVersion} /> }];
+    case "PRIVACY":
+      return [
+        {
+          title: "Your data",
+          body: (
+            <>
+              <ClearHistoryControl />
+              <DiagnosticsPanel />
+            </>
+          ),
+        },
+      ];
+    case "GENERAL":
+      return [{ title: "Backup", body: <BackupPanel onImported={onDataImported} /> }];
+    default:
+      return [];
+  }
+}
 
+export function SettingsPageBody({ page, defs, allDefs, context, dataVersion, onDataImported }: SettingsPageBodyProps) {
   // One notice per distinct missing grant, not one per blocked control.
   const blocking = [
     ...new Set(defs.flatMap((def) => missingPermissions(def.requires_permission, context.permissions))),
   ] as OsPermission[];
 
   // Cards are numbered by position among those actually shown.
-  const cards: { title: string; body: React.ReactNode }[] = [];
+  const cards: PageCard[] = [];
 
   if (page.id === "profiles") {
     cards.push({
@@ -139,37 +180,21 @@ export function SettingsPageBody({ page, defs, allDefs, context, dataVersion, on
       ),
     });
   } else {
-    if (defs.length > 0 || page.id === "recording") {
-      cards.push({
-        title: page.label,
-        body: (
-          <>
-            <SettingRows defs={plain} context={context} />
-            {page.id === "recording" ? <MicTestPanel /> : null}
-            <AdvancedRows defs={advanced} context={context} />
-          </>
-        ),
-      });
-    }
-    if (page.id === "transcription") cards.push({ title: "Models", body: <ModelManager kind="SPEECH" /> });
-    if (page.id === "output") cards.push({ title: "Grammar model", body: <ModelManager kind="GRAMMAR" /> });
-    if (page.id === "vocabulary") {
-      cards.push({ title: "Dictionary", body: <DictionaryManager key={dataVersion} /> });
-      cards.push({ title: "Learned corrections", body: <LearnedCorrections key={dataVersion} /> });
-    }
-    if (page.id === "privacy") {
-      cards.push({
-        title: "Your data",
-        body: (
-          <>
-            <ClearHistoryControl />
-            <DiagnosticsPanel />
-          </>
-        ),
-      });
-    }
-    if (page.id === "general") {
-      cards.push({ title: "Backup", body: <BackupPanel onImported={onDataImported} /> });
+    for (const section of page.sections) {
+      const sectionDefs = defs.filter((def) => def.section === section);
+      if (sectionDefs.length > 0 || section === "RECORDING") {
+        cards.push({
+          title: SECTION_TITLES[section] ?? page.label,
+          body: (
+            <>
+              <SettingRows defs={sectionDefs.filter((def) => !def.advanced)} context={context} />
+              {section === "RECORDING" ? <MicTestPanel /> : null}
+              <AdvancedRows defs={sectionDefs.filter((def) => def.advanced)} context={context} />
+            </>
+          ),
+        });
+      }
+      cards.push(...panelsFor(section, dataVersion, onDataImported));
     }
   }
 

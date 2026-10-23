@@ -78,6 +78,14 @@ impl CapabilityKey {
 pub enum SettingSection {
     Recording,
     Transcription,
+    /// Cleanup and style applied to the words: punctuation, fillers, tone.
+    Writing,
+    /// The rule-based grammar fix. Its own section so it is not mixed in with
+    /// the AI model beside it.
+    Grammar,
+    /// The optional on-device model and what it learns.
+    SmartGrammar,
+    /// Where the finished text goes: paste, clipboard, preview.
     Output,
     Vocabulary,
     Privacy,

@@ -1,26 +1,34 @@
 /**
  * SOURCE OF TRUTH KEYWORDS: SETTINGS_PAGES, SettingsPage, SettingsPageId, pageForSection,
- *   settings-navigation, settings-search
+ *   SECTION_TITLES, settings-navigation, settings-search, hidden-page
  * WHAT:  The pages of the Settings screen — their order, names, icons and
- *        one-line descriptions — and which registry section each one shows.
+ *        one-line descriptions — and which registry sections each one shows.
  * WHY:   What settings EXIST is the registry's business (nothing here lists
  *        them). How they are GROUPED into pages is a layout judgement, and the
- *        one thing the registry cannot decide: seven pages in a sensible reading
- *        order, with per-app profiles as a page of their own because a profile
- *        is not a setting and claiming it lived under Recording or Output would
- *        be a layout lie about what the registry declares. A section with no page
- *        would silently vanish from the screen, so `pageForSection` is total over
- *        SettingSection and the compiler enforces it.
- * WHERE: SettingsView (navigation + routing) and SettingsPage (the cards).
+ *        one thing the registry cannot decide: a sensible reading order, with
+ *        the speech model, the writing style, grammar and AI, and the delivery
+ *        of the text each on a page of their own so none of them is a wall of
+ *        unrelated switches. A page can hold several sections (Grammar & AI
+ *        holds the rule-based fixes and the on-device model as two cards), so
+ *        the rule-based and the AI features read as two different things.
+ *
+ *        A section with no page would silently vanish from the screen, so
+ *        `pageForSection` is total over SettingSection and the compiler enforces
+ *        it. A page can be `hidden`: it stays in the code, with everything it
+ *        needs, and only the navigation stops offering it — per-app profiles
+ *        are held back from the first release this way rather than deleted.
+ * WHERE: SettingsView (navigation + routing) and SettingsPageBody (the cards).
  */
 
-import { AppWindow, BookMarked, Languages, Mic, ShieldCheck, SlidersHorizontal, Type } from "lucide-react";
+import { AppWindow, BookMarked, Languages, Mic, PenLine, ShieldCheck, SlidersHorizontal, Sparkles, Type } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { SettingSection } from "@/lib/bindings";
 
 export type SettingsPageId =
   | "recording"
   | "transcription"
+  | "writing"
+  | "grammar"
   | "output"
   | "vocabulary"
   | "profiles"
@@ -33,66 +41,96 @@ export interface SettingsPage {
   /** One line under the page's heading: what lives here. */
   blurb: string;
   icon: LucideIcon;
-  /** The registry section whose settings this page shows; null for a page that
-   *  is not made of settings. */
-  section: SettingSection | null;
+  /** The registry sections whose settings this page shows, one card each and in
+   *  this order; empty for a page that is not made of settings. */
+  sections: readonly SettingSection[];
+  /** Kept in the code but left out of the navigation. Remove it to bring the
+   *  page back — nothing else needs to change. */
+  hidden?: boolean;
 }
 
-export const SETTINGS_PAGES: readonly SettingsPage[] = [
+/** The title of a section's card where it differs from its page's name. */
+export const SECTION_TITLES: Readonly<Partial<Record<SettingSection, string>>> = {
+  GRAMMAR: "Quick fixes",
+  SMART_GRAMMAR: "Smart grammar (on-device AI)",
+};
+
+const ALL_PAGES: readonly SettingsPage[] = [
   {
     id: "recording",
     label: "Recording",
     blurb: "Your microphone, the shortcut, and how a dictation starts and stops.",
     icon: Mic,
-    section: "RECORDING",
+    sections: ["RECORDING"],
   },
   {
     id: "transcription",
     label: "Transcription",
     blurb: "The speech model, the language, and what it listens for.",
     icon: Languages,
-    section: "TRANSCRIPTION",
+    sections: ["TRANSCRIPTION"],
+  },
+  {
+    id: "writing",
+    label: "Writing",
+    blurb: "How your words are tidied and styled: punctuation, filler words and tone.",
+    icon: PenLine,
+    sections: ["WRITING"],
+  },
+  {
+    id: "grammar",
+    label: "Grammar & AI",
+    blurb: "Fix slips with simple rules, or with a small AI model that runs on your Mac.",
+    icon: Sparkles,
+    sections: ["GRAMMAR", "SMART_GRAMMAR"],
   },
   {
     id: "output",
     label: "Output",
-    blurb: "How the words are cleaned up and where they go.",
+    blurb: "Where the finished text goes: pasting, the clipboard and previews.",
     icon: Type,
-    section: "OUTPUT",
+    sections: ["OUTPUT"],
   },
   {
     id: "vocabulary",
     label: "Vocabulary",
     blurb: "Names and terms Vocs should always get right.",
     icon: BookMarked,
-    section: "VOCABULARY",
+    sections: ["VOCABULARY"],
   },
   {
     id: "profiles",
     label: "Per-app",
     blurb: "Settings that apply only while a particular app is in front.",
     icon: AppWindow,
-    section: null,
+    sections: [],
+    hidden: true,
   },
   {
     id: "privacy",
     label: "Privacy",
     blurb: "What is kept on this Mac, and for how long.",
     icon: ShieldCheck,
-    section: "PRIVACY",
+    sections: ["PRIVACY"],
   },
   {
     id: "general",
     label: "General",
     blurb: "Startup, updates and backups.",
     icon: SlidersHorizontal,
-    section: "GENERAL",
+    sections: ["GENERAL"],
   },
 ];
+
+/** What the navigation offers. */
+export const SETTINGS_PAGES: readonly SettingsPage[] = ALL_PAGES.filter((page) => !page.hidden);
 
 const BY_SECTION: Readonly<Record<SettingSection, SettingsPageId>> = {
   RECORDING: "recording",
   TRANSCRIPTION: "transcription",
+  WRITING: "writing",
+  GRAMMAR: "grammar",
+  SMART_GRAMMAR: "grammar",
   OUTPUT: "output",
   VOCABULARY: "vocabulary",
   PRIVACY: "privacy",
@@ -104,7 +142,8 @@ export function pageForSection(section: SettingSection): SettingsPage {
   return SETTINGS_PAGES.find((page) => page.id === id) ?? SETTINGS_PAGES[0];
 }
 
-/** The page a deep link names, else the first. `#/settings/privacy` → Privacy. */
+/** The page a deep link names, else the first. `#/settings/privacy` → Privacy.
+ *  A hidden page is not a destination: its link lands on the first page. */
 export function resolvePage(section: string | null): SettingsPage {
   return SETTINGS_PAGES.find((page) => page.id === section) ?? SETTINGS_PAGES[0];
 }

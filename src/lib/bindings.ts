@@ -1167,7 +1167,18 @@ export type SettingKind = { kind: "TOGGLE" } | { kind: "TEXT"; placeholder: stri
  *  * WHERE: On every SettingDef; used by the Settings view to build its sections.
  *  
  */
-export type SettingSection = "RECORDING" | "TRANSCRIPTION" | "OUTPUT" | "VOCABULARY" | "PRIVACY" | "GENERAL";
+export type SettingSection = "RECORDING" | "TRANSCRIPTION" | 
+/**  Cleanup and style applied to the words: punctuation, fillers, tone. */
+"WRITING" | 
+/**
+ *  The rule-based grammar fix. Its own section so it is not mixed in with
+ *  the AI model beside it.
+ */
+"GRAMMAR" | 
+/**  The optional on-device model and what it learns. */
+"SMART_GRAMMAR" | 
+/**  Where the finished text goes: paste, clipboard, preview. */
+"OUTPUT" | "VOCABULARY" | "PRIVACY" | "GENERAL";
 
 /**
  * 
