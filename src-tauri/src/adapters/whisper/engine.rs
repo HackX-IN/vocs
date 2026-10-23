@@ -33,7 +33,8 @@ use crate::types::{
 use super::benchmark::measure_realtime_factor;
 use super::coreml::coreml_encoder_path;
 use super::hallucination::{is_digital_silence, is_hallucination, rms_dbfs};
-use super::params::{build_full_params, decode_thread_count, language_code, DecodeProfile};
+use super::params::{audio_ctx_for_profile, build_full_params, decode_thread_count, language_code, DecodeProfile};
+use super::priming::{prime_detection_context, should_prime};
 use super::prompt::{fit_prompt, PROMPT_TOKEN_BUDGET, TOKENIZE_CAPACITY};
 use super::state_pool::StatePool;
 
@@ -308,8 +309,9 @@ impl TranscriptionEngine for WhisperEngine {
             .as_deref()
             .and_then(|prompt| self.fit_prompt_for(model, prompt));
 
+        let profile = DecodeProfile::for_chunk(chunk, self.coreml_in_use());
         let params = build_full_params(
-            DecodeProfile::for_chunk(chunk, self.coreml_in_use()),
+            profile,
             chunk.samples.len(),
             language,
             prompt.as_deref(),
@@ -317,6 +319,15 @@ impl TranscriptionEngine for WhisperEngine {
         );
 
         let mut lease = model.states.acquire(&model.context)?;
+
+        // Language detection runs at the previous decode's encoder context, so a
+        // state left wide by a background chunk is shrunk first. See priming.rs.
+        if should_prime(profile, language.is_none(), lease.audio_ctx()) {
+            prime_detection_context(lease.get()?, self.n_threads)?;
+        }
+        // Recorded before the decode: the state remembers it from the moment
+        // whisper.cpp assigns it, even if the decode then fails.
+        lease.note_audio_ctx(audio_ctx_for_profile(profile, chunk.samples.len()));
         let state = lease.get()?;
 
         state.full(params, &chunk.samples).map_err(|err| {

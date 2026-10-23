@@ -138,6 +138,21 @@ pub fn decode_thread_count() -> c_int {
 }
 
 /**
+ * WHAT:  The encoder context a decode of this profile and length will run at.
+ * WHY:   One answer shared by build_full_params, which applies it, and the
+ *        state pool, which remembers it: whisper.cpp keeps the last value on the
+ *        state and the next language-detection pass runs at it, so the two
+ *        must never be computed separately.
+ * WHERE: build_full_params, and engine.rs after each decode.
+ */
+pub fn audio_ctx_for_profile(profile: DecodeProfile, sample_count: usize) -> c_int {
+    match profile {
+        DecodeProfile::Background => FULL_AUDIO_CTX,
+        DecodeProfile::Tail => audio_ctx_for(sample_count),
+    }
+}
+
+/**
  * SOURCE OF TRUTH KEYWORDS: build_full_params
  * WHAT:  Every whisper parameter from docs/03 §2.2, plus the profile-dependent
  *        `audio_ctx` and the optional vocabulary prompt.
@@ -213,10 +228,7 @@ pub fn build_full_params<'a>(
     params.set_print_special(false);
     params.set_print_timestamps(false);
 
-    params.set_audio_ctx(match profile {
-        DecodeProfile::Background => FULL_AUDIO_CTX,
-        DecodeProfile::Tail => audio_ctx_for(sample_count),
-    });
+    params.set_audio_ctx(audio_ctx_for_profile(profile, sample_count));
 
     if let Some(prompt) = prompt {
         params.set_initial_prompt(prompt);

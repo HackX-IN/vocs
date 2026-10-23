@@ -350,6 +350,16 @@
             "pinning the language must still be worth paying for: auto {auto_ms:.0}ms vs pinned {pinned_ms:.0}ms"
         );
 
+        // 1b. The other half of that promise: detection must not be the 8x
+        //     penalty it was. The state is left at the full context by the
+        //     interior chunk, and without priming.rs the detection pass ran the
+        //     whole 30-second encoder (1943ms against 224ms measured). With it
+        //     the gap is about 2.7x, so 4x fails if the priming stops firing.
+        assert!(
+            auto_ms < pinned_ms * 4.0,
+            "an auto-language tail must stay near a pinned one: auto {auto_ms:.0}ms vs pinned {pinned_ms:.0}ms — is the detection context being primed?"
+        );
+
         // 2. The stage budget from docs/02 §7, scaled by how much slower this
         //    machine measured ITSELF to be than the one docs/03 §9 quotes.
         //

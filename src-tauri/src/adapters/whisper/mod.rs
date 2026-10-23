@@ -23,6 +23,7 @@ pub mod coreml;
 pub mod engine;
 pub mod hallucination;
 pub mod params;
+pub mod priming;
 pub mod prompt;
 pub mod state_pool;
 
