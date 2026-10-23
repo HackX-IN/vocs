@@ -42,7 +42,7 @@ import { formatClock, formatCount, formatDateTime, formatLanguage } from "@/lib/
 import { readDurationMs } from "@/lib/motion";
 import { findMatches, offsetTopOf } from "@/lib/textarea-find";
 import { cn } from "@/lib/utils";
-import { Button, Chip, ErrorSurface, ScrollArea, Skeleton, WindowBar } from "@/components/global";
+import { Button, Chip, ConfirmButton, ErrorSurface, ScrollArea, Skeleton, WindowBar } from "@/components/global";
 import { effectiveText, wasCorrected } from "../session-text";
 import { CorrectionsDock } from "./CorrectionsDock";
 import { FindBar } from "./FindBar";
@@ -135,7 +135,6 @@ function DictationBody({
   const initial: Draft = { title: session.title ?? "", text: effectiveText(session) ?? "" };
   const [draft, setDraft] = useState<Draft>(initial);
   const [copied, setCopied] = useState(false);
-  const [confirmingDelete, setConfirmingDelete] = useState(false);
   const [actionError, setActionError] = useState<AppError | null>(null);
   const copyTimer = useRef(0);
   const [finding, setFinding] = useState(false);
@@ -229,14 +228,9 @@ function DictationBody({
   };
 
   const remove = async () => {
-    if (!confirmingDelete) {
-      setConfirmingDelete(true);
-      return;
-    }
     const result = await unwrapCommand(() => commands.deleteHistoryEntry({ id: session.id }));
     if (result.status === "error") {
       setActionError(result.error);
-      setConfirmingDelete(false);
       return;
     }
     onDeleted(session.id);
@@ -266,15 +260,9 @@ function DictationBody({
               {copied ? <Check className="size-4 text-success" /> : <Copy className="size-4" />}
               {copied ? "Copied" : "Copy"}
             </Button>
-            <Button
-              variant={confirmingDelete ? "danger" : "ghost"}
-              onClick={() => void remove()}
-              onBlur={() => setConfirmingDelete(false)}
-              aria-label="Delete dictation"
-            >
+            <ConfirmButton idleVariant="ghost" confirmLabel="Delete it" onConfirm={remove} aria-label="Delete dictation">
               <Trash2 className="size-4" />
-              {confirmingDelete ? "Delete it" : null}
-            </Button>
+            </ConfirmButton>
           </>
         }
       />

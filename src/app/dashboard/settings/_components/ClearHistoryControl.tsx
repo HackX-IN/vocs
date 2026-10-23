@@ -4,19 +4,23 @@
  * WHY:   Two-step, and the second step is the destructive one. There is no
  *        tombstone and no undo behind this — clear_history destroys the rows —
  *        so the confirmation is the only safety net, exactly as the cancel
- *        countdown is for a recording. The confirm disarms on blur, so walking
- *        away mid-confirmation leaves nothing armed.
+ *        countdown is for a recording. The confirm is the shared ConfirmButton:
+ *        Delete swaps for Cancel and a red confirm, and Escape backs out.
  * WHERE: The Privacy page, next to diagnostics.
  */
 
 import { useState } from "react";
 import { commands } from "@/lib/bindings";
 import { unwrapCommand } from "@/lib/ipc";
-import { Button } from "@/components/global";
+import { ConfirmButton } from "@/components/global";
 
 export function ClearHistoryControl() {
-  const [confirming, setConfirming] = useState(false);
   const [deleted, setDeleted] = useState<number | null>(null);
+
+  const clear = async () => {
+    const result = await unwrapCommand(commands.clearHistory);
+    if (result.status === "ok") setDeleted(result.data);
+  };
 
   return (
     <div className="flex items-center justify-between gap-4 py-3">
@@ -28,22 +32,9 @@ export function ClearHistoryControl() {
             : `Deleted ${deleted} transcript${deleted === 1 ? "" : "s"}.`}
         </p>
       </div>
-      <Button
-        variant={confirming ? "danger" : "default"}
-        onClick={() => {
-          if (!confirming) {
-            setConfirming(true);
-            return;
-          }
-          void unwrapCommand(commands.clearHistory).then((result) => {
-            if (result.status === "ok") setDeleted(result.data);
-            setConfirming(false);
-          });
-        }}
-        onBlur={() => setConfirming(false)}
-      >
-        {confirming ? "Delete everything" : "Delete…"}
-      </Button>
+      <ConfirmButton confirmLabel="Delete everything" onConfirm={clear}>
+        Delete
+      </ConfirmButton>
     </div>
   );
 }
