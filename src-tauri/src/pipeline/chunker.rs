@@ -6,16 +6,20 @@
  * WHY:   This file is the reason the latency target is achievable, and the
  *        numbers in it are counter-intuitive enough to be worth stating:
  *
- *        **Whisper's encoder always processes a 30-second window.** Shorter
- *        audio is padded up to it. So a 1-second chunk costs almost as much to
- *        encode as a 25-second one, and the instinct — "chunk small for low
- *        latency" — makes the app dramatically SLOWER. Chunking at 1s would be
- *        roughly ten times the total compute of chunking at 10s.
+ *        **Whisper's encoder always processes a 30-second window** unless
+ *        `audio_ctx` is shrunk to the audio. At full context a 1-second chunk
+ *        costs almost as much to encode as a 25-second one, which is why the
+ *        first design chunked LONG (8-15s): small chunks at full context are
+ *        dramatically slower in total.
  *
- *        So chunks are LONG (8-15s) and closed at silence. They decode in the
- *        background while the user keeps talking, so their individual latency
- *        is invisible. Only the trailing fragment is on the critical path, and
- *        that is the one the engine shrinks its encoder context for.
+ *        Every decode now shrinks its context to fit (params.rs), which removes
+ *        that penalty, so chunks are MEDIUM (4-12s) and closed at silence. Long
+ *        chunks were hurting the one thing the user feels: a background decode
+ *        at full context took 2.3s on the measured machine, and a stop pressed
+ *        during one queued the tail behind it (2.6s to paste), while an
+ *        utterance shorter than the minimum paid for all of itself at the stop.
+ *        Chunks decode in the background while the user keeps talking, so only
+ *        the trailing fragment is on the critical path, and it is now short.
  *
  *        Chunks overlap by 200ms so a word spoken across a boundary is not
  *        lost. The duplicate that overlap creates is removed downstream by the
@@ -27,11 +31,16 @@
 use crate::pipeline::vad::SpeechDetector;
 use crate::types::{AudioChunk, ChunkKind, TARGET_SAMPLE_RATE};
 
-/// Below this a chunk is not worth its own encoder pass — see the module WHY.
-const MIN_CHUNK_MS: u64 = 8_000;
+/// Below this a chunk is not worth closing early — see the module WHY. Measured
+/// on a real machine's History: an utterance with no interior chunk paid for its
+/// whole length at the stop keypress (a 9s one took 1.0s to decode), while one
+/// already chunked behind it took 0.3-0.4s. Chunks are cheap now that every
+/// decode shrinks its encoder context, so the first one closes at the first
+/// natural pause after this much speech rather than after eight seconds.
+const MIN_CHUNK_MS: u64 = 4_000;
 /// Above this we close regardless of silence, so a continuous talker still gets
 /// background decoding rather than one enormous chunk at the end.
-const MAX_CHUNK_MS: u64 = 15_000;
+const MAX_CHUNK_MS: u64 = 12_000;
 /// Silence long enough to be a natural break rather than a breath.
 const BOUNDARY_SILENCE_MS: u64 = 350;
 /// Carried into the next chunk so a word across the seam survives.
@@ -510,10 +519,11 @@ mod tests {
 
     #[test]
     fn the_chunk_window_matches_the_documented_range() {
-        // Guards against someone "optimising" toward small chunks, which is the
-        // intuitive change and the wrong one.
-        assert_eq!(MIN_CHUNK_MS, 8_000);
-        assert_eq!(MAX_CHUNK_MS, 15_000);
+        // Guards against someone pushing the window below a few seconds: the
+        // encoder context is shrunk to fit, but every chunk still pays a fixed
+        // decode cost and every seam is a place a word can be lost.
+        assert_eq!(MIN_CHUNK_MS, 4_000);
+        assert_eq!(MAX_CHUNK_MS, 12_000);
         // Deliberately compared through variables: clippy correctly points out
         // that two constants compare at compile time, but the value of this
         // assertion is that it fails loudly if someone edits the constants into

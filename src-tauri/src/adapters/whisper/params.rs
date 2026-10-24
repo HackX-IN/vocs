@@ -8,9 +8,12 @@
  *        tail costs the same as a 25s chunk unless `audio_ctx` is shrunk to fit
  *        the actual audio. That single value is the difference between a ~1.4s
  *        final decode and a sub-200ms one, which is the whole p50 < 300ms
- *        budget. It is applied to the TAIL ONLY: reduced context can cost
- *        accuracy, and interior chunks decode in the background where their
- *        latency is invisible, so they keep the full 1500.
+ *        budget. It is applied to EVERY chunk unless Core ML is live. It used to
+ *        be the tail only, on the theory that interior chunks decode in the
+ *        background where latency is invisible. Measured on a real History, it
+ *        is not invisible: a full-context interior decode took 2.3s, and a stop
+ *        pressed during one made the tail wait behind it (2.6s to paste). The
+ *        headroom below keeps the context wider than the audio.
  *        `temperature_inc = 0.0` disables whisper's temperature-fallback loop —
  *        up to six extra decode passes fired without warning, turning a 200ms
  *        decode into 1.4s. `no_context = true` stops decoder state carrying
@@ -35,6 +38,14 @@ pub const MIN_AUDIO_CTX: c_int = 256;
 /// example keeps a margin here because the mel window is padded and a context
 /// sized exactly to the audio clips the final frames.
 pub const AUDIO_CTX_HEADROOM: c_int = 128;
+
+/// The temperature of the ONE retry the engine makes when a decode degenerates
+/// into a repetition loop (see degenerate.rs). Greedy decoding is deterministic,
+/// so retrying at 0.0 would loop identically; a little randomness is what lets
+/// the second attempt take a different path out of the rut. It is never used
+/// for a first attempt, so the common case keeps temperature 0.0 and its
+/// determinism.
+pub const RETRY_TEMPERATURE: f32 = 0.4;
 
 /// Segments whose no-speech probability exceeds this are discarded. Paired with
 /// the VAD gate upstream; see docs/03 §2.4.
@@ -168,6 +179,7 @@ pub fn build_full_params<'a>(
     language: Option<&'a str>,
     prompt: Option<&str>,
     n_threads: c_int,
+    temperature: f32,
 ) -> FullParams<'a, 'a> {
     // Greedy with best_of = 1: temperature is pinned to 0.0, so sampling more
     // candidates would cost time and return identical text.
@@ -192,7 +204,9 @@ pub fn build_full_params<'a>(
     // The #1 cause of "it repeated the same sentence forty times".
     params.set_no_context(true);
 
-    params.set_temperature(0.0);
+    // 0.0 for every first attempt. Only the engine's single retry after a
+    // repetition loop passes more — see RETRY_TEMPERATURE.
+    params.set_temperature(temperature);
     // The latency bomb. See the module WHY.
     params.set_temperature_inc(0.0);
     params.set_entropy_thold(ENTROPY_THOLD);

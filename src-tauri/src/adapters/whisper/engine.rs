@@ -32,8 +32,12 @@ use crate::types::{
 
 use super::benchmark::measure_realtime_factor;
 use super::coreml::coreml_encoder_path;
+use super::degenerate::clean_segment;
 use super::hallucination::{is_digital_silence, is_hallucination, rms_dbfs};
-use super::params::{audio_ctx_for_profile, build_full_params, decode_thread_count, language_code, DecodeProfile};
+use super::params::{
+    audio_ctx_for_profile, build_full_params, decode_thread_count, language_code, DecodeProfile,
+    RETRY_TEMPERATURE,
+};
 use super::priming::{prime_detection_context, should_prime};
 use super::prompt::{fit_prompt, PROMPT_TOKEN_BUDGET, TOKENIZE_CAPACITY};
 use super::state_pool::StatePool;
@@ -288,6 +292,14 @@ impl TranscriptionEngine for WhisperEngine {
      *        silence check runs before the model is touched at all, because the
      *        cheapest way to not hallucinate over an empty buffer is to never
      *        show it to the model.
+     *
+     *        A decode that degenerates into a repetition loop is retried ONCE at
+     *        a small temperature, and discarded if it loops again. A loop the
+     *        decoder cannot leave on a second attempt came from noise rather
+     *        than speech — pasting a collapsed fragment of it is how a silent
+     *        recording used to end up as a stray phrase in the user's document.
+     *        The retry costs a second decode only on that failure, never on the
+     *        ordinary path.
      * WHERE: pipeline/worker.rs, on the ASR thread.
      */
     fn transcribe(
@@ -303,6 +315,47 @@ impl TranscriptionEngine for WhisperEngine {
             return Ok(Vec::new());
         }
 
+        let first = self.decode_once(model, chunk, request, 0.0)?;
+        if !first.looped {
+            return Ok(first.segments);
+        }
+
+        tracing::warn!(
+            duration_ms = chunk.end_ms.saturating_sub(chunk.start_ms),
+            "decode fell into a repetition loop; retrying once"
+        );
+        let second = self.decode_once(model, chunk, request, RETRY_TEMPERATURE)?;
+        if second.looped {
+            tracing::warn!("the retry looped as well; discarding the chunk as non-speech");
+            return Ok(Vec::new());
+        }
+        Ok(second.segments)
+    }
+}
+
+/// One decode's segments, and whether any of them was a repetition loop.
+struct Decoded {
+    segments: Vec<TranscriptSegment>,
+    looped: bool,
+}
+
+impl WhisperEngine {
+    /**
+     * WHAT:  One decode of a chunk at the given temperature, cleaned and filtered.
+     * WHY:   The body of `transcribe`, separated so the retry is the same code
+     *        as the first attempt rather than a second copy that drifts.
+     *        Segment text goes through degenerate::clean_segment BEFORE the
+     *        hallucination check, so a segment that was only a sound tag is
+     *        empty by then and falls to the blocklist's empty-text rule.
+     * WHERE: transcribe, up to twice per chunk.
+     */
+    fn decode_once(
+        &self,
+        model: &LoadedModel,
+        chunk: &AudioChunk,
+        request: &TranscribeRequest,
+        temperature: f32,
+    ) -> AppResult<Decoded> {
         let language = language_code(&request.language);
         let prompt = request
             .prompt
@@ -316,6 +369,7 @@ impl TranscriptionEngine for WhisperEngine {
             language,
             prompt.as_deref(),
             self.n_threads,
+            temperature,
         );
 
         let mut lease = model.states.acquire(&model.context)?;
@@ -357,17 +411,22 @@ impl TranscriptionEngine for WhisperEngine {
         let level_dbfs = rms_dbfs(&chunk.samples);
 
         let mut segments = Vec::new();
+        let mut looped = false;
         for segment in state.as_iter() {
             // Lossy rather than strict: whisper can split a multi-byte
             // character across a segment boundary, and losing one glyph is a
             // better outcome than losing the sentence to a UTF-8 error.
-            let text = match segment.to_str_lossy() {
+            let raw = match segment.to_str_lossy() {
                 Ok(text) => text.trim().to_string(),
                 Err(err) => {
                     tracing::warn!(?err, "unreadable whisper segment discarded");
                     continue;
                 }
             };
+
+            let cleaned = clean_segment(&raw);
+            looped |= cleaned.looped;
+            let text = cleaned.text;
 
             let no_speech = segment.no_speech_probability();
             if is_hallucination(
@@ -376,7 +435,7 @@ impl TranscriptionEngine for WhisperEngine {
                 no_speech,
                 level_dbfs,
             ) {
-                tracing::debug!(%text, no_speech, level_dbfs, "segment dropped as hallucination");
+                tracing::debug!(%raw, no_speech, level_dbfs, "segment dropped as hallucination");
                 continue;
             }
 
@@ -391,7 +450,7 @@ impl TranscriptionEngine for WhisperEngine {
             });
         }
 
-        Ok(segments)
+        Ok(Decoded { segments, looped })
     }
 }
 

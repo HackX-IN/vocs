@@ -401,7 +401,7 @@
     #[test]
     fn the_reduced_encoder_context_is_what_makes_the_tail_cheap() {
         let _lock = testing::engine_lock();
-        let Some(engine) = testing::shared_engine() else {
+        let Some(model_path) = testing::live_model_path() else {
             eprintln!("skipped: default model not downloaded");
             return;
         };
@@ -416,19 +416,39 @@
             );
             return;
         }
-        let request = english();
 
-        let median = |kind: ChunkKind| -> f64 {
+        // Driven through whisper directly rather than the engine: every chunk
+        // kind shrinks its context now, so the engine can no longer be asked for
+        // the full-context path to compare against. The two profiles still exist
+        // — Background is what a live Core ML encoder forces — and this is what
+        // keeps the shrink honest.
+        let context = whisper_rs::WhisperContext::new_with_params(
+            &model_path,
+            whisper_rs::WhisperContextParameters::default(),
+        )
+        .expect("the live model loads");
+        let mut state = context.create_state().expect("a state");
+        let threads = crate::adapters::whisper::params::decode_thread_count();
+
+        let mut median = |profile: DecodeProfile| -> f64 {
             median_ms(
                 || {},
                 || {
-                    let _ = engine.transcribe(&chunk(speech.clone(), kind), &request);
+                    let params = crate::adapters::whisper::params::build_full_params(
+                        profile,
+                        speech.len(),
+                        Some("en"),
+                        None,
+                        threads,
+                        0.0,
+                    );
+                    let _ = state.full(params, &speech);
                 },
             )
         };
 
-        let reduced = median(ChunkKind::Tail);
-        let full = median(ChunkKind::Interior);
+        let reduced = median(DecodeProfile::Tail);
+        let full = median(DecodeProfile::Background);
         eprintln!(
             "{:.1}s fragment, language pinned — audio_ctx {}: {reduced:.0}ms | audio_ctx {}: {full:.0}ms  ({:.1}x)",
             speech.len() as f32 / TARGET_SAMPLE_RATE as f32,

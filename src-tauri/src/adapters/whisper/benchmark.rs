@@ -114,6 +114,7 @@ pub fn measure_realtime_factor(
         Some("en"),
         None,
         n_threads,
+        0.0,
     );
     state.full(warmup_params, &warmup).map_err(|err| {
         AppError::new(
@@ -130,6 +131,7 @@ pub fn measure_realtime_factor(
         Some("en"),
         None,
         n_threads,
+        0.0,
     );
 
     let started = Instant::now();
@@ -177,7 +179,7 @@ pub fn measure_realtime_factor(
  */
 fn warm_dictation_paths(state: &mut WhisperState, n_threads: std::ffi::c_int) -> AppResult<()> {
     let audio = probe_signal(WARMUP_SECONDS * 2.0);
-    let params = build_full_params(DecodeProfile::Tail, audio.len(), None, None, n_threads);
+    let params = build_full_params(DecodeProfile::Tail, audio.len(), None, None, n_threads, 0.0);
     state.full(params, &audio).map_err(|err| {
         AppError::new(
             ErrorCode::EngineNotReady,

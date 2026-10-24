@@ -61,7 +61,7 @@ pub fn should_prime(profile: DecodeProfile, language_is_auto: bool, remembered_c
  */
 pub fn prime_detection_context(state: &mut WhisperState, n_threads: c_int) -> AppResult<()> {
     let audio = probe_signal(PRIME_SECONDS);
-    let mut params = build_full_params(DecodeProfile::Tail, audio.len(), Some("en"), None, n_threads);
+    let mut params = build_full_params(DecodeProfile::Tail, audio.len(), Some("en"), None, n_threads, 0.0);
     params.set_max_tokens(1);
     state.full(params, &audio).map_err(|err| {
         AppError::new(

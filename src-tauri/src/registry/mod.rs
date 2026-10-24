@@ -468,11 +468,11 @@ fn build_capabilities() -> Vec<Capability> {
                 advanced(number(
                     keys::CLIPBOARD_RESTORE_DELAY_MS,
                     "Clipboard restore delay",
-                    "How long to wait after pasting before restoring the clipboard.",
+                    "How long your dictated text stays on the clipboard after pasting, before your previous clipboard comes back. Raise it if an app pastes your old clipboard instead of the dictation.",
                     SettingSection::Output,
-                    (0.0, 1000.0, 10.0),
+                    (0.0, 2000.0, 50.0),
                     Some("ms"),
-                    150.0,
+                    500.0,
                 )),
                 toggle(
                     keys::CAPITALISE_SENTENCES,

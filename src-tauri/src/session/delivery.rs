@@ -31,7 +31,7 @@ use std::time::Instant;
 
 use tokio::sync::mpsc;
 
-use crate::error::AppError;
+use crate::error::{AppError, ErrorCode};
 use crate::ipc::context::SessionContext;
 use crate::pipeline::assembler::Assembler;
 use crate::ports::injector::InjectionRequest;
@@ -210,13 +210,26 @@ async fn deliver(ctx: &SessionContext, pending: PendingDelivery) {
 
     let outcome = {
         let _timer = latency.stage_timer(LatencyStage::Inject);
-        ctx.ports.injector.deliver(&InjectionRequest {
+        // Off the async runtime: the injector sleeps between the clipboard write
+        // and the paste, and a sleep on a tokio worker stalls every IPC command
+        // scheduled behind it (docs/03 §5).
+        let injector = Arc::clone(&ctx.ports.injector);
+        let request = InjectionRequest {
             text: final_text.clone(),
             auto_paste: settings.auto_paste,
             restore_clipboard: settings.restore_clipboard,
             paste_delay_ms: settings.paste_delay_ms,
             clipboard_restore_delay_ms: settings.clipboard_restore_delay_ms,
-        })
+        };
+        tokio::task::spawn_blocking(move || injector.deliver(&request))
+            .await
+            .unwrap_or_else(|err| {
+                Err(AppError::new(
+                    ErrorCode::InjectionFailed,
+                    "Vocs could not send the paste. Your text is on the clipboard.",
+                )
+                .with_detail(err.to_string()))
+            })
     };
 
     let delivery = match outcome {

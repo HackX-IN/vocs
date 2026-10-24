@@ -168,7 +168,7 @@ impl SessionSettings {
             paste_delay_ms: read_number(stored, keys::PASTE_DELAY_MS).unwrap_or(40.0).max(0.0)
                 as u64,
             clipboard_restore_delay_ms: read_number(stored, keys::CLIPBOARD_RESTORE_DELAY_MS)
-                .unwrap_or(150.0)
+                .unwrap_or(500.0)
                 .max(0.0) as u64,
             strip_fillers: read_bool(stored, keys::STRIP_FILLERS).unwrap_or(false),
             filler_strength,
@@ -289,7 +289,7 @@ mod tests {
     fn the_paste_delays_load_into_the_session_settings() {
         let defaults = SessionSettings::from_stored(&empty());
         assert_eq!(defaults.paste_delay_ms, 40);
-        assert_eq!(defaults.clipboard_restore_delay_ms, 150);
+        assert_eq!(defaults.clipboard_restore_delay_ms, 500);
 
         let mut stored = empty();
         stored.insert(keys::PASTE_DELAY_MS.to_string(), SettingValue::Number(120.0));

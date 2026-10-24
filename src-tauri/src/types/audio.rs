@@ -53,11 +53,14 @@ impl AudioChunk {
         matches!(self.kind, ChunkKind::Tail)
     }
 
-    /// Whether the engine may shrink its encoder context for this decode: the
-    /// tail (to be fast when the user is waiting) and an interim snapshot (to be
-    /// cheap while the user is still talking).
+    /// Whether the engine may shrink its encoder context for this decode. Every
+    /// kind does: the tail to be fast when the user is waiting, an interim
+    /// snapshot to be cheap while they talk, and an interior chunk so that a
+    /// stop pressed during its background decode does not queue the tail behind
+    /// a 2s full-context pass (measured). `+ AUDIO_CTX_HEADROOM` keeps the
+    /// context wider than the audio, which is what protects accuracy.
     pub fn shrinks_context(&self) -> bool {
-        matches!(self.kind, ChunkKind::Tail | ChunkKind::Interim)
+        true
     }
 }
 

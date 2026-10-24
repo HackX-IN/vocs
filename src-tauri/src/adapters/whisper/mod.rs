@@ -1,6 +1,7 @@
 /*!
  * SOURCE OF TRUTH KEYWORDS: whisper_adapter, WhisperEngine, WHISPER_ENGINE_ID,
- *   audio_ctx_for, is_hallucination, fit_prompt, measure_realtime_factor
+ *   audio_ctx_for, is_hallucination, fit_prompt, measure_realtime_factor,
+ *   clean_segment
  * WHAT:  Barrel for the whisper.cpp implementation of the TranscriptionEngine
  *        port.
  * WHY:   Split by concern rather than kept as one file, because the three
@@ -20,6 +21,7 @@ mod live_tests;
 pub mod benchmark;
 pub mod blocklist;
 pub mod coreml;
+pub mod degenerate;
 pub mod engine;
 pub mod hallucination;
 pub mod params;
@@ -31,6 +33,7 @@ pub use benchmark::{measure_realtime_factor, RealtimeMeasurement};
 pub use engine::{WhisperEngine, WHISPER_ENGINE_ID};
 pub use blocklist::{blocklist_for, BlockedPhrase, DropRule};
 pub use coreml::coreml_encoder_path;
+pub use degenerate::{clean_segment, CleanedSegment};
 pub use hallucination::{is_digital_silence, is_hallucination, rms_dbfs};
 pub use params::{audio_ctx_for, DecodeProfile, FULL_AUDIO_CTX};
 pub use prompt::{fit_prompt, PROMPT_TOKEN_BUDGET};

@@ -22,15 +22,26 @@
  *           Setting it only on keydown works in some apps and not others, which
  *           is the worst possible failure signature.
  *
+ *        4. **The restore must not make the user wait, and must not race the
+ *           paste.** It used to sleep on the delivery thread (150ms) before
+ *           putting the old clipboard back: that was dead time on every paste
+ *           (`inject` was a flat ~180ms in the metrics), and still too short for
+ *           an Electron app that reads the clipboard lazily — the old text came
+ *           back before the app looked, and the paste "didn't work". Now the
+ *           restore runs on its own thread after a longer delay, and `deliver`
+ *           returns as soon as ⌘V is posted. See ClipboardRestorer.
+ *
  *        Clipboard-only is a SUCCESS throughout this file, never an error. The
  *        app is fully useful without Accessibility, and treating the fallback
  *        as a failure would nag a user whose setup is working as intended.
  * WHERE: Implements the TextInjector port; called by pipeline/deliver.rs.
  */
 
+use std::sync::Arc;
 use std::time::Duration;
 
 use arboard::Clipboard;
+use parking_lot::Mutex;
 use core_graphics::event::{CGEvent, CGEventFlags, CGEventTapLocation};
 use core_graphics::event_source::{CGEventSource, CGEventSourceStateID};
 
@@ -65,11 +76,19 @@ pub struct PasteTiming {
     pub before_restore: Duration,
 }
 
+/// The shortest wait between writing the clipboard and pasting. Below this the
+/// target app can read the pasteboard before the write lands and paste the
+/// PREVIOUS contents; a stored value under it (a hand-tuned 20ms was found in a
+/// real database) is raised rather than honoured.
+const MIN_PASTE_DELAY: Duration = Duration::from_millis(30);
+
 impl Default for PasteTiming {
     fn default() -> Self {
         Self {
             before_paste: Duration::from_millis(40),
-            before_restore: Duration::from_millis(150),
+            // Not slept on any more — see ClipboardRestorer — so it can be long
+            // enough for a lazy reader without costing the user anything.
+            before_restore: Duration::from_millis(500),
         }
     }
 }
@@ -84,19 +103,88 @@ impl PasteTiming {
      */
     fn from_request(request: &InjectionRequest) -> Self {
         Self {
-            before_paste: Duration::from_millis(request.paste_delay_ms),
+            before_paste: Duration::from_millis(request.paste_delay_ms).max(MIN_PASTE_DELAY),
             before_restore: Duration::from_millis(request.clipboard_restore_delay_ms),
         }
     }
 }
 
+/**
+ * SOURCE OF TRUTH KEYWORDS: ClipboardRestorer, RestoreSlot, deferred_clipboard_restore
+ * WHAT:  Puts the user's previous clipboard back some time after a paste, on a
+ *        thread of its own, and never restores something that has been
+ *        superseded.
+ * WHY:   A generation counter guards the one real hazard of deferring it. If a
+ *        second dictation lands before the first restore fires, the second
+ *        would read OUR text as "the user's clipboard" and later restore that —
+ *        so a delivery first takes over any pending original (the true one) and
+ *        bumps the generation, which turns the older timer into a no-op. The
+ *        original is therefore restored exactly once, after the LAST paste of a
+ *        run, and never replaced by dictated text.
+ * WHERE: Owned by MacosInjector; scheduled at the end of `deliver`.
+ */
+#[derive(Default)]
+struct RestoreSlot {
+    generation: u64,
+    /// The original clipboard text, while a restore for it is waiting to fire.
+    pending: Option<String>,
+}
+
+#[derive(Clone, Default)]
+struct ClipboardRestorer {
+    slot: Arc<Mutex<RestoreSlot>>,
+}
+
+impl ClipboardRestorer {
+    /// The text to restore for a delivery that is starting: a still-pending
+    /// original if there is one (the previous restore is cancelled), otherwise
+    /// whatever `read` finds on the clipboard now.
+    fn original(&self, read: impl FnOnce() -> Option<String>) -> Option<String> {
+        let mut slot = self.slot.lock();
+        slot.generation += 1;
+        slot.pending.take().or_else(read)
+    }
+
+    /// Drops any pending restore, for a delivery that has restore turned off.
+    fn cancel(&self) {
+        let mut slot = self.slot.lock();
+        slot.generation += 1;
+        slot.pending = None;
+    }
+
+    /// Runs `write(original)` after `delay`, unless another delivery began first.
+    fn schedule(&self, original: String, delay: Duration, write: impl FnOnce(String) + Send + 'static) {
+        let generation = {
+            let mut slot = self.slot.lock();
+            slot.generation += 1;
+            slot.pending = Some(original.clone());
+            slot.generation
+        };
+        let slot = Arc::clone(&self.slot);
+        std::thread::spawn(move || {
+            std::thread::sleep(delay);
+            // Held across the write so a delivery starting now waits for it
+            // rather than reading the clipboard mid-restore.
+            let mut guard = slot.lock();
+            if guard.generation == generation {
+                guard.pending = None;
+                write(original);
+            }
+        });
+    }
+}
+
 pub struct MacosInjector<P: PermissionProvider> {
     permissions: P,
+    restorer: ClipboardRestorer,
 }
 
 impl<P: PermissionProvider> MacosInjector<P> {
     pub fn new(permissions: P) -> Self {
-        Self { permissions }
+        Self {
+            permissions,
+            restorer: ClipboardRestorer::default(),
+        }
     }
 
     /**
@@ -181,8 +269,9 @@ impl<P: PermissionProvider> TextInjector for MacosInjector<P> {
         // Read the previous contents before overwriting, so a restore is
         // possible. An empty or non-text clipboard is normal, not an error.
         let previous = if request.restore_clipboard {
-            clipboard.get_text().ok()
+            self.restorer.original(|| clipboard.get_text().ok())
         } else {
+            self.restorer.cancel();
             None
         };
 
@@ -265,12 +354,15 @@ impl<P: PermissionProvider> TextInjector for MacosInjector<P> {
         }
 
         if let Some(previous) = previous {
-            std::thread::sleep(timing.before_restore);
-            // A failed restore is not worth surfacing: the paste succeeded and
-            // the only cost is that the old clipboard is gone.
-            if let Err(err) = clipboard.set_text(previous) {
-                tracing::debug!(error = %err, "could not restore the previous clipboard");
-            }
+            // Off this thread: the paste is done as far as the user can tell, and
+            // the restore waits as long as a lazy reader needs.
+            self.restorer.schedule(previous, timing.before_restore, |original| {
+                // A failed restore is not worth surfacing: the paste succeeded
+                // and the only cost is that the old clipboard is gone.
+                if let Err(err) = Clipboard::new().and_then(|mut c| c.set_text(original)) {
+                    tracing::debug!(error = %err, "could not restore the previous clipboard");
+                }
+            });
         }
 
         Ok(InjectionOutcome {
@@ -609,13 +701,64 @@ mod tests {
     }
 
     #[test]
+    fn a_too_short_paste_delay_is_raised_to_the_floor() {
+        let request = InjectionRequest {
+            text: "timing".into(),
+            auto_paste: true,
+            restore_clipboard: true,
+            paste_delay_ms: 20,
+            clipboard_restore_delay_ms: 500,
+        };
+        assert_eq!(PasteTiming::from_request(&request).before_paste, MIN_PASTE_DELAY);
+    }
+
+    #[test]
+    fn a_pending_restore_fires_once_with_the_true_original() {
+        let restorer = ClipboardRestorer::default();
+        let (tx, rx) = std::sync::mpsc::channel();
+
+        let first = restorer.original(|| Some("the user's own text".into()));
+        let tx_first = tx.clone();
+        restorer.schedule(first.expect("read"), Duration::from_millis(80), move |text| {
+            let _ = tx_first.send(("first", text));
+        });
+
+        // A second dictation lands before the first restore fires. The clipboard
+        // now holds OUR text, which must never be mistaken for the original.
+        let second = restorer.original(|| Some("dictated text".into()));
+        assert_eq!(second.as_deref(), Some("the user's own text"));
+        let tx_second = tx.clone();
+        restorer.schedule(second.expect("pending"), Duration::from_millis(40), move |text| {
+            let _ = tx_second.send(("second", text));
+        });
+
+        let fired = rx.recv_timeout(Duration::from_secs(2)).expect("one restore fires");
+        assert_eq!(fired, ("second", "the user's own text".to_string()));
+        assert!(
+            rx.recv_timeout(Duration::from_millis(250)).is_err(),
+            "the superseded restore must not also fire"
+        );
+    }
+
+    #[test]
+    fn turning_restore_off_cancels_a_pending_one() {
+        let restorer = ClipboardRestorer::default();
+        let (tx, rx) = std::sync::mpsc::channel();
+        restorer.schedule("old".into(), Duration::from_millis(40), move |text| {
+            let _ = tx.send(text);
+        });
+        restorer.cancel();
+        assert!(rx.recv_timeout(Duration::from_millis(200)).is_err());
+    }
+
+    #[test]
     fn default_timing_covers_both_races() {
         // Values below these have been observed to paste stale content or to
         // clobber a paste in flight. Guards against someone "optimising" them
         // to zero to shave latency.
         let timing = PasteTiming::default();
         assert!(timing.before_paste >= Duration::from_millis(30));
-        assert!(timing.before_restore >= Duration::from_millis(100));
+        assert!(timing.before_restore >= Duration::from_millis(300));
     }
 
     #[test]
