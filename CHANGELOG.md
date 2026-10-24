@@ -5,6 +5,23 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [1.0.2] - 2026-10-24
+
+### Fixed
+- **No more `*Scoffs*`, `[BLANK_AUDIO]` or `(laughs)` in your text.** Whisper sometimes writes a sound effect for a breath or a click; Vocs now removes those tags instead of pasting them. A stray noise with nothing else in it pastes nothing.
+- **No more runaway repetition.** A recording could come back as the same phrase repeated dozens of times ("the one who is the one who is…"). Vocs now collapses the loop, retries the recording once, and discards it if it loops again, so silence no longer turns into a pasted phrase.
+- **Pastes no longer land late, or paste your old clipboard.** The previous clipboard used to be put back a fraction of a second after pasting, which beat apps that read the clipboard slowly. It now comes back half a second later, in the background, so the paste is never held up for it. (Settings → Output → Clipboard restore delay.) A paste delay below 30 ms is raised to 30.
+
+### Faster
+- **Stop to paste is much quicker.** Every piece of speech is now decoded with a window sized to its length instead of the full 30 seconds (about 8 times faster on a short fragment), and the first piece is closed at the first pause after four seconds instead of eight. Stopping while a background piece was still decoding no longer makes the final words wait behind it.
+
+### Changed
+- **A tighter, livelier sidebar.** Smaller gaps and one clean centre line, and the logo now glances left and right.
+- **The recording pill moves with your voice.** The three bars rise fast and fall slowly, and keep a gentle ripple between words.
+- **Smoother navigation.** Pages fade in, lists dim while a filter loads instead of jumping, and pages centre on wide windows.
+- **Page titles are truly centred**, and an open dictation's back, save status, copy and delete controls now sit directly above its title.
+- **The website** works on phones without sideways scrolling, shows how to open the app in a dialog when you press Download, and presents a long release history as a searchable timeline.
+
 ## [1.0.1] - 2026-10-24
 
 ### Fixed
