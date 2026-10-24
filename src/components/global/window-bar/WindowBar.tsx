@@ -13,6 +13,14 @@
  *        a flex child so the title stays centred on the window however wide the
  *        side slots are.
  *
+ *        THE TITLE IS CENTRED ON THE WINDOW, not on what is left of it. The bar
+ *        used to pad its left edge by the traffic-light inset (92px) and its
+ *        right by the page margin (32px), which moved the middle of the grid —
+ *        and so the title — 30px right of the window's centre, visibly off the
+ *        centre line of the content below it. Padding is now symmetric and the
+ *        traffic-light clearance lives on the leading slot alone, so the two
+ *        1fr tracks stay equal and the title sits on the true centre.
+ *
  *        The whole bar is the drag region; slot children that are interactive
  *        opt out with data-tauri-drag-region={false}, or a click on a button
  *        would drag the window instead.
@@ -37,11 +45,14 @@ export function WindowBar({ leading, title, trailing, className, ...rest }: Wind
       data-tauri-drag-region
       {...rest}
       className={cn(
-        "absolute inset-x-0 top-0 z-10 grid h-[var(--titlebar-height)] grid-cols-[1fr_auto_1fr] items-center gap-4 pr-[var(--page-padding-x)] pl-[var(--titlebar-safe-inset)]",
+        "absolute inset-x-0 top-0 z-10 grid h-[var(--titlebar-height)] grid-cols-[1fr_auto_1fr] items-center gap-4 px-[var(--page-padding-x)]",
         className,
       )}
     >
-      <div data-tauri-drag-region={false} className="flex min-w-0 items-center justify-self-start">
+      <div
+        data-tauri-drag-region={false}
+        className="flex min-w-0 items-center justify-self-start pl-[calc(var(--titlebar-safe-inset)-var(--page-padding-x))]"
+      >
         {leading}
       </div>
       <div data-tauri-drag-region className="flex min-w-0 items-center justify-center">

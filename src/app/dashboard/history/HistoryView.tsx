@@ -79,6 +79,8 @@ export function HistoryView({ hotkey, mode, section }: HistoryViewProps) {
     <HistoryFilters period={period} status={status} onPeriodChange={setPeriod} onStatusChange={setStatus} />
   );
   const editing = section !== null;
+  // A refetch in flight while rows from the previous filter are still showing.
+  const refetching = !feed.loaded && feed.items.length > 0;
 
   useEffect(() => {
     const handle = window.setTimeout(() => setQuery(input), readDurationMs("--search-debounce"));
@@ -108,7 +110,18 @@ export function HistoryView({ hotkey, mode, section }: HistoryViewProps) {
 
   return (
     <>
-      <section className={cn("flex min-h-0 flex-1 flex-col", editing && "hidden")}>
+      {/* `page-enter` replays when the list comes back from the editor (it
+          hides, never unmounts). While a filter or search refetches, the old rows
+          dim rather than vanish, then brighten as the new ones land: the swap is
+          a cross-fade instead of a jump. */}
+      <section
+        aria-busy={refetching}
+        className={cn(
+          "page-enter flex min-h-0 flex-1 flex-col transition-opacity",
+          refetching && "opacity-50",
+          editing && "hidden",
+        )}
+      >
         {exportError ? (
           <div className="px-[var(--page-padding-x)] pt-[var(--page-header-height)]">
             <ErrorSurface size="compact" error={exportError} />

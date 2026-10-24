@@ -15,6 +15,12 @@
  *        Hovering an item shows its name as a native tooltip (the `title`): a
  *        tooltip drawn in the page would be clipped by this window's edge.
  *
+ *        The mark glances left and right on a slow loop (Mark `look`): the one
+ *        piece of ambient life in an otherwise still rail. Spacing is tight and
+ *        every gap comes from --rail-* tokens, with the rail's width equal to a
+ *        tile plus its padding on both sides, so tiles and mark share one
+ *        centre line.
+ *
  *        IT HAS NO TRAFFIC-LIGHT SPACER, and that is the substantive difference
  *        from the rail this replaces. The embedded version reserved
  *        --titlebar-height at its top because the window's hidden title bar put
@@ -57,7 +63,7 @@ export function SidebarWindow({ items, activeRoute, onSelect }: SidebarWindowPro
       className="hairline flex h-full w-full flex-col items-center gap-[var(--rail-item-gap)] rounded-[var(--radius-rail)] bg-elevated p-[var(--rail-padding)]"
     >
       <span className="mb-[var(--rail-mark-gap)] flex h-[var(--rail-mark-height)] shrink-0 items-center text-text-primary">
-        <Mark label="Vocs" />
+        <Mark label="Vocs" look />
       </span>
 
       {items.map((item) => {

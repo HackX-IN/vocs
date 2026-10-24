@@ -217,6 +217,61 @@
   }
 }
 
+/* A page arriving (components/global/page-transition, and the History list
+   coming back from the editor). `backwards` fill, not `both`: once it ends the
+   element must carry NO transform at all, or it becomes the containing block
+   for the fixed dock and the scroll-fade masks inside it. */
+.page-enter {
+  animation: page-enter var(--motion-duration-medium) var(--motion-ease-standard) backwards;
+}
+
+@keyframes page-enter {
+  from {
+    opacity: 0;
+    transform: translateY(var(--page-enter-distance));
+  }
+}
+
+/* The mark looking around (components/global/mark, `look`). The quotes — which
+   are holes in the head — travel, and the head leans into each look, so it reads
+   as turning rather than as two dots sliding. Mostly at rest: the movement
+   lives in the middle of a long cycle. Off under reduced motion, because a loop
+   collapsed to 120ms (the global rule) would be a twitch. */
+.mark-look-eyes,
+.mark-look-head {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+
+.mark-look-eyes {
+  animation: mark-look-eyes var(--mark-look-duration) var(--motion-ease-standard) infinite;
+}
+
+.mark-look-head {
+  animation: mark-look-head var(--mark-look-duration) var(--motion-ease-standard) infinite;
+}
+
+@keyframes mark-look-eyes {
+  0%, 10%, 100% { transform: translateX(0); }
+  18%, 32% { transform: translateX(calc(var(--mark-look-travel) * -1px)); }
+  44%, 60% { transform: translateX(calc(var(--mark-look-travel) * 1px)); }
+  72%, 86% { transform: translateX(0); }
+}
+
+@keyframes mark-look-head {
+  0%, 10%, 100% { transform: skewX(0deg); }
+  18%, 32% { transform: skewX(calc(var(--mark-look-turn) * -1)); }
+  44%, 60% { transform: skewX(var(--mark-look-turn)); }
+  72%, 86% { transform: skewX(0deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mark-look-eyes,
+  .mark-look-head {
+    animation: none;
+  }
+}
+
 @keyframes breathe {
   0%,
   100% {

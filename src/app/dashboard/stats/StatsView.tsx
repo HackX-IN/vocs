@@ -43,7 +43,7 @@ export function StatsView({ metrics, hotkey, mode }: StatsViewProps) {
   const { range, picker } = useActivityRange();
 
   return (
-    <ScrollArea contentClassName="px-[var(--page-padding-x)] pb-8">
+    <ScrollArea centered contentClassName="px-[var(--page-padding-x)] pb-8">
       <ViewState state={stats} onRetry={stats.reload}>
         {(data) =>
           data.total_sessions === 0 ? (

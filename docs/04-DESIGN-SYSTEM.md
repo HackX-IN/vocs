@@ -120,8 +120,9 @@ Dark:   --surface-opaque: #13110F    --surface-opaque-elevated: #1F1D1A
 --space-1: 4px   --space-2: 8px   --space-3: 12px   --space-4: 16px
 --space-5: 24px  --space-6: 32px  --space-8: 48px
 
---rail-width:        64px     /* the icon-only rail window, §8 */
---radius-rail:       32px     /* half the rail width: the rail is a pill; read by src-tauri */
+--rail-width:        56px     /* the icon-only rail window, §8: tile (36) + 2 x padding (10) */
+--rail-item-size:    36px     /* a nav tile; --rail-item-gap 4px, --rail-padding 10px, --rail-mark-gap 10px */
+--radius-rail:       28px     /* half the rail width: the rail is a pill; read by src-tauri */
 --control-height:    32px     /* buttons, selects, segmented controls */
 --control-height-sm: 28px     /* a control inside a row, §11 */
 --card-padding:      20px
@@ -184,7 +185,10 @@ Springs above are for mount/dismiss and morphs, and they run in JS. Hover, press
 --motion-duration-medium: 240ms   /* enter/exit of non-critical chrome */
 --motion-ease-standard:   cubic-bezier(0.32, 0.72, 0, 1)   /* spring-shaped, no overshoot */
 --motion-ease-linear:     linear                            /* countdown ring only */
+--page-enter-distance:    6px                               /* a page arriving fades in while rising this far */
 ```
+
+**Pages arrive, they do not jump.** Navigation and section changes replay one CSS animation (`.page-enter`: `--motion-duration-medium`, `--motion-ease-standard`, opacity plus `--page-enter-distance`) through the global `PageTransition`, keyed on the route or section. It is an enter only — an exit would hold the old page on screen while the new one loads. A list refetching under a changed filter dims to half opacity and brightens as the new rows land, so the swap is a cross-fade. The animation uses a `backwards` fill so the element carries no transform once it ends (a lingering transform would become the containing block for the fixed search dock).
 
 `--motion-duration-fast` and the reduced-motion fade are deliberately the same number: under reduced motion every spring collapses to exactly the duration the app already uses for its smallest transition, so nothing feels out of place.
 
@@ -205,7 +209,7 @@ Framer needs numbers, and a component may not carry one. Every spring in the tab
 - **The window is the pill.** The NSPanel is sized to `--pill-width`/`--pill-height` exactly and its vibrancy carries `--radius-pill`, so every pixel of the window is the capsule. Two consequences bind everything else here: the pill fills the window and **never animates its own size or transform** (object motion — arriving, resizing, leaving — belongs to the window, in Rust; only motion *inside* the pill belongs to CSS), and the pill has **no CSS drop shadow**, because a shadow has nowhere to fall and is clipped by the window bounds. Its shadow is the native window shadow. `src-tauri/src/tray.rs` `include_str!`s `tokens.css` and parses these values at startup, so the window has no second copy of them to disagree with. **Change a token and the window follows — there is no Rust number to edit.** Delete a token the pill needs and it is a build-time panic naming it.
 - **Position:** bottom-centre, `--pill-offset-bottom` (96pt) above the bottom edge of the screen containing the cursor. Multi-monitor: follow the active screen. Position is decided **once per appearance** — enforced by an `is_visible()` gate in `set_pill_visible`, not by intent. State is emitted several times a second, so positioning unconditionally makes the pill chase the pointer between displays mid-sentence.
 - **The mark** (`Mark size="md"`, §12) sits left of the bars in `--pill-ink`. While recording it breathes — a 2s opacity pulse (`--pill-pulse-*`), CSS only, so it costs the audio thread nothing. It is the one thing that tells you the app is alive while you speak.
-- **Three bars**, `--pill-bar-width` (5px) wide with `--pill-bar-gap` (6px) between, up to `--pill-bar-max` (26px) tall, in `--pill-signal`, growing from their centre. They are an **equaliser, not a scrolling history**: the centre bar follows the current level, the flanks trail it by one and two frames with their own weights, and each is floored at its resting height (short · tall · medium = 0.3 · 0.5 · 0.38 of full, low enough that speech has room to move every bar), and eased between levels over `--motion-duration-fast` so fast speech reads as motion, not flicker so silence shows the signature shape rather than three dots. Driven by windowed RMS straight into `transform: scaleY` through a ref — no React render per audio frame.
+- **Three bars**, `--pill-bar-width` (5px) wide with `--pill-bar-gap` (6px) between, up to `--pill-bar-max` (26px) tall, in `--pill-signal`, growing from their centre. They are an **equaliser, not a scrolling history**: the centre bar follows the current level, the flanks trail it by one and two frames with their own weights, and each is floored at its resting height (short · tall · medium = 0.3 · 0.5 · 0.38 of full, low enough that speech has room to move every bar), and eased between levels over `--motion-duration-fast` so fast speech reads as motion, not flicker so silence shows the signature shape rather than three dots. Driven by windowed RMS straight into `transform: scaleY` through a ref — no React render per audio frame. The audio event only records a target; a `requestAnimationFrame` loop moves each bar toward it with `--pill-bar-attack` (0.6, fast up) and `--pill-bar-release` (0.14, slow down) per frame, and between words keeps a sine ripple of `--pill-bar-idle-amplitude` (0.08) over `--pill-bar-idle-period-ms` (1600) a third of a cycle apart per bar, so the pill never goes flat. Reduced motion drops the ripple.
 - **Waveform input scaling.** The RMS arriving from the audio thread is linear 0..1, and real speech sits between roughly 0.05 and 0.3 — so a bar drawn at `height = rms` is a flat line for the entire recording. Two values map the audio range onto the visual one:
 
   ```
@@ -482,8 +486,11 @@ Change the path in `assets/mark.svg` and `Mark.tsx` together or not at all. The 
 
 ```
 --mark-size-sm: 18px   --mark-size-md: 26px   --mark-size-lg: 48px   /* width; height follows the 91.2 : 75.5 aspect */
---rail-mark-height: 16px   /* the mark's drawn height at md — the rail's height formula reads it */
+--rail-mark-height: 22px   /* the mark's drawn height at md (21.5px, rounded up) — the rail's height formula reads it */
+--mark-look-duration: 9s   --mark-look-travel: 9   --mark-look-turn: 6deg   /* the rail mark glancing left and right */
 ```
+
+The rail's mark is the one animated logo: on a slow loop the quotes (holes in the head) slide left, then right, while the head leans into each look, then it rests. It is on in the rail only (`Mark look`) — the pill's mark breathes instead — and off under reduced motion.
 
 Onboarding shows the mark on the tour and nowhere else. The setup steps that follow carry **no progress dots**: they are derived from backend state rather than a fixed-length sequence, so a "1 of 3" would announce a length that varies per machine.
 

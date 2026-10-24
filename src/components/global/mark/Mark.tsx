@@ -12,6 +12,11 @@
  *        onboarding tour) would otherwise share a mask id and the second would
  *        resolve to the first's geometry.
  *
+ *        `look` makes it glance left and right now and then (global.css,
+ *        .mark-look-*): the quotes, being holes, slide across the head while the
+ *        head leans into the look. It is for the rail only — the pill's mark
+ *        breathes instead, and two kinds of motion on one logo would be noise.
+ *
  *        Keep the path in step with assets/mark.svg — change both or neither.
  * WHERE: The top of the dashboard rail, the pill, onboarding's first screen.
  *        The menu-bar and bundle icons are rendered from the SVG assets.
@@ -24,6 +29,8 @@ export type MarkSize = "sm" | "md" | "lg";
 
 export interface MarkProps {
   size?: MarkSize;
+  /** Glance around on a slow loop. Off by default; the rail turns it on. */
+  look?: boolean;
   /** The accessible name. Null renders the mark as decoration, which is right
    *  wherever the product name is already written next to it. */
   label?: string | null;
@@ -39,7 +46,7 @@ const SIZE_CLASS: Readonly<Record<MarkSize, string>> = {
 const QUOTE = "M0 0H38C72 0 100 28 100 64V120H6V62H30C52 62 52 38 30 38H2Z";
 const HEAD = "M-6 46.5L0 45.5C12 39.5 30 26.5 47 26C63 25.5 82 36 87.4 52.5C90 60 90.8 75 91 105H-6Z";
 
-export function Mark({ size = "md", label = null, className }: MarkProps) {
+export function Mark({ size = "md", look = false, label = null, className }: MarkProps) {
   const id = useId();
   const tile = `${id}-tile`;
   const holes = `${id}-holes`;
@@ -61,14 +68,14 @@ export function Mark({ size = "md", label = null, className }: MarkProps) {
         <path id={quote} d={QUOTE} />
         <mask id={holes} maskUnits="userSpaceOnUse" x="0" y="0" width="100" height="100">
           <rect width="100" height="100" fill="#fff" />
-          <g fill="#000">
+          <g fill="#000" className={look ? "mark-look-eyes" : undefined}>
             <use href={`#${quote}`} transform="translate(44.3 43.2) rotate(-4) scale(0.126)" />
             <use href={`#${quote}`} transform="translate(60.9 42) rotate(-4) scale(0.126)" />
           </g>
         </mask>
       </defs>
       <g clipPath={`url(#${tile})`}>
-        <path mask={`url(#${holes})`} d={HEAD} />
+        <path mask={`url(#${holes})`} d={HEAD} className={look ? "mark-look-head" : undefined} />
       </g>
     </svg>
   );

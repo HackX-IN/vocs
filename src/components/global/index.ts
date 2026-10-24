@@ -1,7 +1,8 @@
 /**
  * SOURCE OF TRUTH KEYWORDS: global-components-barrel, GlassPanel, StatCard,
  *   DataList, SettingControl, EmptyState, ErrorSurface, ErrorBoundary, ProgressBar, Skeleton,
- *   CountdownRing, Waveform, Keycap, Button, ConfirmButton, Card, Eyebrow
+ *   CountdownRing, Waveform, Keycap, Button, ConfirmButton, Card, Eyebrow,
+ *   PageTransition
  * WHAT:  The global component library — every primitive reusable across routes.
  * WHY:   One import path for the whole set, so a route never reaches into a
  *        component folder and no two routes disagree about where a primitive
@@ -32,3 +33,4 @@ export * from "./mark";
 export * from "./segmented-control";
 export * from "./window-bar";
 export * from "./boot-screen";
+export * from "./page-transition";

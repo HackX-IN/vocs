@@ -29,6 +29,9 @@ import { useScrollEdges } from "./use-scroll-edges";
 
 export interface ScrollAreaProps {
   children: ReactNode;
+  /** Centre the content in the shell's reading width (--shell-max-width), so a
+   *  wide window gains margins instead of stretching the cards. */
+  centered?: boolean;
   /** Pad the content down past the overlaying page header. On by default —
    *  every dashboard page has one. */
   headerInset?: boolean;
@@ -39,6 +42,7 @@ export interface ScrollAreaProps {
 export function ScrollArea({
   children,
   headerInset = true,
+  centered = false,
   className,
   contentClassName,
 }: ScrollAreaProps) {
@@ -64,7 +68,13 @@ export function ScrollArea({
       }
       className={cn("scroll-fade min-h-0 flex-1 overflow-y-auto", className)}
     >
-      <div className={cn(headerInset && "pt-[var(--page-header-height)]", contentClassName)}>
+      <div
+        className={cn(
+          headerInset && "pt-[var(--page-header-height)]",
+          centered && "mx-auto w-full max-w-[var(--shell-max-width)]",
+          contentClassName,
+        )}
+      >
         {children}
       </div>
     </div>

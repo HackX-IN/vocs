@@ -25,9 +25,11 @@
  *        all come from the application menu's Edit items.
  *
  *        It draws its OWN header (the shell is told not to): back, save status
- *        and actions sit in the traffic-light row, because on this page the
- *        dictation's title is the heading and a second "Dictations" above it
- *        would be wrong twice.
+ *        and actions form a toolbar at the top of the reading column, directly
+ *        above the title they act on — not up in the window bar, where they
+ *        floated a full screen-edge away from the thing being edited. On this
+ *        page the dictation's title is the heading, and a second "Dictations"
+ *        above it would be wrong twice.
  * WHERE: Rendered by HistoryView when the route carries a session id. Header
  *        actions call copy_text / delete_history_entry; saves go through
  *        update_history_entry.
@@ -239,33 +241,11 @@ function DictationBody({
   const words = draft.text.trim().length === 0 ? 0 : draft.text.trim().split(/\s+/).length;
 
   return (
-    <div className="relative flex min-h-0 flex-1 flex-col">
-      <WindowBar
-        leading={
-          <Button variant="ghost" aria-label="Back to dictations" onClick={() => void goBack()} className="size-8 px-0">
-            <ArrowLeft className="size-4" />
-          </Button>
-        }
-        title={
-          <span
-            role="status"
-            className={cn("text-caption", autosave.status === "error" ? "text-danger" : "text-text-tertiary")}
-          >
-            {STATUS_LABEL[autosave.status]}
-          </span>
-        }
-        trailing={
-          <>
-            <Button variant="ghost" onClick={() => void copy()} aria-label="Copy text">
-              {copied ? <Check className="size-4 text-success" /> : <Copy className="size-4" />}
-              {copied ? "Copied" : "Copy"}
-            </Button>
-            <ConfirmButton idleVariant="ghost" confirmLabel="Delete it" onConfirm={remove} aria-label="Delete dictation">
-              <Trash2 className="size-4" />
-            </ConfirmButton>
-          </>
-        }
-      />
+    <div className="page-enter relative flex min-h-0 flex-1 flex-col">
+      {/* No controls up here: the window bar is only the drag handle and the
+          traffic lights. The editor's own toolbar sits in the column, directly
+          above the title it acts on. */}
+      <WindowBar />
 
       {finding ? (
         <FindBar
@@ -283,7 +263,33 @@ function DictationBody({
       ) : null}
 
       <ScrollArea contentClassName="px-[var(--page-padding-x)] pb-24">
-        <article className="mx-auto flex w-full max-w-[var(--content-max-width)] flex-col gap-5 pt-4">
+        <article className="mx-auto flex w-full max-w-[var(--content-max-width)] flex-col gap-5">
+          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-2">
+            <Button
+              variant="ghost"
+              aria-label="Back to dictations"
+              onClick={() => void goBack()}
+              className="size-8 justify-self-start px-0"
+            >
+              <ArrowLeft className="size-4" />
+            </Button>
+            <span
+              role="status"
+              className={cn("text-caption", autosave.status === "error" ? "text-danger" : "text-text-tertiary")}
+            >
+              {STATUS_LABEL[autosave.status]}
+            </span>
+            <div className="flex items-center gap-1 justify-self-end">
+              <Button variant="ghost" onClick={() => void copy()} aria-label="Copy text">
+                {copied ? <Check className="size-4 text-success" /> : <Copy className="size-4" />}
+                {copied ? "Copied" : "Copy"}
+              </Button>
+              <ConfirmButton idleVariant="ghost" confirmLabel="Delete it" onConfirm={remove} aria-label="Delete dictation">
+                <Trash2 className="size-4" />
+              </ConfirmButton>
+            </div>
+          </div>
+
           <textarea
             ref={titleRef}
             rows={1}

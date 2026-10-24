@@ -67,7 +67,7 @@ export function BillingView() {
   }, []);
 
   return (
-    <ScrollArea contentClassName="flex flex-col gap-4 px-[var(--page-padding-x)] pb-12">
+    <ScrollArea centered contentClassName="flex flex-col gap-4 px-[var(--page-padding-x)] pb-12">
       <Card index="01" title="Free. Local. Forever." tone="hero">
         <div className="flex flex-col gap-4">
           <p className="font-display text-title text-text-primary">Yours.</p>

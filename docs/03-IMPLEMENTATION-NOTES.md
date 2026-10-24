@@ -115,6 +115,14 @@ per-segment spans, so seam de-duplication can use them. Ours de-duplicates on
 text as well, over a bounded window, because that also catches genuine spoken
 stutters — but the timestamps are real and available if wanted.
 
+### 2.2a Every decode shrinks its context, and chunks are 4–12 s (measured correction)
+
+§2.1 kept the full 1500 context for interior chunks "because their latency is hidden". On a real machine's History it was not: a full-context interior decode took 2.3 s, and a stop pressed during one made the tail wait behind it (2.6 s to paste); an utterance under the 8 s minimum chunk paid for all of itself at the stop. Measured directly: a 1.7 s fragment decodes in **221 ms at `audio_ctx` 256 and 1783 ms at 1500 (8×)**. So every chunk now uses `audio_ctx_for` (Core ML excepted, §2.6), and the chunker closes the first chunk at the first pause after 4 s of speech (max 12 s).
+
+### 2.2b Degenerate output: sound tags and repetition loops
+
+With temperature fallback off (§2.2) nothing breaks a decoder loop. Real History rows: `*Scoffs*`, `*punch*`, and a 2.4 s recording returned as 217 words of "the one who is…". `adapters/whisper/degenerate.rs` strips `*…*`/`[…]`/`(…)` tags and collapses a phrase repeated 3+ times (a single word 5+); a looping decode is retried once at `RETRY_TEMPERATURE` and a chunk that loops twice is discarded as non-speech.
+
 ### 2.3 The `initial_prompt` trick — this is how the custom dictionary earns its keep
 
 Whisper accepts an initial prompt (up to ~224 tokens) that biases decoding toward that vocabulary. Feeding the user's dictionary terms in as a prompt makes the model **recognize** them correctly, rather than mis-hearing them and relying on a post-hoc string replacement.
@@ -351,6 +359,6 @@ It stays behind an off-by-default cargo feature. Anyone who turns it on gets a s
 
 **3. Optimal chunk length** — 8–15s in use and behaving; not yet swept for the compute/tail balance.
 
-**4. Real paste-timing delays** across TextEdit, Terminal, Slack, VS Code and a browser — still to measure, and this one CANNOT be automated: it requires dictating into each app and watching what arrives. Defaults are 40 ms / 150 ms, which is the middle of the range that works across native apps, Terminal and Electron. Both are exposed as advanced settings precisely because no single number fits every target, so a user who hits it can fix their own case immediately. The symptom to watch for is a paste arriving with the PREVIOUS clipboard contents (raise `output.paste_delay_ms`) or arriving empty in one specific app (turn off `output.restore_clipboard`).
+**4. Real paste-timing delays** across TextEdit, Terminal, Slack, VS Code and a browser — still to measure, and this one CANNOT be automated: it requires dictating into each app and watching what arrives. Defaults are 40 ms / 500 ms (the restore no longer blocks delivery — it runs on its own thread, so it can be long enough for an Electron app that reads the clipboard lazily; a paste delay under 30 ms is raised to 30), which is the middle of the range that works across native apps, Terminal and Electron. Both are exposed as advanced settings precisely because no single number fits every target, so a user who hits it can fix their own case immediately. The symptom to watch for is a paste arriving with the PREVIOUS clipboard contents (raise `output.paste_delay_ms`) or arriving empty in one specific app (turn off `output.restore_clipboard`).
 
 **What could not be verified without a person.** The end-to-end tests replay synthesised speech through a fake `AudioSource`, which exercises the chunker, the VAD, the engine, the assembler, the enhancement rules, the database and the FSM. What they do NOT exercise is the CoreAudio driver itself and the real synthetic-paste path into a third-party app. Those two need a human with a microphone, and no amount of test scaffolding substitutes for it.

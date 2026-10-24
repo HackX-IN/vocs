@@ -19,7 +19,16 @@ import { useMemo } from "react";
 import { commands, type HotkeyBinding, type NavDef, type RegistrySnapshot, type SettingValue } from "@/lib/bindings";
 import { useCommand } from "@/lib/ipc";
 import { useSettings } from "./use-settings";
-import { BootScreen, EmptyState, ErrorBoundary, ErrorSurface, Skeleton, ScrollArea, useBoot } from "@/components/global";
+import {
+  BootScreen,
+  EmptyState,
+  ErrorBoundary,
+  ErrorSurface,
+  PageTransition,
+  Skeleton,
+  ScrollArea,
+  useBoot,
+} from "@/components/global";
 import { PageShell } from "./_components/PageShell";
 import { UpdateNotice } from "./_components/UpdateNotice";
 import { BillingView } from "./billing";
@@ -107,36 +116,37 @@ export function Dashboard() {
           where the design has one. */}
       <div className="flex min-w-0 flex-1 flex-col">
         <PageShell title={editingDictation ? null : activeTitle}>
-        <ErrorBoundary
-          key={activeRoute}
-          fallback={({ error, reset }) => (
-            <ErrorSurface
-              error={{
-                code: "INTERNAL",
-                message: "This view stopped working.",
-                recoverable: true,
-                action: { kind: "RETRY" },
-                detail: error.message,
-              }}
-              onRetry={reset}
-            />
-          )}
-        >
-          {registry.data ? (
-            <View
-              route={activeRoute}
-              section={section}
-              registry={registry.data}
-              metrics={metrics}
-              hotkey={dictationHotkey(registry.data, settings.data)}
-              mode={dictationModeFrom(settings.data)}
-            />
-          ) : (
-            <ScrollArea contentClassName="px-[var(--page-padding-x)] pb-8">
-              <Skeleton rows={4} />
-            </ScrollArea>
-          )}
-        </ErrorBoundary>
+          <PageTransition id={activeRoute} className="flex min-h-0 flex-1 flex-col">
+          <ErrorBoundary
+            fallback={({ error, reset }) => (
+              <ErrorSurface
+                error={{
+                  code: "INTERNAL",
+                  message: "This view stopped working.",
+                  recoverable: true,
+                  action: { kind: "RETRY" },
+                  detail: error.message,
+                }}
+                onRetry={reset}
+              />
+            )}
+          >
+            {registry.data ? (
+              <View
+                route={activeRoute}
+                section={section}
+                registry={registry.data}
+                metrics={metrics}
+                hotkey={dictationHotkey(registry.data, settings.data)}
+                mode={dictationModeFrom(settings.data)}
+              />
+            ) : (
+              <ScrollArea contentClassName="px-[var(--page-padding-x)] pb-8">
+                <Skeleton rows={4} />
+              </ScrollArea>
+            )}
+          </ErrorBoundary>
+          </PageTransition>
         </PageShell>
         <UpdateNotice />
       </div>

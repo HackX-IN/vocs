@@ -27,7 +27,7 @@ import { commands, type AppError, type SettingDef as RegistrySettingDef, type Se
 import { unwrapCommand, useCommand } from "@/lib/ipc";
 import { usePermissions } from "@/lib/use-permissions";
 import { formatBytes } from "@/lib/format";
-import { ErrorSurface, ScrollArea, Skeleton } from "@/components/global";
+import { ErrorSurface, PageTransition, ScrollArea, Skeleton } from "@/components/global";
 import type { SettingOption } from "@/components/global";
 import { navigateTo } from "../use-hash-route";
 import { useSettings } from "../use-settings";
@@ -132,7 +132,7 @@ export function SettingsView({ registry, section }: SettingsViewProps) {
   };
 
   return (
-    <div className="flex min-h-0 flex-1">
+    <div className="mx-auto flex min-h-0 w-full max-w-[var(--shell-max-width)] flex-1">
       {/* The list is fixed while the cards scroll, so the page you are on is
           always in view. It sits below the page header band like the content. */}
       <div className="shrink-0 pt-[var(--page-header-height)] pl-[var(--page-padding-x)]">
@@ -152,15 +152,16 @@ export function SettingsView({ registry, section }: SettingsViewProps) {
         {searching ? (
           <SettingsResults query={query} defs={allDefs} context={context} />
         ) : (
-          <SettingsPageBody
-            key={page.id}
-            page={page}
-            defs={grouped.get(page.id) ?? []}
-            allDefs={allDefs}
-            context={context}
-            dataVersion={dataVersion}
-            onDataImported={onDataImported}
-          />
+          <PageTransition id={page.id} className="flex flex-col gap-4">
+            <SettingsPageBody
+              page={page}
+              defs={grouped.get(page.id) ?? []}
+              allDefs={allDefs}
+              context={context}
+              dataVersion={dataVersion}
+              onDataImported={onDataImported}
+            />
+          </PageTransition>
         )}
       </ScrollArea>
     </div>

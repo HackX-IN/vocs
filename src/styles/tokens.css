@@ -158,17 +158,24 @@
    */
   --rail-detach-gap: 12px;
 
-  --rail-width: 64px;
-  --rail-item-size: 40px;
-  --rail-item-gap: 10px;
-  --rail-padding: 14px;
-  --rail-mark-gap: 12px;
+  /* Tightened from 64/40/10/14/12: the old rhythm left a 10px gap between 40px
+   * tiles, so four icons read as scattered across a tall rail. A 36px tile with
+   * a 4px gap and 10px padding makes the rail one compact object whose width
+   * equals tile + 2 x padding (36 + 20 = 56), so the selected wash sits exactly
+   * centred with the same margin on every side. */
+  --rail-width: 56px;
+  --rail-item-size: 36px;
+  --rail-item-gap: 4px;
+  --rail-padding: 10px;
+  --rail-mark-gap: 10px;
   /* Half the rail's width: the rail is a pill, not a rounded rectangle. Read by
    * src-tauri/src/bootstrap.rs for the window's vibrancy cut. */
-  --radius-rail: 32px;
-  /* The mark's drawn height at --mark-size-md: 26px wide x 91.2:75.5. The rail's
-   * height formula adds this, and bootstrap.rs reads it by name. */
-  --rail-mark-height: 16px;
+  --radius-rail: 28px;
+  /* The mark's drawn height at --mark-size-md: 26px wide x 91.2:75.5 = 21.5px,
+   * rounded up. It said 16px, which made the rail's height formula short by the
+   * difference and the mark overflow its row, so the top margin read bigger than
+   * the bottom. The formula adds this, and bootstrap.rs reads it by name. */
+  --rail-mark-height: 22px;
   --control-height: 32px;
   --control-height-sm: 28px;
 
@@ -239,6 +246,15 @@
   --motion-duration-medium: 240ms;
   --motion-ease-standard: cubic-bezier(0.32, 0.72, 0, 1);
   --motion-ease-linear: linear;
+  /* A page arriving: it fades in while rising this far (docs/04 §6.1). Short on
+   * purpose — it is the app saying "you moved", not a performance. */
+  --page-enter-distance: 6px;
+  /* The identity mark in the rail looks around: one slow cycle, then it rests.
+   * Travel is in the mark's own viewBox units (the mark is ~91 wide), turn is the
+   * lean of the head as it looks. Ambient, so it is long and mostly still. */
+  --mark-look-duration: 9s;
+  --mark-look-travel: 9;
+  --mark-look-turn: 6deg;
 
   --spring-pill-appear-stiffness: 400;
   --spring-pill-appear-damping: 30;
@@ -318,6 +334,17 @@
   --pill-bar-width: 5px;
   --pill-bar-gap: 6px;
   --pill-bar-max: 26px;
+  /* How the three bars move. Each frame a bar closes this share of the distance
+   * to its target: fast upward (attack) so a syllable lands the moment it is
+   * heard, slow downward (release) so the bar falls like a meter rather than
+   * flickering. The idle shimmer is the share of full height the bars keep
+   * breathing by when nobody is talking, over --pill-bar-idle-period-ms, with
+   * the bars a third of a cycle apart so they ripple instead of pulsing in
+   * unison — a flat pill reads as "stopped listening" (docs/04 §7). */
+  --pill-bar-attack: 0.6;
+  --pill-bar-release: 0.14;
+  --pill-bar-idle-amplitude: 0.08;
+  --pill-bar-idle-period-ms: 1600;
 
   /* ── The caption HUD (docs/04 §15) ──────────────────────────────────────
    * One window for two features: the live captions shown while you speak and the
@@ -428,6 +455,11 @@
   --scroll-fade-size: 52px;
 
   /* ── Dashboard (docs/04 §8) ───────────────────────────────────────── */
+  /* The widest the dashboard's pages stretch before they centre and gain margin
+   * instead (ScrollArea `centered`, the Settings split). Matches the default
+   * window, so nothing changes at the shipped size and a larger window reads as
+   * a page on a desk rather than a table pulled wide. */
+  --shell-max-width: 880px;
   --window-width: 960px;
   --window-height: 640px;
   --window-min-width: 840px;
