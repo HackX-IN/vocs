@@ -27,6 +27,9 @@ body {
   font-size: 17px;
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
+  /* A backstop, not the fix: `clip` (unlike `hidden`) leaves position: sticky working, and means a
+     single overflowing element can never put a horizontal scrollbar on the whole page. */
+  overflow-x: clip;
 }
 
 img,

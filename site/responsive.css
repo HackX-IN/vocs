@@ -8,13 +8,7 @@
 /* ── Small screens ───────────────────────────────────────────────────── */
 
 @media (max-width: 860px) {
-  .toast {
-    left: var(--space-3);
-    right: var(--space-3);
-    bottom: var(--space-3);
-    max-width: none;
-  }
-  .release {
+  .release-feature-card {
     padding: var(--space-5);
   }
   .release-head .btn {
@@ -36,7 +30,7 @@
     grid-column: auto;
   }
   .install {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
     gap: var(--space-8);
   }
   .nav-links a:not(.btn) {
@@ -51,7 +45,72 @@
   }
 }
 
+@media (max-width: 560px) {
+  :root {
+    --gutter: 18px;
+  }
+  .nav .wrap {
+    gap: var(--space-3);
+  }
+  .mac-option {
+    flex-wrap: wrap;
+    padding: var(--space-4);
+  }
+  .mac-option-go {
+    width: 100%;
+    text-align: center;
+  }
+  .release-search {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-2);
+  }
+  /* In a column the input's `flex: 1` would grow its HEIGHT, not its width. */
+  .release-search input {
+    flex: none;
+    width: 100%;
+  }
+  /* Phone timeline: the gist drops under the version instead of fighting the date for one line. */
+  .rel-summary {
+    flex-wrap: wrap;
+    row-gap: var(--space-1);
+  }
+  .rel-gist {
+    order: 5;
+    flex-basis: 100%;
+    white-space: normal;
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+  }
+  .rel-date {
+    margin-left: auto;
+  }
+  .release-more {
+    padding-left: 0;
+  }
+  /* The dialog becomes a sheet from the bottom edge. */
+  .modal {
+    width: 100vw;
+    max-width: none;
+    margin: auto 0 0;
+    border-radius: var(--radius-panel) var(--radius-panel) 0 0;
+  }
+  .modal-card {
+    padding: var(--space-6) var(--space-5) var(--space-5);
+  }
+  .modal-actions {
+    flex-direction: column-reverse;
+    align-items: stretch;
+    text-align: center;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .modal[open],
+  .modal[open]::backdrop {
+    animation: none;
+  }
   html {
     scroll-behavior: auto;
   }

@@ -202,9 +202,14 @@ kbd {
 /* Install */
 .install {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  /* minmax(0, 1fr), not 1fr: a bare 1fr track will not shrink below its content's
+     min-content, so one long command stretched the whole page sideways on a phone. */
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: var(--space-10);
   align-items: start;
+}
+.install > * {
+  min-width: 0;
 }
 .install-steps {
   margin: 0;
@@ -257,11 +262,40 @@ kbd {
   font-size: 0.86em;
   color: var(--text);
 }
-.note code {
-  display: block;
+.note p {
+  margin: 0;
+}
+/* A command line: wraps instead of scrolling, so it can never be wider than its column. */
+.cmd {
+  position: relative;
   margin-top: var(--space-2);
-  overflow-x: auto;
-  white-space: nowrap;
+}
+.cmd code {
+  display: block;
+  padding: var(--space-3) 72px var(--space-3) var(--space-3);
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.5;
+}
+.cmd-copy {
+  position: absolute;
+  top: 50%;
+  right: var(--space-2);
+  transform: translateY(-50%);
+  padding: 4px 10px;
+  border: 0.5px solid var(--hairline);
+  border-radius: var(--radius-full);
+  background: var(--card);
+  color: var(--text-2);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 560;
+  cursor: pointer;
+  transition: color var(--motion-fast) var(--ease), border-color var(--motion-fast) var(--ease);
+}
+.cmd-copy:hover {
+  color: var(--text);
+  border-color: var(--accent);
 }
 
 /* FAQ */

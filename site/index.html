@@ -3,9 +3,10 @@
   SOURCE OF TRUTH KEYWORDS: landing-page, launch-page, github-pages, download-latest, open-anyway,
     gatekeeper-steps, privacy-promise, site-index
   WHAT:  Vocs's public launch page: what it is, how it works, the privacy promise, how to install
-         without an Apple notarisation, the release history, and Download buttons that fetch the
-         newest release's DMG without leaving the page. They are plain links to one permanent file
-         URL, so they work with no JavaScript and no API call.
+         without an Apple notarisation, the release history (a featured latest release and a
+         searchable timeline of every earlier one), and Download buttons that fetch the newest
+         release's DMG without leaving the page. They are plain links to one permanent file URL, so
+         they work with no JavaScript and no API call; a dialog then walks through the first launch.
   WHY:   Calm and editorial on purpose (big type, long breaks, one product picture), the way
          Granola's page sells a notepad: the product does the persuading. Nothing here is
          invented — every claim is one the README makes about the app. The install section
@@ -268,7 +269,7 @@
             </p>
             <p class="fine"><span data-version-wrap hidden><span data-version></span> <span data-size></span> · </span><a data-notes href="https://github.com/HackX-IN/vocs/releases">Release notes</a></p>
           </div>
-          <div>
+          <div id="install-guide">
             <ol class="install-steps">
               <li>
                 <strong>Open the downloaded DMG.</strong>
@@ -290,12 +291,14 @@
                 Allow the microphone, download the model, and try your hotkey.
               </li>
             </ol>
-            <p class="note">
-              Prefer the terminal? Run this before opening the DMG, and again for the app if macOS
-              asks about it:
-              <code>xattr -dr com.apple.quarantine ~/Downloads/Vocs-macOS.dmg</code>
-              <code>xattr -dr com.apple.quarantine /Applications/Vocs.app</code>
-            </p>
+            <div class="note">
+              <p>
+                Prefer the terminal? Run this before opening the DMG, and again for the app if macOS
+                asks about it:
+              </p>
+              <div class="cmd"><code>xattr -dr com.apple.quarantine ~/Downloads/Vocs-macOS.dmg</code></div>
+              <div class="cmd"><code>xattr -dr com.apple.quarantine /Applications/Vocs.app</code></div>
+            </div>
           </div>
         </div>
       </section>
@@ -307,9 +310,28 @@
           <h2>What's new.</h2>
           <p class="sub">
             Every version, with what changed. The newest is always the one the Download buttons
-            fetch.
+            fetch; older ones open in place.
           </p>
-          <div id="release-list" class="release-list"></div>
+          <div id="release-feature" class="release-feature"></div>
+
+          <div id="release-search-wrap" class="release-search" hidden>
+            <label for="release-search">Find a version</label>
+            <input
+              id="release-search"
+              type="search"
+              placeholder="1.0.1, grammar, paste…"
+              autocomplete="off"
+              spellcheck="false"
+            />
+          </div>
+
+          <ol id="release-list" class="timeline" aria-label="Earlier releases"></ol>
+          <p id="release-no-match" class="note" hidden>No release matches that.</p>
+
+          <div id="release-more" class="release-more" hidden>
+            <button id="release-more-button" class="btn" type="button">Show 10 older releases</button>
+            <p id="release-count" class="fine" aria-live="polite"></p>
+          </div>
           <p id="releases-empty" class="note">
             No release is published yet. Watch
             <a href="https://github.com/HackX-IN/vocs/releases">the releases page</a> or the
@@ -377,15 +399,21 @@
         </nav>
       </div>
     </footer>
-    <div id="started" class="toast" role="status" hidden>
-      <div>
-        <strong>Download started · <span data-toast-version></span></strong>
-        <p>
-          macOS will say it can't verify the DMG. That's expected: choose Done, then Open Anyway in
-          System Settings → Privacy &amp; Security. <a href="#install">Here's how</a>.
+    <dialog id="started" class="modal" aria-labelledby="started-title">
+      <div class="modal-card">
+        <button class="modal-close" type="button" data-modal-close aria-label="Close">×</button>
+        <p class="eyebrow">Download started</p>
+        <h2 id="started-title">Vocs <span data-modal-version></span> is on its way.</h2>
+        <p class="sub">
+          Look in your Downloads folder. Because Vocs is free and independent, Apple hasn't notarised
+          it, so macOS asks you to approve it once. Here is exactly how.
         </p>
+        <div data-modal-steps></div>
+        <div class="modal-actions">
+          <a class="modal-retry" data-modal-retry href="https://github.com/HackX-IN/vocs/releases/latest/download/Vocs-macOS.dmg">Download didn't start? Try again</a>
+          <button class="btn btn-primary" type="button" data-modal-close>Got it</button>
+        </div>
       </div>
-      <button id="started-close" type="button" aria-label="Dismiss">×</button>
-    </div>
+    </dialog>
   </body>
 </html>

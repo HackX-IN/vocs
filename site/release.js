@@ -19,31 +19,37 @@
  *        60-requests-an-hour anonymous limit, no release yet. The answer is cached ten minutes in
  *        sessionStorage so a reload does not spend the limit; storage is wrapped because it throws
  *        in private windows.
- * WHERE: Imported by main.js and downloads.js. Nothing else talks to the API.
+ *
+ *        Releases are paged, because a project with a hundred of them must not fetch a hundred
+ *        release bodies to paint the first screen: page 1 is thirty, and the Releases section asks
+ *        for the next page only when the visitor asks for older ones (or searches).
+ * WHERE: Imported by downloads.js and releases-view.js. Nothing else talks to the API.
  */
 
 const REPO = "HackX-IN/vocs";
-const API = `https://api.github.com/repos/${REPO}/releases?per_page=10`;
-const CACHE_KEY = "vocs.releases.v2";
+/** Releases per request. GitHub's maximum is 100; 30 keeps the first paint light and the rest one click away. */
+export const PAGE_SIZE = 30;
+const api = (page) => `https://api.github.com/repos/${REPO}/releases?per_page=${PAGE_SIZE}&page=${page}`;
+const cacheKey = (page) => `vocs.releases.v3.p${page}`;
 const CACHE_MS = 10 * 60 * 1000;
 
 /** The releases page; the fallback link for a release that reports no page of its own. */
 export const RELEASES_PAGE = `https://github.com/${REPO}/releases`;
 
-function readCache() {
+function readCache(page) {
   try {
-    const raw = sessionStorage.getItem(CACHE_KEY);
+    const raw = sessionStorage.getItem(cacheKey(page));
     if (!raw) return null;
-    const { at, releases } = JSON.parse(raw);
-    return Date.now() - at < CACHE_MS && Array.isArray(releases) ? releases : null;
+    const { at, releases, hasMore } = JSON.parse(raw);
+    return Date.now() - at < CACHE_MS && Array.isArray(releases) ? { releases, hasMore: Boolean(hasMore) } : null;
   } catch {
     return null;
   }
 }
 
-function writeCache(releases) {
+function writeCache(page, answer) {
   try {
-    sessionStorage.setItem(CACHE_KEY, JSON.stringify({ at: Date.now(), releases }));
+    sessionStorage.setItem(cacheKey(page), JSON.stringify({ at: Date.now(), ...answer }));
   } catch {
     // Private window: the page works the same, it just asks again next time.
   }
@@ -64,21 +70,26 @@ function summarise(release) {
   };
 }
 
-/** Newest first. Always resolves; an empty array means "nothing to offer yet". */
-export async function loadReleases() {
-  const cached = readCache();
+/**
+ * One page of releases, newest first: `{ releases, hasMore }`. Always resolves; an empty list
+ * means "nothing to offer yet". `hasMore` is read from the raw page size, not the summarised one,
+ * because releases without a DMG are dropped and a page of 30 can summarise to fewer.
+ */
+export async function loadReleases(page = 1) {
+  const cached = readCache(page);
   if (cached) return cached;
 
   try {
-    const response = await fetch(API, { headers: { Accept: "application/vnd.github+json" } });
-    if (!response.ok) return [];
-    const releases = (await response.json()).map(summarise).filter(Boolean);
+    const response = await fetch(api(page), { headers: { Accept: "application/vnd.github+json" } });
+    if (!response.ok) return { releases: [], hasMore: false };
+    const raw = await response.json();
+    const answer = { releases: raw.map(summarise).filter(Boolean), hasMore: raw.length === PAGE_SIZE };
     // An empty answer is NOT cached: right after a release is published the page would otherwise
     // keep showing "no release yet" for the rest of the cache window.
-    if (releases.length > 0) writeCache(releases);
-    return releases;
+    if (answer.releases.length > 0) writeCache(page, answer);
+    return answer;
   } catch {
-    return [];
+    return { releases: [], hasMore: false };
   }
 }
 

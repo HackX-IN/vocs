@@ -1,9 +1,9 @@
 /**
- * SOURCE OF TRUTH KEYWORDS: site-download-styles, mac-options, chip-icons, release-list,
- *   release-notes-style, download-toast, badge
+ * SOURCE OF TRUTH KEYWORDS: site-download-styles, mac-options, chip-icons, release-timeline,
+ *   release-notes-style, download-modal, badge
  * WHAT:  Styling for the parts of the launch page that depend on the release: the Apple Silicon and
- *        Intel download options, the small chip badges, the Releases section, and the "download
- *        started" note.
+ *        Intel download options, the small chip badges, the Releases timeline, and the "download
+ *        started" dialog.
  * WHY:   Kept apart from sections.css so that file stays one responsibility and so everything that
  *        is filled in by downloads.js is in one place. Values come from tokens.css; nothing here
  *        introduces a raw colour or size.
@@ -93,26 +93,17 @@
   font-weight: 600;
 }
 
-/* Releases */
-.release-list {
-  display: grid;
-  gap: var(--space-4);
+/* Releases: one featured card, then a timeline of one-line rows */
+.release-feature {
   margin-top: var(--space-8);
   max-width: 820px;
 }
-.release {
+.release-feature-card {
   padding: var(--space-6);
   border-radius: var(--radius-card);
   background: var(--card);
   border: 0.5px solid var(--hairline);
   box-shadow: var(--shadow-card);
-}
-.release summary {
-  cursor: pointer;
-  list-style: none;
-}
-.release summary::-webkit-details-marker {
-  display: none;
 }
 .release-head {
   display: flex;
@@ -142,18 +133,184 @@
   font-weight: 500;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+  white-space: nowrap;
 }
 .badge-muted {
   background: var(--sunken-strong);
   color: var(--text-2);
 }
-.release-body {
+
+.release-search {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  max-width: 820px;
+  margin-top: var(--space-8);
+}
+.release-search[hidden] {
+  display: none;
+}
+.release-search label {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 11.5px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+.release-search input {
+  flex: 1;
+  min-width: 0;
+  height: 40px;
+  padding: 0 var(--space-4);
+  border: 0.5px solid var(--hairline);
+  border-radius: var(--radius-full);
+  background: var(--card);
+  color: var(--text);
+  font: inherit;
+  font-size: 15px;
+}
+.release-search input::placeholder {
+  color: var(--text-3);
+}
+
+/* The timeline: a rail down the left, a dot per release, a heading per year. */
+.timeline {
+  position: relative;
+  max-width: 820px;
+  margin: var(--space-5) 0 0;
+  padding: 0 0 0 var(--space-6);
+  list-style: none;
+}
+.timeline::before {
+  content: "";
+  position: absolute;
+  left: 7px;
+  top: 8px;
+  bottom: 8px;
+  width: 1px;
+  background: var(--hairline);
+}
+.timeline:empty {
+  display: none;
+}
+.rel-year {
+  margin: var(--space-6) 0 var(--space-2);
+  font-family: var(--font-display);
+  padding-left: var(--space-4);
+  font-size: 26px;
+  line-height: 1;
+  color: var(--text-2);
+}
+.rel-year:first-child {
+  margin-top: 0;
+}
+.rel {
+  position: relative;
+}
+.rel::before {
+  content: "";
+  position: absolute;
+  left: calc(var(--space-6) * -1 + 3px);
+  top: 21px;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: var(--page);
+  border: 1.5px solid var(--text-3);
+  transition: border-color var(--motion-fast) var(--ease), background var(--motion-fast) var(--ease);
+}
+.rel:hover::before,
+.rel:has(details[open])::before {
+  border-color: var(--accent);
+  background: var(--accent);
+}
+.rel-row {
+  border-radius: var(--radius-input);
+  transition: background var(--motion-fast) var(--ease);
+}
+.rel-row:hover,
+.rel-row[open] {
+  background: var(--sunken);
+}
+.rel-summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 48px;
+  padding: var(--space-3) var(--space-4);
+  cursor: pointer;
+  list-style: none;
+}
+.rel-summary::-webkit-details-marker {
+  display: none;
+}
+.rel-summary::after {
+  content: "";
+  flex: none;
+  width: 7px;
+  height: 7px;
+  margin-left: var(--space-1);
+  border-right: 1.5px solid var(--text-3);
+  border-bottom: 1.5px solid var(--text-3);
+  transform: rotate(45deg);
+  transition: transform var(--motion-fast) var(--ease);
+}
+.rel-row[open] > .rel-summary::after {
+  transform: rotate(-135deg);
+}
+.rel-version {
+  flex: none;
+  font-family: var(--font-mono);
+  font-size: 15px;
+  font-weight: 600;
+}
+.rel-gist {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 15px;
+  color: var(--text-2);
+}
+.rel-date {
+  flex: none;
+  font-size: 14px;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+.rel-body {
+  padding: 0 var(--space-4) var(--space-5);
+}
+.rel-body .notes {
+  margin-top: 0;
+}
+.rel-body .btn {
   margin-top: var(--space-4);
 }
+
+.release-more {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-4);
+  max-width: 820px;
+  margin-top: var(--space-5);
+  padding-left: var(--space-6);
+}
+.release-more[hidden] {
+  display: none;
+}
+.release-more .fine {
+  margin: 0;
+}
+
 .notes {
   margin-top: var(--space-4);
   font-size: 16px;
   color: var(--text-2);
+  overflow-wrap: anywhere;
 }
 .notes h4 {
   margin: var(--space-5) 0 var(--space-2);
@@ -163,6 +320,9 @@
   letter-spacing: 0.1em;
   text-transform: uppercase;
   color: var(--text-3);
+}
+.notes h4:first-child {
+  margin-top: 0;
 }
 .notes ul {
   margin: 0;
@@ -190,46 +350,92 @@
   color: var(--accent);
 }
 
-/* "Download started" */
-.toast {
-  position: fixed;
-  right: var(--space-5);
-  bottom: var(--space-5);
-  z-index: 30;
-  display: flex;
-  align-items: flex-start;
-  gap: var(--space-4);
-  max-width: 380px;
-  padding: var(--space-4) var(--space-5);
-  border-radius: var(--radius-card);
-  background: var(--night);
-  color: var(--night-ink);
+/* "Download started": the dialog that explains the first launch */
+.modal {
+  width: min(640px, calc(100vw - var(--space-6)));
+  max-height: calc(100dvh - var(--space-6));
+  margin: auto;
+  padding: 0;
+  border: 0.5px solid var(--hairline);
+  border-radius: var(--radius-panel);
+  background: var(--page);
+  color: var(--text);
   box-shadow: var(--shadow-panel);
-  font-size: 15px;
+  overflow: hidden;
 }
-.toast[hidden] {
-  display: none;
+.modal::backdrop {
+  background: var(--scrim);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
 }
-.toast p {
-  margin: var(--space-1) 0 0;
-  color: var(--night-ink-2);
+.modal[open] {
+  animation: modal-in var(--motion-medium) var(--ease);
 }
-.toast a {
-  color: var(--night-ink);
+.modal[open]::backdrop {
+  animation: modal-fade var(--motion-medium) var(--ease);
 }
-.toast button {
-  flex: none;
-  width: 28px;
-  height: 28px;
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px) scale(0.985);
+  }
+}
+@keyframes modal-fade {
+  from {
+    opacity: 0;
+  }
+}
+.modal-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100dvh - var(--space-6));
+  padding: var(--space-8) var(--space-8) var(--space-6);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+.modal-card h2 {
+  margin: var(--space-2) 0 var(--space-3);
+  font-size: clamp(26px, 5vw, 34px);
+  line-height: 1.15;
+}
+.modal-card .sub {
+  margin: 0 0 var(--space-6);
+  font-size: 16.5px;
+}
+.modal-close {
+  position: absolute;
+  top: var(--space-4);
+  right: var(--space-4);
+  width: 36px;
+  height: 36px;
   border: 0;
   border-radius: 50%;
-  background: transparent;
-  color: var(--night-ink-2);
+  background: var(--sunken);
+  color: var(--text-2);
   font: inherit;
-  font-size: 20px;
+  font-size: 22px;
   line-height: 1;
   cursor: pointer;
 }
-.toast button:hover {
-  background: var(--night-hairline);
+.modal-close:hover {
+  background: var(--sunken-strong);
+  color: var(--text);
+}
+.modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  margin-top: var(--space-4);
+  padding-top: var(--space-5);
+  border-top: 0.5px solid var(--hairline);
+}
+.modal-retry {
+  font-size: 15px;
+  color: var(--text-2);
+}
+.modal-retry:hover {
+  color: var(--text);
 }

@@ -42,6 +42,9 @@
   --night-ink-2: rgba(246, 242, 235, 0.62);
   --night-hairline: rgba(255, 244, 230, 0.1);
 
+  /* The dimmed page behind the download dialog. */
+  --scrim: rgba(10, 9, 8, 0.55);
+
   --radius-card: 20px;
   --radius-panel: 28px;
   --radius-input: 12px;

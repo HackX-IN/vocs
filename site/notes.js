@@ -9,7 +9,7 @@
  *        construction, with no sanitiser to get wrong. Only the markdown the CHANGELOG actually
  *        uses is supported (### headings, "- " bullets, **bold**, `code`, [text](https://...)),
  *        because a full renderer would be a dependency for a dozen lines of notes.
- * WHERE: Imported by downloads.js, which fills the Releases section.
+ * WHERE: Imported by releases-view.js, which fills the Releases section.
  */
 
 const INLINE = /(\*\*[^*]+\*\*|`[^`]+`|\[[^\]]+\]\(https:\/\/[^)\s]+\))/g;
@@ -77,4 +77,25 @@ export function renderNotes(markdown) {
     fragment.append(paragraph);
   }
   return fragment;
+}
+
+/**
+ * WHAT:  The first bullet or sentence of the notes as plain text, shortened — the one-line gist a
+ *        collapsed release row shows beside its version.
+ * WHY:   With a hundred releases the list is only scannable if each row says something. Inline
+ *        markdown is stripped rather than rendered, since this goes into a single ellipsised line.
+ * WHERE: Imported by releases-view.js.
+ */
+export function gistOf(markdown, max = 110) {
+  for (const raw of String(markdown).split("\n")) {
+    const line = raw.trim();
+    if (!line || /^#{1,6}\s/.test(line)) continue;
+    const plain = line
+      .replace(/^[-*]\s+/, "")
+      .replace(/\*\*([^*]+)\*\*/g, "$1")
+      .replace(/`([^`]+)`/g, "$1")
+      .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1");
+    return plain.length > max ? `${plain.slice(0, max - 1).trimEnd()}…` : plain;
+  }
+  return "";
 }
