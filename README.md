@@ -6,7 +6,17 @@ before you can look up.
 Local-first speech to text for macOS. No account, no subscription, no word cap,
 and no audio ever leaves your machine.
 
-**[Download](https://hackx-in.github.io/vocs/)** · [Releases](https://github.com/HackX-IN/vocs/releases) · [Changelog](CHANGELOG.md)
+**[Download](https://hackx-in.github.io/vocs/)** · [Releases](https://github.com/HackX-IN/vocs/releases) · [Changelog](CHANGELOG.md) · [♥ Sponsor](https://github.com/sponsors/HackX-IN)
+
+<a href="https://github.com/HackX-IN/vocs/blob/main/brag-output/brag.mp4">
+  <img src="brag-output/brag.jpg" alt="Vocs — Talk. It types. Watch the 25-second launch video." width="100%">
+</a>
+
+<p align="center">
+  <a href="https://github.com/HackX-IN/vocs/blob/main/brag-output/brag.mp4"><b>▶ Watch the launch video</b></a>
+  &nbsp;·&nbsp;
+  <a href="https://github.com/sponsors/HackX-IN"><img src="https://img.shields.io/badge/Sponsor-%E2%99%A5-ea4aaa?logo=githubsponsors&logoColor=white" alt="Sponsor HackX-IN on GitHub"></a>
+</p>
 
 ---
 
