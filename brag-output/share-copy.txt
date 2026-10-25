@@ -1,0 +1,1 @@
+You think faster than you type. Vocs is speech-to-text for macOS: press ⌥Space, talk, press it again, and your words land wherever you were typing. Free, open source, 99 languages, and nothing leaves your Mac. hackx-in.github.io/vocs
