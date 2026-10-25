@@ -13,8 +13,6 @@ and no audio ever leaves your machine.
 </a>
 
 <p align="center">
-  <a href="https://github.com/HackX-IN/vocs/blob/main/brag-output/brag.mp4"><b>▶ Watch the launch video</b></a>
-  &nbsp;·&nbsp;
   <a href="https://github.com/sponsors/HackX-IN"><img src="https://img.shields.io/badge/Sponsor-%E2%99%A5-ea4aaa?logo=githubsponsors&logoColor=white" alt="Sponsor HackX-IN on GitHub"></a>
 </p>
 
