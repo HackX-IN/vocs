@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Vocs launch film</title>
+<link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+<div id="stage">
+  <div id="world">
+    <div id="glow"></div>
+    <div id="paperbg"></div>
+    <canvas id="lattice" width="1920" height="1080"></canvas>
+
+    <!-- 1 · Hook -->
+    <section class="scene" id="s1">
+      <div id="s1text"></div>
+      <div class="key" id="keyopt" style="width:170px"><small>⌥</small></div>
+      <div class="key" id="keyspace" style="width:560px">Space</div>
+    </section>
+
+    <!-- 2 · Reveal -->
+    <section class="scene" id="s2">
+      <div id="s2tag">Talk. <em>It types.</em></div>
+    </section>
+
+    <!-- 3 · The product in use -->
+    <section class="scene" id="s3">
+      <div class="step" id="st1" style="top:300px"><div class="n">1</div><div class="l">Press ⌥ Space</div><div class="s">Anywhere, in any app.</div></div>
+      <div class="step" id="st2" style="top:520px"><div class="n">2</div><div class="l">Say what you mean</div><div class="s">It transcribes while you speak.</div></div>
+      <div class="step" id="st3" style="top:740px"><div class="n">3</div><div class="l">Press it again</div><div class="s">Pasted where you were typing.</div></div>
+      <div class="win" id="mail" style="left:720px;top:96px;width:1080px;height:560px">
+        <div class="bar"><div class="dots"><u></u><u></u><u></u></div><div class="title">New message</div></div>
+        <div class="field"><span class="k">To:</span><span class="chip-to">Design team</span></div>
+        <div class="field"><span class="k">Subject:</span><span>Launch</span></div>
+        <div class="body"><span class="txt" id="mailtxt"><span class="hl" id="mailhl"></span><span id="mailwords"></span></span><span class="caret" id="mailcaret"></span></div>
+      </div>
+      <div id="caption"><div class="vig"></div><p id="captext"></p></div>
+      <div class="keychip" id="kc1"><span>⌥</span><span>Space</span></div>
+    </section>
+
+    <!-- 4 · Everywhere -->
+    <section class="scene" id="s4">
+      <div class="headline" id="h4" style="top:120px;font-size:96px;line-height:110px"></div>
+      <div id="deck"></div>
+      <div id="ticker"></div>
+    </section>
+
+    <!-- 5a · Languages -->
+    <section class="scene" id="s5a">
+      <div id="big99">99</div>
+      <div id="langlabel">languages</div>
+      <div id="langsub">Auto-detected, or pinned.</div>
+      <div id="roll"></div>
+    </section>
+
+    <!-- 5b · Escape takes it back -->
+    <section class="scene" id="s5b">
+      <div class="key" id="esckey">esc</div>
+      <div id="escline1">Escape takes it back.</div>
+      <div id="escline2">Press it again and nothing is lost.</div>
+    </section>
+
+    <!-- 6 · Privacy -->
+    <section class="scene" id="s6">
+      <div id="chips"></div>
+      <div class="headline" id="h6" style="top:600px;font-size:128px;line-height:140px;color:var(--ink-light)"></div>
+    </section>
+
+    <!-- 7 · Outro -->
+    <section class="scene" id="s7">
+      <div id="icon-shadow"></div>
+      <div id="flood"></div>
+      <div id="wordmark">Vocs</div>
+      <div id="tagline">Talk. <em>It types.</em></div>
+      <div id="meta"><div class="eyebrow">Free <em>·</em> Open source <em>·</em> macOS</div><div class="url">hackx-in.github.io/vocs</div></div>
+    </section>
+
+    <!-- The pill travels across scenes, so it lives above them. -->
+    <div class="pill-wrap" id="pillwrap">
+      <div class="pill" id="pill"></div>
+      <div class="pill-flash" id="pillflash"></div>
+    </div>
+    <canvas id="fx" width="1920" height="1080"></canvas>
+  </div>
+  <div id="vignette"></div>
+  <canvas id="wipe" width="1920" height="1080"></canvas>
+  <div id="grain"></div>
+</div>
+<script src="./kit.js"></script>
+<script src="./scenes.js"></script>
+</body>
+</html>
