@@ -3,8 +3,6 @@
 All notable changes to Vocs. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versions follow [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
-
 ## [1.0.2] - 2026-10-24
 
 ### Fixed
