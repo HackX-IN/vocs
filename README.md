@@ -9,7 +9,7 @@ and no audio ever leaves your machine.
 **[Download](https://hackx-in.github.io/vocs/)** · [Releases](https://github.com/HackX-IN/vocs/releases) · [Changelog](CHANGELOG.md) · [♥ Sponsor](https://github.com/sponsors/HackX-IN)
 
 <a href="https://github.com/HackX-IN/vocs/blob/main/brag-output/brag.mp4">
-  <img src="brag-output/brag.jpg" alt="Vocs — Talk. It types. Watch the 25-second launch video." width="100%">
+  <img src="brag-output/brag-preview.webp" alt="Vocs — Talk. It types. Click to watch the full 25-second launch video." width="100%">
 </a>
 
 <p align="center">
