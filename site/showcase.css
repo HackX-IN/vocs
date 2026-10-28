@@ -200,3 +200,60 @@
   font-weight: 500;
   white-space: nowrap;
 }
+
+/* The floating "New in 1.1" pointer. It scrolls to the section, and gets out of the way once
+   that section is on screen so it never sits on top of the thing it points at. */
+.new-fab {
+  position: fixed;
+  right: var(--space-5);
+  bottom: var(--space-5);
+  z-index: 15;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-full);
+  background: var(--night);
+  color: var(--night-ink);
+  border: 0.5px solid var(--night-hairline);
+  box-shadow: var(--shadow-panel);
+  font-size: 14px;
+  font-weight: 550;
+  text-decoration: none;
+  transition:
+    opacity 0.24s ease,
+    transform 0.24s ease;
+}
+.new-fab:hover {
+  transform: translateY(-2px);
+}
+.new-fab[data-hidden="true"] {
+  opacity: 0;
+  transform: translateY(var(--space-3));
+  pointer-events: none;
+}
+.new-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--accent);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .new-dot {
+    animation: pulse 2.4s ease-in-out infinite;
+  }
+}
+@keyframes pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .new-fab {
+    transition: opacity 0.12s linear;
+  }
+  .new-fab:hover {
+    transform: none;
+  }
+}
+

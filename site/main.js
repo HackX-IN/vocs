@@ -1,7 +1,8 @@
 /**
  * SOURCE OF TRUTH KEYWORDS: site-script, main-entry, nav-stuck, typing-demo, reduced-motion
  * WHAT:  The page's entry script: starts the download wiring, marks the nav once the page scrolls,
- *        and runs the typing demo in the product picture.
+ *        hides the floating "New" pointer while its section is on screen, and runs the typing demo
+ *        in the product picture.
  * WHY:   Kept to the small, decorative things on purpose. Everything that talks to GitHub lives in
  *        release.js and downloads.js so there is one place to look when the download misbehaves.
  *        The typing demo is decoration: with reduced motion, or no JavaScript, the first sentence
@@ -18,6 +19,16 @@ const nav = document.querySelector(".nav");
 const syncNav = () => nav?.setAttribute("data-stuck", String(window.scrollY > 8));
 window.addEventListener("scroll", syncNav, { passive: true });
 syncNav();
+
+// ── Floating "New" pointer: hidden while the section it points at is on screen ───────
+const fab = document.querySelector("[data-new-fab]");
+const showcase = document.getElementById("new");
+if (fab && showcase && "IntersectionObserver" in window) {
+  new IntersectionObserver(
+    ([entry]) => fab.setAttribute("data-hidden", String(entry.isIntersecting)),
+    { threshold: 0.15 },
+  ).observe(showcase);
+}
 
 // ── Typing demo ─────────────────────────────────────────────────────────
 const target = document.querySelector("[data-typing]");
