@@ -31,6 +31,7 @@ import {
 } from "@/components/global";
 import { PageShell } from "./_components/PageShell";
 import { UpdateNotice } from "./_components/UpdateNotice";
+import { useWhatsNew, WhatsNewDialog } from "./_components/whats-new";
 import { BillingView } from "./billing";
 import { navigateTo, useHashRoute } from "./use-hash-route";
 import { dictationModeFrom, type DictationMode } from "@/lib/dictation-mode";
@@ -67,6 +68,9 @@ export function Dashboard() {
   const settings = useSettings();
   const { route, section } = useHashRoute();
   const boot = useBoot(registry.data !== null || registry.error !== null);
+  // Once per version, after the boot screen has had its moment: announcing news over a
+  // startup animation would be missed. See _components/whats-new.
+  const whatsNew = useWhatsNew();
 
   // The rail is a separate WINDOW now, so a click over there reaches us as an
   // event rather than as a callback. One way on purpose: nothing else in the
@@ -149,6 +153,9 @@ export function Dashboard() {
           </PageTransition>
         </PageShell>
         <UpdateNotice />
+        {whatsNew.version && !boot.visible ? (
+          <WhatsNewDialog version={whatsNew.version} open={whatsNew.open} onClose={whatsNew.dismiss} />
+        ) : null}
       </div>
     </main>
   );

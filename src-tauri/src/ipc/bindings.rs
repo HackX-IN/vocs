@@ -105,6 +105,9 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             // Updates
             commands::updates::check_for_update,
             commands::updates::install_update,
+            // What's new
+            commands::whats_new::get_whats_new,
+            commands::whats_new::mark_whats_new_seen,
         ])
         .events(collect_events![
             events::SessionStateChanged,

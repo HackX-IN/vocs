@@ -3,15 +3,18 @@
 All notable changes to Vocs. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versions follow [Semantic Versioning](https://semver.org/).
 
-## [Unreleased]
+## [1.1.0] - 2026-10-28
 
 ### Fixed
 - **"I spoke and nothing was pasted."** Stopping in a pause, while the last piece of speech was still being recognised, could finish the dictation before those words arrived and then drop them. Vocs now waits for everything you said to be recognised before it pastes, however you stop.
 - **No more silently dropped speech on a slow Mac.** If recognition fell behind, a finished piece of speech could be thrown away because the queue was full. Vocs now holds it and recognises it as soon as there is room, in order.
 - **The on-device grammar model can no longer make a paste slow.** Its time limit is now enforced inside each correction, not only between sentences; a sentence it has no time for goes out as the rules wrote it, in half a second at most.
+- **Checking for updates is quicker and more dependable.** A check now gives up after ten seconds and says why instead of sitting on "Checking"; opening a window reuses a recent answer instead of asking GitHub again; installing starts from the update that was already found; and a check that fails at launch (the Mac was still joining wifi) is retried within minutes instead of tomorrow.
+- **Installing an update shows real progress at the bottom of the window** and Vocs restarts by itself when it finishes.
 - **Live captions no longer flicker through half-heard words.** The last word of a caption is shown once two snapshots agree on it, and the language is pinned from the first few seconds instead of being guessed again on every caption.
 
 ### Added
+- **What's new.** After an update, the dashboard shows a short carousel of what the release added, once. Settings → Updates can open it again.
 - **Language hotkeys** (Settings → Recording): up to two extra dictation shortcuts that each always listen for one language, so you never depend on auto-detection when you switch between languages. Off until you turn them on.
 - **Voice commands that take words back.** Say "scratch that" to drop the sentence you just spoke, "undo last sentence" to drop the one before, or "scratch everything" to start the dictation again. English; part of Spoken formatting.
 - **Dictation scratchpad.** A floating notepad (menu bar → Open Scratchpad, or an optional shortcut): ramble into it, press Return to have it turned into bullets, a task list or a clean paragraph, and ⌘Return to send the result to the app you came from.

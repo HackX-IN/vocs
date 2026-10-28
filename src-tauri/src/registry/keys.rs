@@ -77,3 +77,5 @@ pub const LAUNCH_AT_LOGIN: &str = "general.launch_at_login";
 pub const BASELINE_WPM: &str = "general.baseline_wpm";
 pub const CHECK_UPDATES: &str = "general.check_updates";
 pub const ONBOARDING_COMPLETE: &str = "general.onboarding_complete";
+// Bookkeeping, deliberately NOT declared in the registry: see ipc/commands/whats_new.rs.
+pub const LAST_SEEN_VERSION: &str = "general.last_seen_version";

@@ -28,6 +28,7 @@
 @import "./tokens.css";
 
 @theme inline {
+  --color-scrim: var(--scrim);
   --color-glass: var(--surface-glass);
   --color-elevated: var(--surface-elevated);
   --color-sunken: var(--surface-sunken);

@@ -30,6 +30,7 @@ use crate::ports::{
     TextEnhancer, TextInjector, TextOrganizer, TranscriptionEngine,
 };
 use crate::registry::CapabilityKey;
+use super::update_cache::UpdateCache;
 use crate::session::preview::PreviewGate;
 use crate::session::SessionEvent;
 use crate::types::{LanguageHint, SessionState};
@@ -201,6 +202,9 @@ pub struct AppState {
     /// through `session_context`, and reached by the Escape handler. See
     /// session/preview.rs.
     pub preview: PreviewGate,
+    /// The last update check, so a burst of windows makes one request. See
+    /// ipc/update_cache.rs.
+    pub updates: UpdateCache,
 }
 
 impl AppState {
@@ -222,6 +226,7 @@ impl AppState {
             inflight: Arc::new(Mutex::new(HashSet::new())),
             published_state: Arc::new(Mutex::new(SessionState::Idle)),
             preview: PreviewGate::new(),
+            updates: UpdateCache::new(),
         }
     }
 

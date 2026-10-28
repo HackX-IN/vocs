@@ -2,7 +2,8 @@
 <!--
   SOURCE OF TRUTH KEYWORDS: landing-page, launch-page, github-pages, download-latest, open-anyway,
     gatekeeper-steps, privacy-promise, site-index
-  WHAT:  Vocs's public launch page: what it is, how it works, the privacy promise, how to install
+  WHAT:  Vocs's public launch page: what it is, how it works, what is new in the latest release, the
+         privacy promise, how to install
          without an Apple notarisation, the release history (a featured latest release and a
          searchable timeline of every earlier one), and Download buttons that fetch the newest
          release's DMG without leaving the page. They are plain links to one permanent file URL, so
@@ -42,6 +43,7 @@
     <link rel="stylesheet" href="tokens.css" />
     <link rel="stylesheet" href="styles.css" />
     <link rel="stylesheet" href="sections.css" />
+    <link rel="stylesheet" href="showcase.css" />
     <link rel="stylesheet" href="download.css" />
     <link rel="stylesheet" href="responsive.css" />
     <script type="module" src="main.js"></script>
@@ -72,6 +74,7 @@
         <nav class="nav-links" aria-label="Primary">
           <a href="#how">How it works</a>
           <a href="#features">Features</a>
+          <a href="#new">New</a>
           <a href="#privacy">Privacy</a>
           <a href="#releases">Releases</a>
           <a href="#faq">FAQ</a>
@@ -224,10 +227,82 @@
         </div>
       </section>
 
+      <!-- New in 1.1 -->
+      <section id="new">
+        <div class="wrap">
+          <p class="eyebrow"><b>03</b> · New in 1.1</p>
+          <h2>Say it. Scratch it. Tidy it.</h2>
+          <p class="sub">
+            Take words back by voice, give each language its own key, and ramble into a notepad that
+            sorts itself out. Plus a faster, steadier app underneath.
+          </p>
+          <div class="grid">
+            <article class="tile wide">
+              <div class="demo" aria-hidden="true">
+                <span class="say">you say “scratch that”</span>
+                <p class="line"><s>Ship it on Friday.</s> Ship it Monday.</p>
+              </div>
+              <h3>Take it back by voice</h3>
+              <p>Say “scratch that” to drop the sentence you just spoke, “undo last sentence” for the one before, or “scratch everything” to start over. It is gone before anything is pasted. English.</p>
+            </article>
+            <article class="tile wide">
+              <div class="demo" aria-hidden="true">
+                <div class="pad">
+                  <p class="ramble">“…email Sam about the budget and also remember to book the flights…”</p>
+                  <p class="label">Action items</p>
+                  <p>☐ Email Sam about the budget</p>
+                  <p>☐ Book the flights</p>
+                  <p class="keys-hint"><span class="keys"><kbd>↵</kbd></span> organise <span class="keys"><kbd>⌘</kbd><kbd>↵</kbd></span> send</p>
+                </div>
+              </div>
+              <h3>A scratchpad for rambling</h3>
+              <p>Open it from the menu bar, talk freely, and press Return: it becomes bullets, a task list or a clean paragraph. Press ⌘Return to send it to the app you came from.</p>
+            </article>
+            <article class="tile wide">
+              <div class="demo" aria-hidden="true">
+                <div class="chords">
+                  <div class="chord"><span class="keys"><kbd>⌃</kbd><kbd>⌥</kbd><kbd>1</kbd></span> listens for <strong>English</strong></div>
+                  <div class="chord"><span class="keys"><kbd>⌃</kbd><kbd>⌥</kbd><kbd>2</kbd></span> listens for <strong>Español</strong></div>
+                </div>
+              </div>
+              <h3>A hotkey for each language</h3>
+              <p>Auto-detection has to guess from your first few words. Give each language its own shortcut and it never has to. Off until you turn it on, in Settings.</p>
+            </article>
+            <article class="tile wide">
+              <div class="demo" aria-hidden="true">
+                <ul class="checks">
+                  <li>You stop in the middle of a pause <span>pastes</span></li>
+                  <li>Your Mac is busy or slow <span>pastes</span></li>
+                  <li>The grammar model is on <span>pastes</span></li>
+                </ul>
+              </div>
+              <h3>Your words always arrive</h3>
+              <p>Stopping in a pause can no longer lose the sentence before it, a slow Mac can no longer drop a stretch of speech, and the on-device grammar model waits at most half a second.</p>
+            </article>
+            <article class="tile wide">
+              <div class="demo" aria-hidden="true">
+                <div class="segments"><span>Fast</span><span class="on">Balanced</span><span>Accurate</span></div>
+                <span class="say">a little more time, fewer mistakes</span>
+              </div>
+              <h3>Speed or accuracy, your call</h3>
+              <p>Fast stays the default. Balanced and Accurate trade a little time for fewer mistakes, and live captions now hold back a half-heard last word until it settles.</p>
+            </article>
+            <article class="tile wide">
+              <div class="demo" aria-hidden="true">
+                <div class="update-bar"><span>Vocs 1.1.0 is ready to install.</span><b>Install and restart</b></div>
+                <span class="say">then it relaunches by itself</span>
+              </div>
+              <h3>Updates that wait for you</h3>
+              <p>A quicker check, with a clear message when the network is slow. When a new version is ready it waits in a bar at the bottom of the window, shows real progress, and restarts Vocs for you. A short tour of what changed opens once.</p>
+            </article>
+          </div>
+        </div>
+      </section>
+
       <!-- Privacy -->
       <section class="night" id="privacy">
         <div class="wrap">
-          <p class="eyebrow"><b>03</b> · Privacy</p>
+          <p class="eyebrow"><b>04</b> · Privacy</p>
           <h2>Nothing leaves your Mac.</h2>
           <p class="sub">
             Recognition runs on your machine. There is no account to make, no subscription, no
@@ -245,7 +320,7 @@
       <section id="install">
         <div class="wrap install">
           <div>
-            <p class="eyebrow"><b>04</b> · Install</p>
+            <p class="eyebrow"><b>05</b> · Install</p>
             <h2>Up and running in a minute.</h2>
             <p class="sub">
               Needs macOS 13 or later, Apple Silicon or Intel, and about 600 MB of disk for the
@@ -306,7 +381,7 @@
       <!-- Releases -->
       <section id="releases">
         <div class="wrap">
-          <p class="eyebrow"><b>05</b> · Releases</p>
+          <p class="eyebrow"><b>06</b> · Releases</p>
           <h2>What's new.</h2>
           <p class="sub">
             Every version, with what changed. The newest is always the one the Download buttons
@@ -347,7 +422,7 @@
       <!-- FAQ -->
       <section id="faq">
         <div class="wrap center">
-          <p class="eyebrow"><b>06</b> · Questions</p>
+          <p class="eyebrow"><b>07</b> · Questions</p>
           <h2>Good to know.</h2>
           <div class="faq" style="text-align: left">
             <details>
@@ -364,7 +439,11 @@
             </details>
             <details>
               <summary>How do updates work?</summary>
-              <p>Vocs checks quietly at launch and once a day, and Settings → Updates has a Check for updates button. Every update is verified against a signature before it is installed, and it won't install in the middle of a dictation. You can turn the check off.</p>
+              <p>Vocs checks quietly at launch and once a day (and tries again soon if the network was not ready), and Settings → Updates has a Check for updates button. When a new version is ready it waits in a bar at the bottom of the window: press Install and restart and Vocs relaunches by itself. Every update is verified against a signature before it is installed, and it won't install in the middle of a dictation. You can turn the check off.</p>
+            </details>
+            <details>
+              <summary>Can I take words back while I'm talking?</summary>
+              <p>Yes, in English. Say “scratch that” to drop the sentence you just spoke, “undo last sentence” for the one before it, or “scratch everything” to start the dictation again. The words are removed before anything is pasted. It is part of Spoken formatting in Settings.</p>
             </details>
             <details>
               <summary>What does it need permission for?</summary>

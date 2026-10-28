@@ -379,3 +379,16 @@ It stays behind an off-by-default cargo feature. Anyone who turns it on gets a s
 **4. Real paste-timing delays** across TextEdit, Terminal, Slack, VS Code and a browser — still to measure, and this one CANNOT be automated: it requires dictating into each app and watching what arrives. Defaults are 40 ms / 500 ms (the restore no longer blocks delivery — it runs on its own thread, so it can be long enough for an Electron app that reads the clipboard lazily; a paste delay under 30 ms is raised to 30), which is the middle of the range that works across native apps, Terminal and Electron. Both are exposed as advanced settings precisely because no single number fits every target, so a user who hits it can fix their own case immediately. The symptom to watch for is a paste arriving with the PREVIOUS clipboard contents (raise `output.paste_delay_ms`) or arriving empty in one specific app (turn off `output.restore_clipboard`).
 
 **What could not be verified without a person.** The end-to-end tests replay synthesised speech through a fake `AudioSource`, which exercises the chunker, the VAD, the engine, the assembler, the enhancement rules, the database and the FSM. What they do NOT exercise is the CoreAudio driver itself and the real synthetic-paste path into a third-party app. Those two need a human with a microphone, and no amount of test scaffolding substitutes for it.
+
+---
+
+## 10. Updates: why a check used to feel slow
+
+Three separate causes, fixed together (`ipc/commands/updates.rs`, `ipc/update_cache.rs`):
+
+- **No timeout.** The updater plugin's request has none by default, so a network that accepts the connection and then goes quiet left the button on "Checking" indefinitely. A check now gives up after 10 s and says it was slow rather than unreachable. The plugin's timeout is a *total request* timeout, so the install path sets its own (30 minutes) on the `Update` before downloading — reusing the check's would cut a download off after ten seconds.
+- **Three round trips for one decision.** The dashboard bar and the Settings card each asked GitHub on every mount, and installing asked again before it would start. `UpdateCache` keeps the last answer (and the downloadable `Update`) for ten minutes; only a pressed button or the daily timer passes `force`. A gate serialises concurrent checks so a burst of windows makes one request. The download still verifies the signature, so a release pulled in between fails safely.
+- **A failed launch check waited a day.** The first check often runs while the Mac is still joining wifi. The scheduler now retries after 2, 10 and 30 minutes before returning to the 24-hour cadence (`update_retry_delay`).
+
+`install_update` ends in `app.restart()`: the person never has to remember the second half of "Install and restart". **What's new** (`ipc/commands/whats_new.rs`) is keyed on the running VERSION against the last version Rust recorded, so it appears however the new build arrived; a fresh install records the version silently and is not greeted with a changelog.
+

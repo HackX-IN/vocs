@@ -510,50 +510,93 @@ const UPDATE_CHECK_INTERVAL: std::time::Duration = std::time::Duration::from_sec
  * WHERE: Started once by setup.
  */
 fn start_update_checks(state: AppState) {
+    tauri::async_runtime::spawn(async move {
+        let mut failures = 0usize;
+        loop {
+            let next = match check_once_and_announce(&state).await {
+                CheckOutcome::Answered => {
+                    failures = 0;
+                    UPDATE_CHECK_INTERVAL
+                }
+                CheckOutcome::Failed => {
+                    failures += 1;
+                    update_retry_delay(failures)
+                }
+            };
+            tokio::time::sleep(next).await;
+        }
+    });
+}
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: update_retry_delay, UPDATE_RETRY_DELAYS, retry_after_failed_check
+ * WHAT:  How long to wait before looking again after `failures` failed checks in a
+ *        row: a couple of minutes, then ten, then half an hour, then the daily
+ *        interval again.
+ * WHY:   The launch check usually runs while the Mac is still joining wifi, so it
+ *        failed — and the next attempt was a day away. Someone could run an old
+ *        version for a week without ever being told. Backing off keeps a dead
+ *        network from being hammered, and stopping after three leaves the daily
+ *        cadence the setting promises.
+ */
+const UPDATE_RETRY_DELAYS: [std::time::Duration; 3] = [
+    std::time::Duration::from_secs(2 * 60),
+    std::time::Duration::from_secs(10 * 60),
+    std::time::Duration::from_secs(30 * 60),
+];
+
+fn update_retry_delay(failures: usize) -> std::time::Duration {
+    failures
+        .checked_sub(1)
+        .and_then(|index| UPDATE_RETRY_DELAYS.get(index))
+        .copied()
+        .unwrap_or(UPDATE_CHECK_INTERVAL)
+}
+
+enum CheckOutcome {
+    /// The server answered (or checks are off, or one is already running): the
+    /// daily cadence applies.
+    Answered,
+    /// The request failed: try again sooner.
+    Failed,
+}
+
+async fn check_once_and_announce(state: &AppState) -> CheckOutcome {
     use crate::ipc::commands::updates::{look_for_update, UpdateCheck};
     use crate::ipc::events::UpdateAvailable;
     use tauri_specta::Event;
 
-    tauri::async_runtime::spawn(async move {
-        let mut ticker = tokio::time::interval(UPDATE_CHECK_INTERVAL);
-        loop {
-            // The first tick completes immediately: that is the launch check.
-            ticker.tick().await;
+    let Some(_guard) = state.begin_exclusive(registry::CapabilityKey::Updates) else {
+        tracing::debug!("an update check is already running; skipping this one");
+        return CheckOutcome::Answered;
+    };
 
-            let Some(_guard) = state.begin_exclusive(registry::CapabilityKey::Updates) else {
-                tracing::debug!("an update check is already running; skipping this one");
-                continue;
-            };
-
-            match look_for_update(&state).await {
-                Ok(UpdateCheck::Available {
-                    version,
-                    current_version,
-                    notes,
-                    ..
-                }) => {
-                    tracing::info!(version, current_version, "an update is available");
-                    let event = UpdateAvailable {
-                        version,
-                        current_version,
-                        notes,
-                    };
-                    if let Err(err) = event.emit(&state.app) {
-                        tracing::warn!(error = %err, "could not announce the update");
-                    }
-                }
-                Ok(UpdateCheck::UpToDate { current_version }) => {
-                    tracing::debug!(current_version, "already on the newest version")
-                }
-                Ok(UpdateCheck::Disabled) => {
-                    tracing::debug!("update checks are turned off")
-                }
-                // Offline, or the endpoint is unreachable. Not worth telling the
-                // user about — they did not ask for this check.
-                Err(err) => tracing::info!(error = %err, "could not check for updates"),
+    // Forced: this IS the daily look, so it must reach the server rather than
+    // reuse an answer a window cached a few minutes ago.
+    match look_for_update(state, true).await {
+        Ok(UpdateCheck::Available { version, current_version, notes, .. }) => {
+            tracing::info!(version, current_version, "an update is available");
+            let event = UpdateAvailable { version, current_version, notes };
+            if let Err(err) = event.emit(&state.app) {
+                tracing::warn!(error = %err, "could not announce the update");
             }
+            CheckOutcome::Answered
         }
-    });
+        Ok(UpdateCheck::UpToDate { current_version }) => {
+            tracing::debug!(current_version, "already on the newest version");
+            CheckOutcome::Answered
+        }
+        Ok(UpdateCheck::Disabled) => {
+            tracing::debug!("update checks are turned off");
+            CheckOutcome::Answered
+        }
+        // Offline, or the endpoint is unreachable. Not worth telling the user
+        // about — they did not ask for this check — but worth trying again soon.
+        Err(err) => {
+            tracing::info!(error = %err, "could not check for updates");
+            CheckOutcome::Failed
+        }
+    }
 }
 
 /// How often the retention sweep runs after the one at launch. Six hours, not
@@ -1726,6 +1769,16 @@ pub fn place_rail(app: &AppHandle) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_failed_update_check_is_retried_soon_and_then_the_daily_cadence_resumes() {
+        let minutes = |n: u64| std::time::Duration::from_secs(n * 60);
+        assert_eq!(update_retry_delay(1), minutes(2));
+        assert_eq!(update_retry_delay(2), minutes(10));
+        assert_eq!(update_retry_delay(3), minutes(30));
+        assert_eq!(update_retry_delay(4), UPDATE_CHECK_INTERVAL, "after three tries the daily cadence applies");
+        assert_eq!(update_retry_delay(0), UPDATE_CHECK_INTERVAL);
+    }
 
     /**
      * SOURCE OF TRUTH KEYWORDS: the_warm_up_never_downloads

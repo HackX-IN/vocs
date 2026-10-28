@@ -130,8 +130,12 @@ export const commands = {
 	openTextFile: (input: OpenTextFileInput) => typedError<string | null, AppError>(__TAURI_INVOKE("open_text_file", { input })),
 	startMicTest: () => typedError<null, AppError>(__TAURI_INVOKE("start_mic_test")),
 	stopMicTest: () => typedError<null, AppError>(__TAURI_INVOKE("stop_mic_test")),
-	checkForUpdate: () => typedError<UpdateCheck, AppError>(__TAURI_INVOKE("check_for_update")),
+	checkForUpdate: (input: CheckForUpdateInput) => typedError<UpdateCheck, AppError>(__TAURI_INVOKE("check_for_update", { input })),
 	installUpdate: () => typedError<null, AppError>(__TAURI_INVOKE("install_update")),
+	getWhatsNew: () => typedError<{
+	version: string,
+} | null, AppError>(__TAURI_INVOKE("get_whats_new")),
+	markWhatsNewSeen: () => typedError<null, AppError>(__TAURI_INVOKE("mark_whats_new_seen")),
 };
 
 /** Events */
@@ -281,6 +285,19 @@ export type Caption =
  */
 export type CaptionChanged = {
 	caption: Caption | null,
+};
+
+/**
+ * 
+ *  * SOURCE OF TRUTH KEYWORDS: CheckForUpdateInput, force_check
+ *  * WHAT:  Whether this check must go to the network (`force`) or may reuse an
+ *  *        answer a few minutes old.
+ *  * WHY:   The button a person pressed must really look; the quiet look on opening
+ *  *        a window must not cost a round trip each time. See ipc/update_cache.rs.
+ *  
+ */
+export type CheckForUpdateInput = {
+	force: boolean,
 };
 
 /**
@@ -1381,6 +1398,18 @@ export type UpdateHistoryInput = {
 export type UpdateProgress = {
 	received_bytes: number,
 	total_bytes: number | null,
+};
+
+/**
+ * 
+ *  * SOURCE OF TRUTH KEYWORDS: WhatsNew
+ *  * WHAT:  The version whose notes are due.
+ *  * WHERE: Returned by get_whats_new; the slides themselves are the frontend's copy,
+ *  *        keyed by this version.
+ *  
+ */
+export type WhatsNew = {
+	version: string,
 };
 
 /* Tauri Specta runtime */
