@@ -3,6 +3,20 @@
 All notable changes to Vocs. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versions follow [Semantic Versioning](https://semver.org/).
 
+## [Unreleased]
+
+### Fixed
+- **"I spoke and nothing was pasted."** Stopping in a pause, while the last piece of speech was still being recognised, could finish the dictation before those words arrived and then drop them. Vocs now waits for everything you said to be recognised before it pastes, however you stop.
+- **No more silently dropped speech on a slow Mac.** If recognition fell behind, a finished piece of speech could be thrown away because the queue was full. Vocs now holds it and recognises it as soon as there is room, in order.
+- **The on-device grammar model can no longer make a paste slow.** Its time limit is now enforced inside each correction, not only between sentences; a sentence it has no time for goes out as the rules wrote it, in half a second at most.
+- **Live captions no longer flicker through half-heard words.** The last word of a caption is shown once two snapshots agree on it, and the language is pinned from the first few seconds instead of being guessed again on every caption.
+
+### Added
+- **Language hotkeys** (Settings → Recording): up to two extra dictation shortcuts that each always listen for one language, so you never depend on auto-detection when you switch between languages. Off until you turn them on.
+- **Voice commands that take words back.** Say "scratch that" to drop the sentence you just spoke, "undo last sentence" to drop the one before, or "scratch everything" to start the dictation again. English; part of Spoken formatting.
+- **Dictation scratchpad.** A floating notepad (menu bar → Open Scratchpad, or an optional shortcut): ramble into it, press Return to have it turned into bullets, a task list or a clean paragraph, and ⌘Return to send the result to the app you came from.
+- **Speed or accuracy** (Settings → Transcription): Fast is the default and unchanged; Balanced and Accurate trade a little time for fewer mistakes, live captions included.
+
 ## [1.0.2] - 2026-10-24
 
 ### Fixed

@@ -36,6 +36,9 @@ and no audio ever leaves your machine.
   turn it on), is the way back from a paste that went nowhere.
 - **Writing style** — natural, casual, formal or literal, set once for everywhere.
 - **Preview before pasting** and **live captions** (both off by default): see the finished text for a moment before it lands, or watch what Vocs hears rise out of the recording pill as you speak.
+- **Take words back by voice.** Say "scratch that", "undo last sentence" or "scratch everything" and the words are removed from what gets pasted (English).
+- **A language per hotkey.** Give each language you speak its own shortcut and skip auto-detection entirely. Off until you turn it on.
+- **A dictation scratchpad.** Ramble into a floating notepad, press Return to turn it into bullets, a task list or a clean paragraph, and ⌘Return to send it to the app you came from.
 - **Filler removal that does not eat real words**, at three strengths. "I like
   pizza" is never touched; "it was, like, fine" loses the "like".
 - **Optional grammar fixes** for slips that are wrong every time — "a idea",

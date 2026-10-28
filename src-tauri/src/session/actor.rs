@@ -27,6 +27,7 @@ use tokio::sync::mpsc;
 use crate::error::{AppError, ErrorCode};
 use crate::ipc::context::{AppState, SessionContext};
 use crate::pipeline::assembler::Assembler;
+use crate::pipeline::backlog::{ChunkBacklog, Deferred};
 use crate::pipeline::worker::{AsrWorker, DecodeResult};
 use crate::pipeline::Chunker;
 use crate::ports::audio::{CaptureConfig, CaptureEvent, CaptureSession};
@@ -35,7 +36,7 @@ use crate::ports::permissions::{OsPermission, PermissionState};
 use crate::services;
 use crate::telemetry::{now_ms, LatencyRecorder};
 use crate::types::{
-    ChunkKind, LanguageCode, LanguageHint, LatencyStage, SessionId, SessionState,
+    AudioChunk, ChunkKind, LanguageCode, LanguageHint, LatencyStage, SessionId, SessionState,
 };
 
 use super::captions::LiveCaptions;
@@ -58,6 +59,9 @@ pub const EVENT_QUEUE_DEPTH: usize = 64;
  *        actor rather than a longer silent queue.
  */
 const DELIVERY_QUEUE_DEPTH: usize = 4;
+/// How much speech a live-caption snapshot must cover before its detected
+/// language is trusted enough to pin. See `pin_language_from_snapshot`.
+const EARLY_LANGUAGE_PIN_MS: u64 = 3_000;
 /// How often elapsed time is pushed to the pill while recording.
 const TICK_INTERVAL: Duration = Duration::from_millis(100);
 
@@ -138,6 +142,16 @@ pub struct SessionActor {
     /// Taken by `run`, which spawns the worker. See the note on `new` for why
     /// it is not spawned at construction.
     delivery_rx: Option<mpsc::Receiver<FinishedRecording>>,
+
+    /**
+     * SOURCE OF TRUTH KEYWORDS: chunk_backlog, no_chunk_left_behind
+     * WHAT:  Closed chunks the ASR queue had no room for, held in order.
+     * WHY:   A full queue used to drop the chunk — recorded speech silently
+     *        missing from the transcript. See pipeline/backlog.rs.
+     * WHERE: Pushed by handle_capture; drained by flush_backlog on every decode
+     *        result and, completely, before the tail is submitted.
+     */
+    backlog: ChunkBacklog,
 }
 
 impl SessionActor {
@@ -171,6 +185,7 @@ impl SessionActor {
             delivery_rx: Some(delivery_rx),
             pending: std::collections::HashMap::new(),
             deliveries,
+            backlog: ChunkBacklog::new(),
             machine: SessionMachine::new(settings.cancel_countdown_ms),
             chunker: Chunker::new(),
             assembler: Assembler::new(),
@@ -352,6 +367,7 @@ impl SessionActor {
         self.finalize_started = None;
         self.assembler.clear();
         self.chunker.clear();
+        self.backlog.clear();
         self.detected_language = None;
 
         let app_bundle_id = self
@@ -366,6 +382,20 @@ impl SessionActor {
         // and so the app that had focus when the hotkey fired is the one whose
         // profile applies.
         self.settings = SessionSettings::load_for_app(&self.ctx.db, app_bundle_id.as_deref());
+        /*
+         * SOURCE OF TRUTH KEYWORDS: hotkey_language_wins
+         * A language-pinned hotkey is an explicit choice made with this very
+         * keypress, so it beats the global language AND the app profile — both
+         * are standing defaults, and this is the user overriding them right now.
+         * `take` consumes it, so it can only ever apply to this one recording.
+         */
+        if let Some(hint) = self.ctx.session.take_language_override() {
+            tracing::info!(?hint, "this recording's language comes from the hotkey that started it");
+            self.settings.language = match hint {
+                LanguageHint::Pinned { language } => Some(language),
+                LanguageHint::Auto => None,
+            };
+        }
         self.machine.set_cancel_countdown_ms(self.settings.cancel_countdown_ms);
         self.machine
             .set_discard_on_escape(self.settings.discard_on_escape);
@@ -504,6 +534,7 @@ impl SessionActor {
     /// Escape means gone: the row, the audio and every decoded segment go in
     /// the same step. No tombstone, no purge job to trust.
     fn destroy(&mut self, session_id: SessionId) {
+        self.backlog.clear();
         self.chunker.clear();
         self.assembler.clear();
         self.started_at = None;
@@ -524,9 +555,14 @@ impl SessionActor {
                     self.captions.chunk_closed();
                     let request = self.transcribe_request();
                     if let Some(session_id) = self.machine.session_id().cloned() {
-                        self.worker.submit(chunk, request, session_id);
+                        // Pushed then flushed, so a chunk can never overtake an
+                        // older one that is still waiting for room.
+                        self.backlog.push(Deferred { chunk, request, session_id });
+                        self.flush_backlog();
                     }
-                } else if self.captions.due(self.chunker.duration_ms()) {
+                } else if self.backlog.is_empty() && self.captions.due(self.chunker.duration_ms()) {
+                    // A caption snapshot is speculative; it never queues up behind
+                    // — or in front of — real chunks that are already waiting.
                     self.request_caption_snapshot();
                 }
             }
@@ -538,6 +574,26 @@ impl SessionActor {
                 tracing::warn!(error = %err, "capture device lost");
                 let _ = self.ctx.session.send(SessionEvent::DeviceLost(err)).await;
             }
+        }
+    }
+
+    /**
+     * WHAT:  Hands every waiting chunk the ASR queue has room for to the worker.
+     * WHY:   Called whenever room may have appeared — a decode just finished —
+     *        so a chunk waits for the shortest possible time and the transcript
+     *        keeps its order. See pipeline/backlog.rs.
+     */
+    fn flush_backlog(&mut self) {
+        if self.backlog.is_empty() {
+            return;
+        }
+        let worker = &self.worker;
+        self.backlog.drain_into(|job| worker.offer(job));
+        if !self.backlog.is_empty() {
+            tracing::warn!(
+                waiting = self.backlog.len(),
+                "the ASR queue is full; closed chunks are waiting for it to drain"
+            );
         }
     }
 
@@ -570,6 +626,9 @@ impl SessionActor {
         if Some(&decode.session_id) != self.machine.session_id() {
             return;
         }
+        if decode.error.is_none() {
+            self.pin_language_from_snapshot(&decode);
+        }
         let current = self.captions.accept();
         if !current || decode.error.is_some() {
             return;
@@ -583,7 +642,40 @@ impl SessionActor {
         );
     }
 
+    /**
+     * SOURCE OF TRUTH KEYWORDS: early_language_pin, interim_language
+     * WHAT:  Adopts the language a snapshot detected, once it covers enough
+     *        speech to be trusted, when no language is pinned yet.
+     * WHY:   Until the first interior chunk closes (4 s of speech and a pause)
+     *        every live caption ran language detection again, each time on a few
+     *        seconds of audio — slow, and prone to guessing the wrong language
+     *        for a short phrase, which then showed up as nonsense on screen. The
+     *        snapshot that has heard 3 s is as informed as the chunk that would
+     *        have pinned it a moment later, so waiting for the chunk only made the
+     *        first captions worse. An explicit language always wins and is never
+     *        overwritten.
+     * WHERE: handle_interim.
+     */
+    fn pin_language_from_snapshot(&mut self, decode: &DecodeResult) {
+        if self.detected_language.is_some() || self.settings.language.is_some() {
+            return;
+        }
+        let (Some(first), Some(last)) = (decode.segments.first(), decode.segments.last()) else {
+            return;
+        };
+        if last.end_ms.saturating_sub(first.start_ms) < EARLY_LANGUAGE_PIN_MS {
+            return;
+        }
+        if let Some(language) = decode.segments.iter().find_map(|s| s.language.clone()) {
+            tracing::debug!(language = %language, "pinning language from a live-caption snapshot");
+            self.detected_language = Some(language);
+        }
+    }
+
     async fn handle_decode(&mut self, decode: DecodeResult) {
+        // A decode finishing is the moment the ASR queue gains a free slot.
+        self.flush_backlog();
+
         // Speculative work for the captions: no latency sample, no language
         // pinning, no assembly, no checkpoint.
         if decode.kind == ChunkKind::Interim {
@@ -600,9 +692,13 @@ impl SessionActor {
          * session's decode time on another session's row. Wrong numbers rather
          * than missing ones, which is worse: they still look like measurements.
          */
-        match self.pending.get(&decode.session_id) {
-            Some(pending) => pending.latency.record(decode.stage, decode.elapsed_ms),
-            None => self.latency.record(decode.stage, decode.elapsed_ms),
+        // A barrier decoded nothing: filing its ~0 ms as a tail decode would drag
+        // the headline recognition p50 down with samples that measure no work.
+        if !decode.barrier {
+            match self.pending.get(&decode.session_id) {
+                Some(pending) => pending.latency.record(decode.stage, decode.elapsed_ms),
+                None => self.latency.record(decode.stage, decode.elapsed_ms),
+            }
         }
 
         if let Some(error) = &decode.error {
@@ -693,6 +789,7 @@ impl SessionActor {
     async fn hand_off_to_delivery(&mut self, session_id: SessionId) {
         let heard_nothing_at_all = self.chunker.heard_nothing_at_all();
         let peak_amplitude = self.chunker.peak_amplitude();
+        let audio_end_ms = self.chunker.duration_ms();
         let tail = self.chunker.close_tail();
 
         /*
@@ -725,14 +822,20 @@ impl SessionActor {
         // missing, which is worse because they still look like measurements.
         self.latency = Arc::new(LatencyRecorder::new());
 
-        let Some(tail) = tail else {
-            // Nothing left to decode: either silence, or everything already
-            // went out as interior chunks. It is finished as it stands.
-            self.finish(pending).await;
-            return;
-        };
+        /*
+         * SOURCE OF TRUTH KEYWORDS: no_tail_barrier, stop_in_a_pause
+         * No audio left to decode is NOT the same as nothing left to wait for.
+         * Stopping in a pause is the ordinary way to finish a sentence, and the
+         * chunk that pause closed may still be in the ASR queue. Finishing here
+         * delivered an empty transcript and the chunk's words, arriving a
+         * moment later, were dropped as belonging to a finished session — the
+         * "I spoke and nothing was pasted" bug. An empty tail queued behind
+         * everything else is the signal that the queue has drained.
+         */
+        let tail = tail.unwrap_or_else(|| AudioChunk::barrier(audio_end_ms));
 
         let deadline = Duration::from_millis(pending.settings.finalize_timeout_ms);
+        self.flush_backlog_before_tail(deadline).await;
         self.pending.insert(session_id.clone(), pending);
 
         if !self.worker.submit_tail(tail, request, deadline, session_id.clone()) {
@@ -755,6 +858,36 @@ impl SessionActor {
             tokio::time::sleep(deadline).await;
             let _ = session.send(SessionEvent::DeliveryTimedOut(session_id)).await;
         });
+    }
+
+    /**
+     * SOURCE OF TRUTH KEYWORDS: flush_backlog_before_tail
+     * WHAT:  Waits, for at most `within`, until every chunk still held back has
+     *        been handed to the ASR queue.
+     * WHY:   The tail is the signal that a recording is complete, so it must be
+     *        queued AFTER every chunk that came before it; a tail that overtook
+     *        a waiting chunk would finish the recording without that chunk's
+     *        words. Bounded by the finalize timeout for the same reason
+     *        submit_tail is: a wedged worker must cost the person a timeout, not
+     *        a frozen actor. Sleeping yields to the runtime between attempts.
+     */
+    async fn flush_backlog_before_tail(&mut self, within: Duration) {
+        let give_up_at = Instant::now() + within;
+        loop {
+            self.flush_backlog();
+            if self.backlog.is_empty() {
+                return;
+            }
+            if Instant::now() >= give_up_at {
+                tracing::error!(
+                    waiting = self.backlog.len(),
+                    "the ASR queue never made room; delivering without the chunks still waiting"
+                );
+                self.backlog.clear();
+                return;
+            }
+            tokio::time::sleep(Duration::from_millis(10)).await;
+        }
     }
 
     /// Queues a finished recording for its turn to be pasted.
@@ -916,6 +1049,7 @@ impl SessionActor {
         TranscribeRequest {
             language,
             prompt: self.prompt(),
+            accuracy: self.settings.accuracy,
         }
     }
 

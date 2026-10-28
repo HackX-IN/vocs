@@ -33,7 +33,9 @@
 
 pub mod fillers;
 pub mod grammar;
+pub mod organize;
 pub mod repeats;
+pub mod rollback;
 pub mod sentences;
 pub mod text;
 pub mod tone;
@@ -91,6 +93,17 @@ impl TextEnhancer for RuleEnhancer {
         // 2. Spoken formatting: inserts punctuation and newlines.
         if context.expand_spoken_commands {
             out = text::expand_spoken_commands(&out, language);
+        }
+
+        /*
+         * 2a. Voice rollback ("scratch that", "undo last sentence"). Right after
+         * the spoken commands so "full stop" has already become a real stop to
+         * roll back to, and BEFORE fillers, corrections and the dictionary so
+         * none of them spends effort on words that are about to be removed. The
+         * same switch as the commands above: it is a spoken command.
+         */
+        if context.expand_spoken_commands {
+            out = rollback::apply_voice_rollback(&out, language);
         }
 
         // 3. Fillers, before the dictionary can try to match across one.

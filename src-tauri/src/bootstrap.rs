@@ -149,6 +149,8 @@ fn apply_window_vibrancy(app: &AppHandle) {
         (SIDEBAR_WINDOW, NSVisualEffectMaterial::Sidebar, Some(crate::tray::design_token("--radius-rail"))),
         (DASHBOARD_WINDOW, NSVisualEffectMaterial::Sidebar, Some(window_radius)),
         (ONBOARDING_WINDOW, NSVisualEffectMaterial::Popover, Some(window_radius)),
+        // A floating note, not a workspace: the same sheet material as onboarding.
+        (SCRATCHPAD_WINDOW, NSVisualEffectMaterial::Popover, Some(window_radius)),
     ] {
         let Some(window) = app.get_webview_window(label) else {
             continue;
@@ -169,6 +171,7 @@ pub const PILL_WINDOW: &str = "pill";
 pub const CAPTION_WINDOW: &str = "caption";
 pub const SIDEBAR_WINDOW: &str = "sidebar";
 pub const ONBOARDING_WINDOW: &str = "onboarding";
+pub const SCRATCHPAD_WINDOW: &str = "scratchpad";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: setup
@@ -273,6 +276,7 @@ pub fn setup(app: &AppHandle) -> AppResult<()> {
     }
     watch_settings_for_rebinds(app);
     crate::copy_last_hotkey::apply(app);
+    crate::extra_hotkeys::apply(app);
     prepare_engine(
         app,
         Arc::clone(&ports.engine),
@@ -316,6 +320,7 @@ fn build_ports(app: &AppHandle, paths: &AppPaths) -> AppResult<Ports> {
         engine,
         audio: Arc::new(CpalAudioSource::new()),
         enhancer: Arc::new(RuleEnhancer::new()),
+        organizer: adapters::build_organizer(),
         grammar: adapters::build_grammar_model(),
         injector: Arc::new(MacosInjector::new(MacosPermissions::new())),
         models,
@@ -724,9 +729,11 @@ pub fn pause_hotkeys(app: &AppHandle, paused: bool) {
     if paused {
         release_dictation_binding(app);
         crate::copy_last_hotkey::release(app);
+        crate::extra_hotkeys::release(app);
     } else {
         rebind_dictation_hotkey(app);
         crate::copy_last_hotkey::apply(app);
+        crate::extra_hotkeys::apply(app);
     }
 }
 
@@ -762,7 +769,7 @@ fn bind_dictation(app: &AppHandle, binding: &HotkeyBinding) -> AppResult<()> {
             // toggle logic in on_dictation_hotkey does the rest. Push-to-talk
             // is meaningless for a modifier and is documented as such in the
             // recording-mode setting.
-            on_dictation_hotkey(&handler_app, ShortcutState::Pressed);
+            on_dictation_hotkey(&handler_app, ShortcutState::Pressed, None);
         });
 
         return match tap {
@@ -783,7 +790,7 @@ fn bind_dictation(app: &AppHandle, binding: &HotkeyBinding) -> AppResult<()> {
     let handler_app = app.clone();
     app.global_shortcut()
         .on_shortcut(shortcut, move |_app, _shortcut, event| {
-            on_dictation_hotkey(&handler_app, event.state());
+            on_dictation_hotkey(&handler_app, event.state(), None);
         })
         .map_err(|err| {
             AppError::new(
@@ -863,6 +870,15 @@ fn watch_settings_for_rebinds(app: &AppHandle) {
             || touched(keys::DICTATION_HOTKEY)
         {
             crate::copy_last_hotkey::apply(&handler_app);
+        }
+        // The language hotkeys may not share a key with dictation, copy-last or
+        // each other, so a change to any of those re-checks them.
+        if crate::extra_hotkeys::is_affected_by(key.as_deref())
+            || touched(keys::COPY_LAST_ENABLED)
+            || touched(keys::COPY_LAST_HOTKEY)
+            || touched(keys::DICTATION_HOTKEY)
+        {
+            crate::extra_hotkeys::apply(&handler_app);
         }
     });
 }
@@ -972,7 +988,11 @@ fn apply_launch_at_login(app: &AppHandle) {
  *        as a stop, because key repeat fires while a key is held.
  * WHERE: The global shortcut handler.
  */
-fn on_dictation_hotkey(app: &AppHandle, key_state: ShortcutState) {
+pub(crate) fn on_dictation_hotkey(
+    app: &AppHandle,
+    key_state: ShortcutState,
+    language: Option<crate::types::LanguageHint>,
+) {
     let Some(state) = app.try_state::<AppState>() else {
         return;
     };
@@ -1001,6 +1021,13 @@ fn on_dictation_hotkey(app: &AppHandle, key_state: ShortcutState) {
             // Key repeat while held, or a release in toggle mode.
             _ => return,
         };
+
+        // The language belongs to the press that STARTS a recording; a stop needs
+        // none. Set unconditionally on a start — `None` for the main hotkey —
+        // so a stale pin from an earlier press can never leak into this one.
+        if matches!(event, SessionEvent::StartRequested) {
+            state.session.set_language_override(language);
+        }
 
         // Stamped here, at the press, because this is the only place that
         // knows when it happened. Feeds HotkeyDispatch and TotalFinalize.

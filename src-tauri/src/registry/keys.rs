@@ -1,7 +1,8 @@
 /*!
  * SOURCE OF TRUTH KEYWORDS: setting_keys, DICTATION_HOTKEY, DICTATION_MODE,
  *   CAPTURE_MODE, CANCEL_COUNTDOWN_MS, TRANSCRIPTION_MODEL, LANGUAGE,
- *   AUTO_PASTE, RESTORE_CLIPBOARD, RETENTION_DAYS, LAUNCH_AT_LOGIN
+ *   AUTO_PASTE, RESTORE_CLIPBOARD, RETENTION_DAYS, LAUNCH_AT_LOGIN,
+ *   LANG_HOTKEY_1_HOTKEY, LANG_HOTKEY_2_LANGUAGE
  * WHAT:  Every setting key in the app, as a constant.
  * WHY:   These strings are database keys. A typo in one does not fail — it
  *        reads as an absent setting and silently falls back to the default,
@@ -22,12 +23,23 @@ pub const INPUT_DEVICE: &str = "dictation.input_device";
 pub const AUDIO_FEEDBACK: &str = "dictation.audio_feedback";
 pub const QUIET_SPEAKERS: &str = "dictation.quiet_speakers";
 pub const LIVE_CAPTIONS: &str = "dictation.live_captions";
+// Extra dictation hotkeys, each pinned to one language. See extra_hotkeys.rs.
+pub const LANG_HOTKEY_1_ENABLED: &str = "dictation.lang_hotkey_1_enabled";
+pub const LANG_HOTKEY_1_HOTKEY: &str = "dictation.lang_hotkey_1_hotkey";
+pub const LANG_HOTKEY_1_LANGUAGE: &str = "dictation.lang_hotkey_1_language";
+pub const LANG_HOTKEY_2_ENABLED: &str = "dictation.lang_hotkey_2_enabled";
+pub const LANG_HOTKEY_2_HOTKEY: &str = "dictation.lang_hotkey_2_hotkey";
+pub const LANG_HOTKEY_2_LANGUAGE: &str = "dictation.lang_hotkey_2_language";
+// The floating dictation scratchpad. See scratchpad.rs.
+pub const SCRATCHPAD_ENABLED: &str = "dictation.scratchpad_enabled";
+pub const SCRATCHPAD_HOTKEY: &str = "dictation.scratchpad_hotkey";
 
 // ── Transcription ────────────────────────────────────────────────────────
 pub const TRANSCRIPTION_MODEL: &str = "transcription.model";
 pub const LANGUAGE: &str = "transcription.language";
 pub const FINALIZE_TIMEOUT_MS: &str = "transcription.finalize_timeout_ms";
 pub const CONTEXT_PROMPT: &str = "transcription.context_prompt";
+pub const ACCURACY: &str = "transcription.accuracy";
 
 // ── Output ───────────────────────────────────────────────────────────────
 pub const AUTO_PASTE: &str = "output.auto_paste";

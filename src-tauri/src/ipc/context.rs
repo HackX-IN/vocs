@@ -27,12 +27,12 @@ use crate::error::{AppError, AppResult, ErrorCode};
 use crate::pipeline::{GrammarPass, MicMonitor};
 use crate::ports::{
     AudioSource, EventSink, GrammarModel, ModelStore, PermissionProvider, SpeakerDucker,
-    TextEnhancer, TextInjector, TranscriptionEngine,
+    TextEnhancer, TextInjector, TextOrganizer, TranscriptionEngine,
 };
 use crate::registry::CapabilityKey;
 use crate::session::preview::PreviewGate;
 use crate::session::SessionEvent;
-use crate::types::SessionState;
+use crate::types::{LanguageHint, SessionState};
 
 /**
  * SOURCE OF TRUTH KEYWORDS: Ports
@@ -47,6 +47,8 @@ pub struct Ports {
     pub engine: Arc<dyn TranscriptionEngine>,
     pub audio: Arc<dyn AudioSource>,
     pub enhancer: Arc<dyn TextEnhancer>,
+    /// Restructures a ramble for the dictation scratchpad. See ports/organizer.rs.
+    pub organizer: Arc<dyn TextOrganizer>,
     /// The optional on-device grammar model. Empty until its file is installed.
     pub grammar: Arc<dyn GrammarModel>,
     pub injector: Arc<dyn TextInjector>,
@@ -101,14 +103,44 @@ pub struct SessionHandle {
      *        consumed by SessionActor::dispatch.
      */
     requested_at: Arc<Mutex<Option<Instant>>>,
+    /**
+     * SOURCE OF TRUTH KEYWORDS: language_override, hotkey_language, pinned_per_hotkey
+     * WHAT:  The language the hotkey that just fired is pinned to, if any.
+     * WHY:   Carried beside the event for the same reason as `requested_at`: the
+     *        FSM's vocabulary is about what happened, and "the user started a
+     *        recording" must not grow a payload that every match arm and test
+     *        then has to construct. Stamped with the time it was set and ignored
+     *        once stale, so a press the FSM rejected can never pin the language of
+     *        an unrelated recording started from the tray a minute later.
+     * WHERE: Set by bootstrap::on_dictation_hotkey just before StartRequested;
+     *        consumed by SessionActor::persist_row.
+     */
+    language_override: Arc<Mutex<Option<(Instant, LanguageHint)>>>,
 }
+
+/// How long a hotkey's language stays claimable. Generously longer than the hop
+/// from keypress to the actor, short enough that it cannot outlive the press.
+const LANGUAGE_OVERRIDE_TTL: std::time::Duration = std::time::Duration::from_secs(2);
 
 impl SessionHandle {
     pub fn new(sender: mpsc::Sender<SessionEvent>) -> Self {
         Self {
             sender,
             requested_at: Arc::new(Mutex::new(None)),
+            language_override: Arc::new(Mutex::new(None)),
         }
+    }
+
+    /// Records the language the pressed hotkey is pinned to; `None` clears any
+    /// earlier one, so the main hotkey always means "the configured language".
+    pub fn set_language_override(&self, hint: Option<LanguageHint>) {
+        *self.language_override.lock() = hint.map(|hint| (Instant::now(), hint));
+    }
+
+    /// Takes the pending language, if one was set recently enough to be this press's.
+    pub fn take_language_override(&self) -> Option<LanguageHint> {
+        let (set_at, hint) = self.language_override.lock().take()?;
+        (set_at.elapsed() <= LANGUAGE_OVERRIDE_TTL).then_some(hint)
     }
 
     /// Marks "the user just pressed the key". Call immediately before sending

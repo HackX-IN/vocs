@@ -35,8 +35,8 @@ use std::time::{Duration, Instant};
 use parking_lot::Mutex;
 
 use crate::error::{AppError, AppResult, ErrorCode};
-use crate::ports::grammar::GrammarModel;
-use decode::{load_weights, T5Weights};
+use crate::ports::grammar::{GrammarModel, RewriteLimit};
+use decode::{load_weights, out_of_time, out_of_time_error, T5Weights};
 
 pub const T5_MODEL_ID: &str = "t5-small-grammar";
 
@@ -137,11 +137,36 @@ impl GrammarModel for T5GrammarModel {
         false
     }
 
-    fn rewrite(&self, sentence: &str) -> AppResult<String> {
-        let mut inner = self.inner.lock();
+    /**
+     * WHAT:  One sentence through the model, honouring `limit` at the three
+     *        places it can be overrun: the wait for the lock, the cold load, and
+     *        the decode itself.
+     * WHY:   A caller with a deadline is a paste somebody is waiting for. The
+     *        lock is held by whichever rewrite got there first — usually the live
+     *        prefetch — so an unbounded `lock()` made the budget meaningless;
+     *        it waits only until the deadline. A cold load (~0.2 s, more on a
+     *        busy disk) is refused outright for the same reason: the sentence
+     *        goes out as the rules wrote it, and `warm` brings the weights in
+     *        behind the next recording instead. Without a deadline — the
+     *        background prefetch — it blocks and loads as before.
+     */
+    fn rewrite(&self, sentence: &str, limit: RewriteLimit<'_>) -> AppResult<String> {
+        if out_of_time(&limit) {
+            return Err(out_of_time_error());
+        }
+
+        let mut inner = match limit.deadline {
+            Some(deadline) => self.inner.try_lock_until(deadline).ok_or_else(out_of_time_error)?,
+            None => self.inner.lock(),
+        };
+
         if inner.weights.is_none() {
-            // Loading on demand keeps a cold call correct, just slower than a
-            // warmed one — the caller's time budget decides whether to risk it.
+            if limit.deadline.is_some() {
+                return Err(AppError::new(
+                    ErrorCode::EngineNotReady,
+                    "The grammar model is not loaded yet.",
+                ));
+            }
             let path = inner.path.clone().ok_or_else(Self::not_installed)?;
             inner.weights = Some(load_weights(&path)?);
             self.loaded.store(true, Ordering::Release);
@@ -149,7 +174,7 @@ impl GrammarModel for T5GrammarModel {
         inner.last_used = Instant::now();
 
         let weights = inner.weights.as_mut().ok_or_else(Self::not_installed)?;
-        let out = weights.rewrite(sentence);
+        let out = weights.rewrite(sentence, limit);
         inner.last_used = Instant::now();
         out
     }
@@ -165,7 +190,10 @@ mod tests {
         assert!(!model.is_installed());
         assert!(!model.is_loaded());
         assert_eq!(model.warm().err().map(|e| e.code), Some(ErrorCode::ModelMissing));
-        assert_eq!(model.rewrite("I has a idea.").err().map(|e| e.code), Some(ErrorCode::ModelMissing));
+        assert_eq!(
+            model.rewrite("I has a idea.", RewriteLimit::default()).err().map(|e| e.code),
+            Some(ErrorCode::ModelMissing)
+        );
     }
 
     #[test]
@@ -177,6 +205,50 @@ mod tests {
         // Warming a path that is not there fails cleanly and stays unloaded.
         assert!(model.warm().is_err());
         assert!(!model.is_loaded());
+    }
+
+    #[test]
+    fn a_rewrite_already_past_its_deadline_returns_at_once() {
+        let model = T5GrammarModel::new();
+        let limit = RewriteLimit { deadline: Some(Instant::now()), cancel: None };
+        let err = model.rewrite("I has a idea.", limit).expect_err("out of time");
+        assert_eq!(err.code, ErrorCode::FinalizeTimeout);
+    }
+
+    #[test]
+    fn a_cancelled_rewrite_is_refused_before_it_waits_for_anything() {
+        let model = T5GrammarModel::new();
+        let cancel = AtomicBool::new(true);
+        let limit = RewriteLimit { deadline: None, cancel: Some(&cancel) };
+        assert_eq!(model.rewrite("I has a idea.", limit).err().map(|e| e.code), Some(ErrorCode::FinalizeTimeout));
+    }
+
+    #[test]
+    fn a_deadline_never_pays_for_a_cold_load() {
+        // Installed but not loaded: the critical path must not load ~0.2 s of
+        // weights, so it declines and leaves the sentence to the rules.
+        let model = T5GrammarModel::new();
+        model.install(PathBuf::from("/nonexistent/model.safetensors"));
+        let limit = RewriteLimit { deadline: Some(Instant::now() + Duration::from_secs(5)), cancel: None };
+        let err = model.rewrite("I has a idea.", limit).expect_err("not loaded");
+        assert_eq!(err.code, ErrorCode::EngineNotReady);
+        assert!(!model.is_loaded());
+    }
+
+    #[test]
+    fn a_deadline_does_not_wait_for_a_rewrite_that_holds_the_lock() {
+        let model = T5GrammarModel::new();
+        let _held = model.inner.lock();
+        let started = Instant::now();
+        let limit = RewriteLimit {
+            deadline: Some(started + Duration::from_millis(30)),
+            cancel: None,
+        };
+        // `try_lock_until` in the same thread cannot succeed, which is the point:
+        // it must give up at the deadline instead of deadlocking.
+        let err = model.rewrite("I has a idea.", limit).expect_err("lock is taken");
+        assert_eq!(err.code, ErrorCode::FinalizeTimeout);
+        assert!(started.elapsed() < Duration::from_secs(2));
     }
 
     #[test]
@@ -214,7 +286,9 @@ mod tests {
         assert!(model.is_loaded());
 
         let started = Instant::now();
-        let out = model.rewrite("She don't know what we was talking about.").expect("rewrites");
+        let out = model
+            .rewrite("She don't know what we was talking about.", RewriteLimit::default())
+            .expect("rewrites");
         eprintln!("rewrite took {:?}: {out}", started.elapsed());
         assert_eq!(out, "She doesn't know what we were talking about.");
 

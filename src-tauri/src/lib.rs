@@ -41,7 +41,9 @@ pub mod session;
 pub mod bootstrap;
 pub mod copy_last_hotkey;
 pub mod ipc;
+pub mod extra_hotkeys;
 pub mod menu;
+pub mod scratchpad;
 pub mod tray;
 
 use tauri::Manager;

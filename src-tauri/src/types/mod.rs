@@ -17,13 +17,17 @@ pub mod diff;
 pub mod engine;
 pub mod language;
 pub mod learned;
+pub mod accuracy;
 pub mod metrics;
 pub mod numeric;
+pub mod organize;
 pub mod profile;
 pub mod session;
 pub mod settings;
 pub mod transcript;
 
+pub use accuracy::AccuracyMode;
+pub use organize::OrganizeMode;
 pub use audio::{
     AudioChunk, AudioLevel, CaptureMode, ChunkKind, DeviceInfo, MicTestStopReason, MicTestUpdate,
     TARGET_SAMPLE_RATE,

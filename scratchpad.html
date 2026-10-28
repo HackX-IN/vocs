@@ -1,0 +1,23 @@
+<!--
+  SOURCE OF TRUTH KEYWORDS: scratchpad-window, scratchpad.html, scratchpad-entry, dictation-canvas
+  WHAT:  The dictation scratchpad document. Loads src/entries/scratchpad.tsx.
+  WHY:   Its own document, like the caption HUD, so the scratchpad ships none of the
+         dashboard's charts, tables or router and opens the instant its shortcut is
+         pressed. The body is painted by styles/global.css so the native rounded
+         window shows one surface from edge to edge.
+  WHERE: Opened as the floating scratchpad window by src-tauri
+         (crate::scratchpad). Siblings: caption.html, pill.html, index.html,
+         sidebar.html, onboarding.html.
+-->
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Vocs scratchpad</title>
+  </head>
+  <body data-window="scratchpad">
+    <div id="root"></div>
+    <script type="module" src="/src/entries/scratchpad.tsx"></script>
+  </body>
+</html>

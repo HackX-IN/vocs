@@ -45,6 +45,9 @@ use crate::types::{
     DeliveryKind, LanguageCode, LatencyStage, SessionId, SessionOutcome,
 };
 
+/// The longest one paste may take before the next recording is allowed to go.
+const INJECT_HARD_LIMIT: std::time::Duration = std::time::Duration::from_secs(4);
+
 /**
  * SOURCE OF TRUTH KEYWORDS: PendingDelivery
  * WHAT:  A recording whose capture has ended but whose trailing fragment is
@@ -185,6 +188,20 @@ async fn deliver(ctx: &SessionContext, pending: PendingDelivery) {
     };
 
     /*
+     * SOURCE OF TRUTH KEYWORDS: scratched_everything, nothing_left_to_paste
+     * Words were heard but a voice command ("scratch that", "undo last
+     * sentence") took all of them back. There is nothing to paste, and pasting
+     * an empty string would still clobber the clipboard and fire a stop-to-pasted
+     * sample for a delivery that delivered nothing. It is the same outcome as
+     * saying nothing, so it is handled the same way: no row, no toast.
+     */
+    if final_text.trim().is_empty() {
+        tracing::info!("everything was taken back by a voice command; nothing to paste");
+        discard_empty(ctx, &session_id);
+        return;
+    }
+
+    /*
      * Opt-in preview: the finished text is shown for a moment and Escape keeps it
      * out of the document. Placed AFTER enhancement — it shows what WILL be
      * pasted, not what was heard — and BEFORE the injection timer, so the pause
@@ -221,15 +238,27 @@ async fn deliver(ctx: &SessionContext, pending: PendingDelivery) {
             paste_delay_ms: settings.paste_delay_ms,
             clipboard_restore_delay_ms: settings.clipboard_restore_delay_ms,
         };
-        tokio::task::spawn_blocking(move || injector.deliver(&request))
-            .await
-            .unwrap_or_else(|err| {
+        /*
+         * SOURCE OF TRUTH KEYWORDS: inject_hard_limit, one_stuck_paste_blocks_all
+         * Bounded because this worker is one task for every recording: an
+         * injection that never returns (a contended pasteboard, an app that
+         * stops answering) would otherwise hold every later dictation behind
+         * it until Vocs was restarted, which reads as "it stopped pasting".
+         * The blocking thread is abandoned, not killed; it ends on its own.
+         */
+        match tokio::time::timeout(INJECT_HARD_LIMIT, tokio::task::spawn_blocking(move || injector.deliver(&request))).await {
+            Ok(joined) => joined.unwrap_or_else(|err| {
                 Err(AppError::new(
                     ErrorCode::InjectionFailed,
                     "Vocs could not send the paste. Your text is on the clipboard.",
                 )
                 .with_detail(err.to_string()))
-            })
+            }),
+            Err(_elapsed) => Err(AppError::new(
+                ErrorCode::InjectionFailed,
+                "The paste took too long. Your text is in Dictations — press the copy-last shortcut to get it back.",
+            )),
+        }
     };
 
     let delivery = match outcome {

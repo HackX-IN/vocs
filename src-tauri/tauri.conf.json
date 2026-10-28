@@ -85,6 +85,24 @@
         "transparent": true,
         "titleBarStyle": "Overlay",
         "hiddenTitle": true
+      },
+      {
+        "label": "scratchpad",
+        "url": "scratchpad.html",
+        "title": "Vocs scratchpad",
+        "width": 560,
+        "height": 420,
+        "minWidth": 420,
+        "minHeight": 300,
+        "resizable": true,
+        "center": true,
+        "visible": false,
+        "transparent": true,
+        "decorations": false,
+        "alwaysOnTop": true,
+        "skipTaskbar": true,
+        "shadow": true,
+        "acceptFirstMouse": true
       }
     ],
     "security": {

@@ -22,6 +22,8 @@
  */
 
 use std::path::Path;
+use std::sync::atomic::Ordering;
+use std::time::Instant;
 
 use candle_core::{DType, Device, Tensor};
 use candle_nn::VarBuilder;
@@ -29,6 +31,7 @@ use candle_transformers::models::t5::{Config, T5ForConditionalGeneration};
 use tokenizers::Tokenizer;
 
 use crate::error::{AppError, AppResult, ErrorCode};
+use crate::ports::RewriteLimit;
 
 /// The task prefix the model was fine-tuned with. Without it the output is not
 /// a correction.
@@ -64,6 +67,23 @@ fn internal(err: impl std::fmt::Display) -> AppError {
         .with_detail(err.to_string())
 }
 
+/**
+ * SOURCE OF TRUTH KEYWORDS: out_of_time, out_of_time_error
+ * WHAT:  Whether a RewriteLimit has run out, and the error that says so.
+ * WHY:   Lives here and not on the port: ports hold no logic, and the adapter is
+ *        the only place that knows how often it can afford to look.
+ * WHERE: Checked by T5GrammarModel::rewrite before it waits and by
+ *        T5Weights::rewrite on every token.
+ */
+pub fn out_of_time(limit: &RewriteLimit<'_>) -> bool {
+    limit.deadline.is_some_and(|deadline| Instant::now() >= deadline)
+        || limit.cancel.is_some_and(|cancel| cancel.load(Ordering::Relaxed))
+}
+
+pub fn out_of_time_error() -> AppError {
+    AppError::new(ErrorCode::FinalizeTimeout, "The grammar model ran out of time.")
+}
+
 /// Reads, widens and builds the model. Blocking: ~0.2 s on an M2.
 pub fn load_weights(path: &Path) -> AppResult<T5Weights> {
     let device = Device::Cpu;
@@ -94,7 +114,7 @@ impl T5Weights {
      *        that cache, so re-sending the prefix would attend to it twice.
      * WHERE: T5GrammarModel::rewrite, behind its lock.
      */
-    pub fn rewrite(&mut self, sentence: &str) -> AppResult<String> {
+    pub fn rewrite(&mut self, sentence: &str, limit: RewriteLimit<'_>) -> AppResult<String> {
         let encoding = self
             .tokenizer
             .encode(format!("{PROMPT_PREFIX}{sentence}"), true)
@@ -119,6 +139,11 @@ impl T5Weights {
         let mut last = DECODER_START_TOKEN_ID;
 
         for _ in 0..budget {
+            // Once per token (~5 ms): the only way a limit can stop a decode that
+            // is already running, since a half-finished rewrite is useless.
+            if out_of_time(&limit) {
+                return Err(out_of_time_error());
+            }
             let step = Tensor::new(&[last], &self.device)
                 .and_then(|t| t.unsqueeze(0))
                 .map_err(internal)?;

@@ -19,6 +19,7 @@ pub mod learned;
 pub mod mic_test;
 pub mod models;
 pub mod profiles;
+pub mod scratchpad;
 pub mod session;
 pub mod settings;
 pub mod stats;

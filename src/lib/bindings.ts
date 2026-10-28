@@ -84,6 +84,16 @@ export const commands = {
 	 *  
 	 */
 	suggestTone: (input: SuggestToneInput) => typedError<string, AppError>(__TAURI_INVOKE("suggest_tone", { input })),
+	/**
+	 * 
+	 *  * WHAT:  `text` restructured per `mode`.
+	 *  * WHY:   The language comes from the person's settings, so a Hindi note is laid
+	 *  *        out but never sorted with English cues.
+	 *  
+	 */
+	organizeText: (input: OrganizeInput) => typedError<string, AppError>(__TAURI_INVOKE("organize_text", { input })),
+	scratchpadInsert: (input: InsertInput) => typedError<DeliveryKind, AppError>(__TAURI_INVOKE("scratchpad_insert", { input })),
+	hideScratchpad: () => typedError<null, AppError>(__TAURI_INVOKE("hide_scratchpad")),
 	getStats: () => typedError<StatsSummary, AppError>(__TAURI_INVOKE("get_stats")),
 	listDictionary: () => typedError<DictionaryEntry[], AppError>(__TAURI_INVOKE("list_dictionary")),
 	createDictionaryEntry: (input: CreateDictionaryEntryInput) => typedError<DictionaryId, AppError>(__TAURI_INVOKE("create_dictionary_entry", { input })),
@@ -573,6 +583,10 @@ export type ImportSummary = {
 	profiles_skipped: number,
 };
 
+export type InsertInput = {
+	text: string,
+};
+
 export type KeyModifier = "COMMAND" | "CONTROL" | "OPTION" | "SHIFT";
 
 /**  A BCP-47-ish code as Whisper uses it: "en", "hi", "ar", "zh". */
@@ -874,6 +888,24 @@ export type OpenTextFileInput = {
 	/**  Without the dot, e.g. ["json"]. */
 	extensions: string[],
 };
+
+export type OrganizeInput = {
+	text: string,
+	mode: OrganizeMode,
+};
+
+export type OrganizeMode = 
+/**
+ *  Action items and notes when there are tasks, bullets for a longer
+ *  ramble, a paragraph for a short one.
+ */
+"AUTO" | 
+/**  One bullet per thought. */
+"BULLETS" | 
+/**  A checklist of what has to be done; says so when there is nothing to do. */
+"ACTIONS" | 
+/**  The same words as one clean paragraph. */
+"PARAGRAPH";
 
 /**
  * 

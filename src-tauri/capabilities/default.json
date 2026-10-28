@@ -1,13 +1,14 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Vocs's five windows. Tauri v2 refuses any CORE or PLUGIN call from a window not listed here, and does so silently \u2014 app-defined commands still work, so a missing window renders and loads data perfectly while every cross-window event it sends is dropped at the boundary. That is exactly how the detached rail came to draw itself correctly and navigate nowhere.",
+  "description": "Vocs's six windows. Tauri v2 refuses any CORE or PLUGIN call from a window not listed here, and does so silently \u2014 app-defined commands still work, so a missing window renders and loads data perfectly while every cross-window event it sends is dropped at the boundary. That is exactly how the detached rail came to draw itself correctly and navigate nowhere.",
   "windows": [
     "dashboard",
     "sidebar",
     "pill",
     "caption",
-    "onboarding"
+    "onboarding",
+    "scratchpad"
   ],
   "permissions": [
     "core:default",

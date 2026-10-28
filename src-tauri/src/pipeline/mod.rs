@@ -10,6 +10,7 @@
  */
 
 pub mod assembler;
+pub mod backlog;
 pub mod chunker;
 pub mod diff;
 pub mod grammar;
@@ -17,6 +18,7 @@ pub mod mic_monitor;
 pub mod vad;
 pub mod worker;
 
+pub use backlog::ChunkBacklog;
 pub use chunker::Chunker;
 pub use grammar::GrammarPass;
 pub use mic_monitor::MicMonitor;

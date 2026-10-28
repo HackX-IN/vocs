@@ -33,7 +33,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use crate::ports::grammar::GrammarModel;
+use crate::ports::grammar::{GrammarModel, RewriteLimit};
 use crate::types::{CorrectionEdit, DictionaryEntry, LanguageCode};
 
 use super::cache::RewriteCache;
@@ -41,8 +41,11 @@ use super::guard::merge_safe_edits;
 use super::sentences::split_sentences;
 
 /// How long the stop-to-paste path may spend asking the model. Sentences not
-/// reached are left as the rules wrote them.
-pub const GRAMMAR_BUDGET: Duration = Duration::from_millis(900);
+/// reached are left as the rules wrote them. Enforced INSIDE each model call
+/// (RewriteLimit), not only between sentences: it was 900 ms and could still be
+/// overrun by a whole sentence, a held lock or a cold load, which is how a paste
+/// took seconds with the on-device model on.
+pub const GRAMMAR_BUDGET: Duration = Duration::from_millis(500);
 
 /**
  * SOURCE OF TRUTH KEYWORDS: PassOutcome
@@ -90,6 +93,26 @@ pub struct GrammarPass {
     model: Arc<dyn GrammarModel>,
     cache: RewriteCache,
     prefetching: AtomicBool,
+    /// Set while the stop-time pass is running so a live prefetch lets go of the
+    /// model. See `yield_to_final_pass`.
+    stop_prefetch: AtomicBool,
+}
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: PrefetchYield, yield_to_final_pass
+ * WHAT:  While alive, tells any running prefetch to stop and any new one to
+ *        stand down; dropping it lets prefetching resume.
+ * WHY:   The model is single-threaded behind one lock. A prefetch that is
+ *        mid-sentence when the person stops talking would otherwise make the
+ *        paste wait for it, and the paste is the one with a person attached.
+ * WHERE: Held by GrammarPass::correct for the length of the pass.
+ */
+pub struct PrefetchYield<'a>(&'a AtomicBool);
+
+impl Drop for PrefetchYield<'_> {
+    fn drop(&mut self) {
+        self.0.store(false, Ordering::Release);
+    }
 }
 
 /// Words the person's dictionary owns, which the guard must never alter.
@@ -110,7 +133,18 @@ pub fn protected_terms(dictionary: &[DictionaryEntry]) -> HashSet<String> {
 
 impl GrammarPass {
     pub fn new(model: Arc<dyn GrammarModel>) -> Self {
-        Self { model, cache: RewriteCache::default(), prefetching: AtomicBool::new(false) }
+        Self {
+            model,
+            cache: RewriteCache::default(),
+            prefetching: AtomicBool::new(false),
+            stop_prefetch: AtomicBool::new(false),
+        }
+    }
+
+    /// See `PrefetchYield`.
+    pub fn yield_to_final_pass(&self) -> PrefetchYield<'_> {
+        self.stop_prefetch.store(true, Ordering::Release);
+        PrefetchYield(&self.stop_prefetch)
     }
 
     /// The model handle, for the bootstrap tasks that install, warm and unload it.
@@ -148,6 +182,10 @@ impl GrammarPass {
     ) -> PassOutcome {
         let PassOptions { budget, formal } = options;
         let deadline = Instant::now() + budget;
+        let _prefetch_yields = self.yield_to_final_pass();
+        // Every model call is bounded by the same deadline as the loop, so the
+        // budget holds for the call in flight too — see ports::grammar::RewriteLimit.
+        let limit = RewriteLimit { deadline: Some(deadline), cancel: None };
         let protected = protected_terms(dictionary);
         let ranges = split_sentences(text);
 
@@ -176,7 +214,7 @@ impl GrammarPass {
                 None if Instant::now() >= deadline => None,
                 None => {
                     outcome.model_calls += 1;
-                    match self.model.rewrite(sentence) {
+                    match self.model.rewrite(sentence, limit) {
                         Ok(rewrite) => {
                             self.cache.put(sentence, rewrite.clone());
                             Some(rewrite)
@@ -233,7 +271,13 @@ impl GrammarPass {
             if !finished || self.cache.contains(sentence) {
                 continue;
             }
-            match self.model.rewrite(sentence) {
+            // The stop-time pass outranks this: once it is running, give the
+            // model back instead of finishing a sentence nobody is waiting for.
+            if self.stop_prefetch.load(Ordering::Acquire) {
+                break;
+            }
+            let limit = RewriteLimit { deadline: None, cancel: Some(&self.stop_prefetch) };
+            match self.model.rewrite(sentence, limit) {
                 Ok(rewrite) => {
                     self.cache.put(sentence, rewrite);
                     ran += 1;
@@ -308,6 +352,58 @@ mod tests {
         // The first call starts inside the budget; the second does not.
         assert_eq!(out.text, "She doesn't know. We was late.");
         assert_eq!((out.model_calls, out.left_alone), (1, 1));
+    }
+
+    #[test]
+    fn the_stop_time_pass_bounds_every_model_call_with_its_deadline() {
+        let model = ScriptedGrammar::answering(FIXES);
+        let pass = GrammarPass::new(model.clone());
+
+        pass.correct("She don't know. We was late.", &[], PassOptions::default());
+
+        // (deadline, cancel): the paste is bounded by time, never by a flag.
+        assert_eq!(*model.limits.lock(), vec![(true, false), (true, false)]);
+    }
+
+    #[test]
+    fn a_background_prefetch_has_no_deadline_but_can_be_told_to_stop() {
+        let model = ScriptedGrammar::answering(FIXES);
+        let pass = GrammarPass::new(model.clone());
+
+        pass.prefetch("She don't know.");
+
+        assert_eq!(*model.limits.lock(), vec![(false, true)]);
+    }
+
+    #[test]
+    fn a_running_prefetch_gives_the_model_up_when_the_final_pass_wants_it() {
+        let model = ScriptedGrammar::slow(FIXES, Duration::from_secs(5));
+        let pass = Arc::new(GrammarPass::new(model));
+
+        let background = {
+            let pass = Arc::clone(&pass);
+            std::thread::spawn(move || pass.prefetch("She don't know. We was late."))
+        };
+        // Let the prefetch get into its first (slow) sentence.
+        std::thread::sleep(Duration::from_millis(60));
+
+        let started = Instant::now();
+        let hold = pass.yield_to_final_pass();
+        let ran = background.join().expect("prefetch thread");
+        drop(hold);
+
+        assert_eq!(ran, 0, "the interrupted sentence was not cached");
+        assert!(started.elapsed() < Duration::from_secs(2), "it did not sit out the 5 s sentence");
+    }
+
+    #[test]
+    fn prefetching_resumes_once_the_final_pass_is_done() {
+        let model = ScriptedGrammar::answering(FIXES);
+        let pass = GrammarPass::new(model);
+
+        drop(pass.yield_to_final_pass());
+
+        assert_eq!(pass.prefetch("She don't know."), 1);
     }
 
     #[test]

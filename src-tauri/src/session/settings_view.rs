@@ -69,6 +69,8 @@ pub struct SessionSettings {
     /// The user's own recognition bias, ahead of the dictionary terms. None
     /// when blank, so the actor never builds a prompt out of whitespace.
     pub context_prompt: Option<String>,
+    /// How hard the engine works on each decode. See types/accuracy.rs.
+    pub accuracy: crate::types::AccuracyMode,
     /// The display name of the frontmost app when its profile turns Vocs off.
     /// None everywhere else, including when no app could be identified.
     pub excluded_app: Option<String>,
@@ -147,6 +149,9 @@ impl SessionSettings {
         let preview_before_paste = read_bool(stored, keys::PREVIEW_BEFORE_PASTE).unwrap_or(false);
         let live_captions = read_bool(stored, keys::LIVE_CAPTIONS).unwrap_or(false);
 
+        // One line, for the same reachability reason as the ones above.
+        let accuracy = crate::types::AccuracyMode::from_stored(&read_choice(stored, keys::ACCURACY).unwrap_or_default());
+
         // One line, for the same reachability reason as the two above.
         let tone = crate::types::Tone::from_stored(&read_choice(stored, keys::TONE).unwrap_or_default());
 
@@ -190,6 +195,7 @@ impl SessionSettings {
             context_prompt: read_choice(stored, keys::CONTEXT_PROMPT)
                 .map(|text| text.trim().to_string())
                 .filter(|text| !text.is_empty()),
+            accuracy,
             excluded_app: None,
         }
     }

@@ -499,7 +499,7 @@
 
         // 1. Auto-detect.
         let auto = engine
-            .transcribe(&chunk, &TranscribeRequest { language: LanguageHint::Auto, prompt: None })
+            .transcribe(&chunk, &TranscribeRequest { language: LanguageHint::Auto, ..TranscribeRequest::default() })
             .expect("auto decode");
         let auto_text: String = auto.iter().map(|s| s.text.as_str()).collect();
         let auto_lang = auto.first().and_then(|s| s.language.clone());
@@ -509,7 +509,7 @@
         let pinned = engine
             .transcribe(&chunk, &TranscribeRequest {
                 language: LanguageHint::Pinned { language: LanguageCode("ar".into()) },
-                prompt: None,
+                ..TranscribeRequest::default()
             })
             .expect("pinned decode");
         let pinned_text: String = pinned.iter().map(|s| s.text.as_str()).collect();

@@ -27,6 +27,14 @@
  *          - OFF BY DEFAULT. It transcribes a little extra while you talk, and a
  *            stop pressed mid-snapshot waits for it — so it is a setting.
  *
+ *        THE LAST WORD IS HELD BACK until two snapshots in a row agree on it. A
+ *        snapshot ends wherever the microphone happened to be, usually in the
+ *        middle of a word, and the decoder dutifully turns that fragment into a
+ *        different, real-looking word — "transcri" becomes "transcript" becomes
+ *        "transcribes" over three captions. Showing it is what made captions look
+ *        like they were mishearing; withholding it costs one interval of delay on
+ *        the final word and nothing else, and the finished text is unaffected.
+ *
  *        The "fixed" text is produced by the SAME enhancement the paste will use
  *        (`enhance_context`), so the caption never shows a rule
  *        set the paste will not apply.
@@ -66,6 +74,9 @@ pub struct LiveCaptions {
     epoch: u32,
     /// The last pair shown, so an unchanged caption is not re-emitted.
     last_shown: Option<(String, String)>,
+    /// The words of the previous snapshot's whole hypothesis, normalised, for
+    /// deciding whether the final word has settled. See `withhold_unconfirmed`.
+    previous_words: Vec<String>,
 }
 
 impl LiveCaptions {
@@ -140,7 +151,15 @@ impl LiveCaptions {
     ) {
         let mut preview = committed.clone();
         preview.push_segments(snapshot);
-        let heard = preview.finish();
+        let hypothesis = preview.finish();
+        if hypothesis.trim().is_empty() {
+            return;
+        }
+
+        // Remembered whether or not anything is shown below: agreement is between
+        // CONSECUTIVE snapshots, so a skipped one must still count as a previous.
+        let heard = withhold_unconfirmed(&hypothesis, &self.previous_words).to_string();
+        self.previous_words = normalised_words(&hypothesis);
         if heard.trim().is_empty() {
             return;
         }
@@ -161,6 +180,56 @@ impl LiveCaptions {
             .events
             .caption_changed(Some(&Caption::Live { heard: shown.0.clone(), fixed: shown.1.clone() }));
         self.last_shown = Some(shown);
+    }
+}
+
+/// Letters, digits and apostrophes only, lowercased: "Hello," and "hello" agree.
+fn normalise_word(word: &str) -> String {
+    word.chars()
+        .filter(|c| c.is_alphanumeric() || *c == '\'')
+        .collect::<String>()
+        .to_lowercase()
+}
+
+fn normalised_words(text: &str) -> Vec<String> {
+    text.split_whitespace().map(normalise_word).collect()
+}
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: withhold_unconfirmed, stable_caption, local_agreement
+ * WHAT:  `text` without its final word, unless the previous snapshot had the same
+ *        word in the same place.
+ * WHY:   Two snapshots agreeing on a word is the cheapest evidence it is finished
+ *        rather than cut off. Only the LAST word is ever held: everything before
+ *        it has had a later word spoken after it, which is what makes it settled,
+ *        so a caption never lags by more than one word. Positions are compared,
+ *        not just words, so a word that has moved is not mistaken for a match.
+ * WHERE: LiveCaptions::show.
+ */
+fn withhold_unconfirmed<'a>(text: &'a str, previous: &[String]) -> &'a str {
+    let mut words: Vec<(usize, &str)> = Vec::new();
+    let mut start = None;
+    for (i, ch) in text.char_indices() {
+        if ch.is_whitespace() {
+            if let Some(s) = start.take() {
+                words.push((s, &text[s..i]));
+            }
+        } else if start.is_none() {
+            start = Some(i);
+        }
+    }
+    if let Some(s) = start {
+        words.push((s, &text[s..]));
+    }
+
+    let Some(&(last_start, last)) = words.last() else {
+        return text;
+    };
+    let settled = previous.get(words.len() - 1).is_some_and(|word| *word == normalise_word(last));
+    if settled {
+        text
+    } else {
+        text[..last_start].trim_end()
     }
 }
 
@@ -216,6 +285,50 @@ mod tests {
     fn an_answer_nobody_asked_for_is_not_current() {
         let mut captions = on();
         assert!(!captions.accept());
+    }
+
+    fn words(text: &str) -> Vec<String> {
+        normalised_words(text)
+    }
+
+    #[test]
+    fn a_final_word_nobody_has_confirmed_yet_is_held_back() {
+        assert_eq!(withhold_unconfirmed("we should ship the transcri", &[]), "we should ship the");
+        assert_eq!(withhold_unconfirmed("hello", &[]), "", "a single unconfirmed word shows nothing yet");
+    }
+
+    #[test]
+    fn a_final_word_the_previous_snapshot_agreed_on_is_shown() {
+        let previous = words("We should ship the transcript");
+        assert_eq!(
+            withhold_unconfirmed("We should ship the transcript today", &previous),
+            "We should ship the transcript",
+            "'today' is new; 'transcript' was confirmed by the later word it now has before it"
+        );
+        assert_eq!(
+            withhold_unconfirmed("we should ship the transcript", &previous),
+            "we should ship the transcript",
+            "an identical hypothesis is settled, punctuation and case aside"
+        );
+    }
+
+    #[test]
+    fn a_word_that_changed_is_not_mistaken_for_a_match() {
+        let previous = words("we should ship the transcript");
+        assert_eq!(withhold_unconfirmed("we should ship the transcribes", &previous), "we should ship the");
+    }
+
+    #[test]
+    fn a_word_in_a_different_place_is_not_a_match() {
+        // "ship" is in the previous hypothesis, but at position 2, not 4.
+        let previous = words("we should ship the thing");
+        assert_eq!(withhold_unconfirmed("we should ship the ship", &previous), "we should ship the");
+    }
+
+    #[test]
+    fn nothing_to_hold_back_in_nothing() {
+        assert_eq!(withhold_unconfirmed("", &[]), "");
+        assert_eq!(withhold_unconfirmed("   ", &[]), "   ");
     }
 
     #[test]

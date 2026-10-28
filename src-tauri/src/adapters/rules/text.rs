@@ -36,7 +36,7 @@ const ENGLISH_SPOKEN_COMMANDS: &[(&str, &str)] = &[
     ("comma", ","),
 ];
 
-fn is_english(language: Option<&LanguageCode>) -> bool {
+pub(super) fn is_english(language: Option<&LanguageCode>) -> bool {
     language.map(|l| l.as_str().starts_with("en")).unwrap_or(false)
 }
 
@@ -186,15 +186,15 @@ const MAX_ALIGN_WORDS: usize = 4;
 /// A word plus where it sits in the original string, so a replacement can be
 /// spliced without rebuilding — and therefore without disturbing anything else.
 #[derive(Debug, Clone, Copy)]
-struct Word<'a> {
-    text: &'a str,
+pub(super) struct Word<'a> {
+    pub(super) text: &'a str,
     /// Byte offset of the word in the original string. Only the START is kept:
     /// every splice here takes "everything from this word onwards", so an end
     /// offset would be a field nothing reads.
-    start: usize,
+    pub(super) start: usize,
 }
 
-fn words_with_offsets(text: &str) -> Vec<Word<'_>> {
+pub(super) fn words_with_offsets(text: &str) -> Vec<Word<'_>> {
     let mut out = Vec::new();
     let mut start = None;
     for (i, ch) in text.char_indices() {
@@ -213,7 +213,7 @@ fn words_with_offsets(text: &str) -> Vec<Word<'_>> {
 }
 
 /// Lowercased letters and digits only. "Tuesday," and "tuesday" compare equal.
-fn bare(word: &str) -> String {
+pub(super) fn bare(word: &str) -> String {
     word.chars()
         .filter(|c| c.is_alphanumeric() || *c == '\'')
         .collect::<String>()
@@ -221,7 +221,7 @@ fn bare(word: &str) -> String {
 }
 
 /// True when this word ends a clause — the next word starts a new one.
-fn ends_clause(word: &str) -> bool {
+pub(super) fn ends_clause(word: &str) -> bool {
     word.ends_with(',')
         || word.ends_with('.')
         || word.ends_with(';')

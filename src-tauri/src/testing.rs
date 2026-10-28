@@ -1,6 +1,6 @@
 /*!
  * SOURCE OF TRUTH KEYWORDS: read_wav_f32, synthesise_speech, testing_support,
- *   speech_fixture
+ *   speech_fixture, synthetic_voice
  * WHAT:  Test-only helpers for getting real spoken audio into a test.
  * WHY:   Two test modules need identical fixtures — the whisper live tests and
  *        the end-to-end session tests — and a second copy of a WAV parser is
@@ -29,6 +29,46 @@ use parking_lot::{Mutex, MutexGuard};
 
 use crate::config::AppPaths;
 use crate::ports::TranscriptionEngine;
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: synthetic_voice, platform_independent_speech
+ * WHAT:  `ms` milliseconds of a vowel-like synthetic voice: harmonics of `f0`
+ *        shaped by two formants, with a syllable-rate envelope that never falls
+ *        silent, peak-normalised well inside [-1, 1].
+ * WHY:   `synthesise_speech` needs macOS `say`, so every test built on it
+ *        silently SKIPS anywhere else — which is how a whole class of recording
+ *        bugs went untested in CI. The VAD accepts this signal as speech, so a
+ *        test can drive the real chunker, worker and actor with no platform
+ *        dependency. It will not transcribe (nothing real does), which is fine:
+ *        the engine in these tests is a script.
+ * WHERE: session/e2e_tests.rs, for the tests that must run on every host.
+ */
+pub fn synthetic_voice(ms: u64, f0: f32) -> Vec<f32> {
+    use std::f32::consts::TAU;
+
+    let count = (ms * 16) as usize;
+    let mut samples: Vec<f32> = (0..count)
+        .map(|i| {
+            let t = i as f32 / 16_000.0;
+            let envelope = 0.5 + 0.5 * (TAU * 4.0 * t).sin().abs();
+            let voiced: f32 = (1..16)
+                .map(|harmonic| {
+                    let frequency = f0 * harmonic as f32;
+                    let gain = (-((frequency - 700.0) / 300.0).powi(2)).exp()
+                        + 0.7 * (-((frequency - 1200.0) / 400.0).powi(2)).exp();
+                    gain * (TAU * frequency * t).sin() / harmonic as f32
+                })
+                .sum();
+            envelope * voiced
+        })
+        .collect();
+
+    let peak = samples.iter().fold(1e-6_f32, |peak, sample| peak.max(sample.abs()));
+    for sample in &mut samples {
+        *sample = *sample / peak * 0.6;
+    }
+    samples
+}
 
 /**
  * WHAT:  Reads 32-bit float samples from a WAV file by locating its data chunk.
@@ -259,6 +299,8 @@ pub fn engine_lock() -> MutexGuard<'static, ()> {
 pub struct ScriptedGrammar {
     answers: Vec<(String, String)>,
     pub calls: Mutex<Vec<String>>,
+    /// What each call was allowed: (had a deadline, had a cancel flag).
+    pub limits: Mutex<Vec<(bool, bool)>>,
     delay: std::time::Duration,
     fails: bool,
 }
@@ -268,6 +310,7 @@ impl ScriptedGrammar {
         Arc::new(Self {
             answers: answers.iter().map(|(a, b)| ((*a).to_string(), (*b).to_string())).collect(),
             calls: Mutex::new(Vec::new()),
+            limits: Mutex::new(Vec::new()),
             delay: std::time::Duration::ZERO,
             fails: false,
         })
@@ -304,8 +347,21 @@ impl crate::ports::GrammarModel for ScriptedGrammar {
     fn unload_if_idle(&self, _: std::time::Duration) -> bool {
         false
     }
-    fn rewrite(&self, sentence: &str) -> crate::error::AppResult<String> {
-        std::thread::sleep(self.delay);
+    fn rewrite(
+        &self,
+        sentence: &str,
+        limit: crate::ports::RewriteLimit<'_>,
+    ) -> crate::error::AppResult<String> {
+        self.limits.lock().push((limit.deadline.is_some(), limit.cancel.is_some()));
+        // Honours the CANCEL flag while it "decodes", as the real model does, but
+        // not the deadline: the older tests rely on a slow call that finishes.
+        let started = std::time::Instant::now();
+        while started.elapsed() < self.delay {
+            if limit.cancel.is_some_and(|c| c.load(std::sync::atomic::Ordering::Relaxed)) {
+                return Err(crate::error::AppError::new(crate::error::ErrorCode::FinalizeTimeout, "cancelled"));
+            }
+            std::thread::sleep(std::time::Duration::from_millis(2));
+        }
         self.calls.lock().push(sentence.to_string());
         if self.fails {
             return Err(crate::error::AppError::new(crate::error::ErrorCode::Internal, "scripted failure"));
