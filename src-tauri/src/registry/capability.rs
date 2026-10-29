@@ -77,6 +77,13 @@ impl CapabilityKey {
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum SettingSection {
     Recording,
+    /// The extra dictation hotkeys that each listen for one language. Its own
+    /// section so they read as a group, as a card below the main recording
+    /// settings, rather than as a run of rows in the middle of them.
+    LanguageHotkeys,
+    /// The floating dictation scratchpad and its shortcut. A feature in its own
+    /// right, so it gets its own page rather than a few rows among Recording's.
+    Scratchpad,
     Transcription,
     /// Cleanup and style applied to the words: punctuation, fillers, tone.
     Writing,

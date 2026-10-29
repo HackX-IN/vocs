@@ -20,7 +20,7 @@
  * WHERE: SettingsView (navigation + routing) and SettingsPageBody (the cards).
  */
 
-import { AppWindow, BookMarked, Languages, Mic, PenLine, ShieldCheck, SlidersHorizontal, Sparkles, Type } from "lucide-react";
+import { AppWindow, BookMarked, Languages, Mic, NotebookPen, PenLine, ShieldCheck, SlidersHorizontal, Sparkles, Type } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
 import type { SettingSection } from "@/lib/bindings";
 
@@ -30,6 +30,7 @@ export type SettingsPageId =
   | "writing"
   | "grammar"
   | "output"
+  | "scratchpad"
   | "vocabulary"
   | "profiles"
   | "privacy"
@@ -51,6 +52,7 @@ export interface SettingsPage {
 
 /** The title of a section's card where it differs from its page's name. */
 export const SECTION_TITLES: Readonly<Partial<Record<SettingSection, string>>> = {
+  LANGUAGE_HOTKEYS: "Language hotkeys",
   GRAMMAR: "Quick fixes",
   SMART_GRAMMAR: "Smart grammar (on-device AI)",
 };
@@ -61,7 +63,7 @@ const ALL_PAGES: readonly SettingsPage[] = [
     label: "Recording",
     blurb: "Your microphone, the shortcut, and how a dictation starts and stops.",
     icon: Mic,
-    sections: ["RECORDING"],
+    sections: ["RECORDING", "LANGUAGE_HOTKEYS"],
   },
   {
     id: "transcription",
@@ -90,6 +92,13 @@ const ALL_PAGES: readonly SettingsPage[] = [
     blurb: "Where the finished text goes: pasting, the clipboard and previews.",
     icon: Type,
     sections: ["OUTPUT"],
+  },
+  {
+    id: "scratchpad",
+    label: "Scratchpad",
+    blurb: "A floating notepad: ramble, let Vocs shape it, then send it to the app you came from.",
+    icon: NotebookPen,
+    sections: ["SCRATCHPAD"],
   },
   {
     id: "vocabulary",
@@ -127,11 +136,13 @@ export const SETTINGS_PAGES: readonly SettingsPage[] = ALL_PAGES.filter((page) =
 
 const BY_SECTION: Readonly<Record<SettingSection, SettingsPageId>> = {
   RECORDING: "recording",
+  LANGUAGE_HOTKEYS: "recording",
   TRANSCRIPTION: "transcription",
   WRITING: "writing",
   GRAMMAR: "grammar",
   SMART_GRAMMAR: "grammar",
   OUTPUT: "output",
+  SCRATCHPAD: "scratchpad",
   VOCABULARY: "vocabulary",
   PRIVACY: "privacy",
   GENERAL: "general",

@@ -1217,7 +1217,18 @@ export type SettingKind = { kind: "TOGGLE" } | { kind: "TEXT"; placeholder: stri
  *  * WHERE: On every SettingDef; used by the Settings view to build its sections.
  *  
  */
-export type SettingSection = "RECORDING" | "TRANSCRIPTION" | 
+export type SettingSection = "RECORDING" | 
+/**
+ *  The extra dictation hotkeys that each listen for one language. Its own
+ *  section so they read as a group, as a card below the main recording
+ *  settings, rather than as a run of rows in the middle of them.
+ */
+"LANGUAGE_HOTKEYS" | 
+/**
+ *  The floating dictation scratchpad and its shortcut. A feature in its own
+ *  right, so it gets its own page rather than a few rows among Recording's.
+ */
+"SCRATCHPAD" | "TRANSCRIPTION" | 
 /**  Cleanup and style applied to the words: punctuation, fillers, tone. */
 "WRITING" | 
 /**
