@@ -903,6 +903,20 @@ mod scripted {
         crate::testing::synthesise_speech("Testing the session wiring end to end.", name).map(with_silence)
     }
 
+    /// Speech that is still going three seconds in, whatever voice and speed the
+    /// machine's `say` uses. Live captions ask for a second snapshot after 3 s of
+    /// audio, and a word is only shown once two snapshots agree on it, so a short
+    /// sentence made the live-caption test pass or fail on how fast the voice talked:
+    /// 2.2 s of speech cleared the mark by 0.18 s here and a faster CI voice missed it.
+    /// No comma, so there is no pause for the chunker to close on.
+    fn long_speech(name: &str) -> Option<Vec<f32>> {
+        crate::testing::synthesise_speech(
+            "Testing the session wiring end to end with a sentence long enough that the recording stays open for several seconds.",
+            name,
+        )
+        .map(with_silence)
+    }
+
     fn set(db: &Database, key: &str, value: SettingValue) {
         services::settings::set_setting(db, key, &value, 1).expect("setting written");
     }
@@ -1242,10 +1256,14 @@ mod scripted {
      * WHY:   The last clause is the one that matters: a speculative decode must
      *        not leak into the transcript, so the paste is asserted to be exactly
      *        what it is with captions off, not that text twice.
+     *
+     *        Uses `long_speech` because the last word of a caption is held back
+     *        until a second snapshot agrees, and the second snapshot is only due
+     *        3 s into the audio: the speech has to outlast that on any voice.
      */
     #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
     async fn live_captions_show_heard_and_fixed_and_leave_the_transcript_alone() {
-        let Some(samples) = speech("scripted-live-captions") else {
+        let Some(samples) = long_speech("scripted-live-captions-long") else {
             eprintln!("skipped: could not synthesise speech");
             return;
         };
