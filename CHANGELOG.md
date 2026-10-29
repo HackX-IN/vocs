@@ -3,7 +3,7 @@
 All notable changes to Vocs. Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versions follow [Semantic Versioning](https://semver.org/).
 
-## [1.1.0] - 2026-10-28
+## [1.1.0] - 2026-10-29
 
 ### Fixed
 - **A fresh install no longer says "Vocs is still starting up" forever.** After the first-run model download the speech model was never loaded until Vocs was quit and reopened, so the setup's "Try it" step (and every hotkey press) was refused. The model now loads as soon as the download finishes, and pressing the hotkey on a model that is on disk but not loaded starts loading it instead of leaving you stuck. If you are on 1.0.2 and hit this, quit Vocs from the menu bar and open it again once.
@@ -16,9 +16,9 @@ versions follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 - **What's new.** After an update, the dashboard shows a short carousel of what the release added, once. Settings → Updates can open it again.
-- **Language hotkeys** (Settings → Recording): up to two extra dictation shortcuts that each always listen for one language, so you never depend on auto-detection when you switch between languages. Off until you turn them on.
+- **Language hotkeys** (Settings → Recording, in their own card): up to two extra dictation shortcuts that each always listen for one language, so you never depend on auto-detection when you switch between languages. Off until you turn them on.
 - **Voice commands that take words back.** Say "scratch that" to drop the sentence you just spoke, "undo last sentence" to drop the one before, or "scratch everything" to start the dictation again. English; part of Spoken formatting.
-- **Dictation scratchpad.** A floating notepad (menu bar → Open Scratchpad, or an optional shortcut): ramble into it, press Return to have it turned into bullets, a task list or a clean paragraph, and ⌘Return to send the result to the app you came from.
+- **Dictation scratchpad.** A floating notepad (menu bar → Open Scratchpad, or an optional shortcut you turn on in Settings → Scratchpad): ramble into it, with your usual dictation hotkey or by typing, press Return to have it turned into bullets, a task list or a clean paragraph, and ⌘Return to send the result to the app you came from.
 - **Speed or accuracy** (Settings → Transcription): Fast is the default and unchanged; Balanced and Accurate trade a little time for fewer mistakes, live captions included.
 
 ## [1.0.2] - 2026-10-24
