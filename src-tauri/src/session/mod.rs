@@ -10,6 +10,7 @@
 
 pub mod actor;
 pub mod delivery;
+pub mod engine_warmup;
 pub mod enhance_context;
 pub mod captions;
 pub mod grammar_runtime;

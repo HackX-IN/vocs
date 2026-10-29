@@ -137,6 +137,11 @@ const SAFETY_CORPUS: &[(&str, &str)] = &[
     ("he said \"she don't care\" and left", "He said \"she don't care\" and left."),
     ("the sign read \"a idea\" in red", "The sign read \"a idea\" in red."),
     ("a one time fee and a european trip", "A one time fee and a european trip."),
+    // ── words that sound like a rollback command but are ordinary speech ──
+    ("i need to scratch that itch", "I need to scratch that itch."),
+    ("you can undo that change later", "You can undo that change later."),
+    ("please delete that file", "Please delete that file."),
+    ("we should forget that ever happened", "We should forget that ever happened."),
     // ── another language is never run through English rules ──
     ("um like you know", "Um like you know."),
     ("hello um world comma again", "Hello um world comma again."),
@@ -144,6 +149,10 @@ const SAFETY_CORPUS: &[(&str, &str)] = &[
 
 /// General quality. At least MIN_PASS_RATE must match exactly.
 const CORPUS: &[(&str, &str)] = &[
+    // ── taking words back by voice ──
+    ("ship it friday full stop scratch that full stop ship it monday", "Ship it monday."),
+    ("we meet at noon full stop actually at one comma scratch that full stop let's do dinner", "We meet at noon. Let's do dinner."),
+    ("one full stop two full stop undo last sentence full stop three", "One. Three."),
     // ── hesitations ──
     ("um hello there", "Hello there."),
     ("uh i think so", "I think so."),

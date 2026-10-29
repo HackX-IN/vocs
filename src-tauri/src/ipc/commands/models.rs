@@ -10,6 +10,8 @@
  * WHERE: Consumed by onboarding and the model manager in Settings.
  */
 
+use std::sync::Arc;
+
 use tauri::State;
 
 use crate::error::AppError;
@@ -111,6 +113,12 @@ pub async fn download_model(
         // setting works without a restart.
         if is_grammar_model(&ctx, &input.model_id).await {
             adopt_grammar_model(ctx.grammar(), path.clone());
+        } else {
+            // A speech model has just become usable. On a first run the launch
+            // warm-up found nothing to load and exited, so without this the engine
+            // stays unloaded until the app is restarted and the first dictation is
+            // refused with "still starting up". See session/engine_warmup.rs.
+            crate::session::engine_warmup::prepare_in_background(Arc::clone(&ctx.ports().engine));
         }
         Ok(path.to_string_lossy().into_owned())
     })

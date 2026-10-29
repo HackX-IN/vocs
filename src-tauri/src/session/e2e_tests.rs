@@ -306,6 +306,7 @@ fn build_with(
             samples: Arc::new(samples),
         }),
         enhancer: Arc::new(RuleEnhancer::new()),
+        organizer: Arc::new(crate::adapters::rules::organize::RuleOrganizer::new()),
         grammar,
         injector: Arc::clone(&injector) as Arc<dyn TextInjector>,
         models: Arc::new(UnusedModelStore),
@@ -824,6 +825,13 @@ mod scripted {
     struct ScriptedEngine {
         reply: String,
         requests: Mutex<Vec<TranscribeRequest>>,
+        /// Where each decoded chunk started, in the order they were decoded.
+        starts: Mutex<Vec<u64>>,
+        /// How long each decode takes, to put a chunk "still decoding" at the stop.
+        delay: Duration,
+        /// Say `reply` followed by the chunk's start second, so each chunk's words
+        /// are distinguishable in the pasted text.
+        tag_with_start: bool,
     }
 
     impl ScriptedEngine {
@@ -831,6 +839,20 @@ mod scripted {
             Arc::new(Self {
                 reply: reply.into(),
                 requests: Mutex::new(Vec::new()),
+                starts: Mutex::new(Vec::new()),
+                delay: Duration::ZERO,
+                tag_with_start: false,
+            })
+        }
+
+        /// A model that takes `delay` per chunk and labels what it hears.
+        fn slow_and_tagged(reply: &str, delay: Duration) -> Arc<Self> {
+            Arc::new(Self {
+                reply: reply.into(),
+                requests: Mutex::new(Vec::new()),
+                starts: Mutex::new(Vec::new()),
+                delay,
+                tag_with_start: true,
             })
         }
     }
@@ -855,14 +877,21 @@ mod scripted {
         }
         fn transcribe(
             &self,
-            _chunk: &AudioChunk,
+            chunk: &AudioChunk,
             request: &TranscribeRequest,
         ) -> AppResult<Vec<TranscriptSegment>> {
+            std::thread::sleep(self.delay);
             self.requests.lock().push(request.clone());
+            self.starts.lock().push(chunk.start_ms);
+            let (text, start_ms, end_ms) = if self.tag_with_start {
+                (format!("{} {}", self.reply, chunk.start_ms / 1_000), chunk.start_ms, chunk.end_ms)
+            } else {
+                (self.reply.clone(), 0, 1_000)
+            };
             Ok(vec![TranscriptSegment {
-                text: self.reply.clone(),
-                start_ms: 0,
-                end_ms: 1_000,
+                text,
+                start_ms,
+                end_ms,
                 language: Some(LanguageCode("en".into())),
             }])
         }
@@ -917,6 +946,124 @@ mod scripted {
                 SessionState::Failed { code: crate::error::ErrorCode::AppExcluded, .. }
             )),
             "the pill was never told why nothing happened"
+        );
+    }
+
+
+    /**
+     * SOURCE OF TRUTH KEYWORDS: stop_in_a_pause_regression, no_tail_barrier_e2e
+     * WHAT:  Stopping in a pause, while the chunk that pause closed is still being
+     *        decoded, delivers that chunk's words.
+     * WHY:   The "I spoke and nothing was pasted" bug. With no audio left after
+     *        the pause there was no tail to wait for, so the recording was
+     *        finished at once with an empty transcript — and the chunk's words,
+     *        arriving a moment later, were dropped as belonging to no recording.
+     *        The decode is slow on purpose (it is what makes the stop land
+     *        mid-decode) and the voice is synthetic so this runs on every host
+     *        rather than skipping where macOS `say` is missing.
+     * WHERE: Guards the tail barrier in SessionActor::hand_off_to_delivery.
+     */
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn stopping_in_a_pause_still_delivers_the_chunk_that_is_still_decoding() {
+        let mut samples = crate::testing::synthetic_voice(5_000, 130.0);
+        samples.extend(vec![0.0; 16_000 * 2]);
+        let engine = ScriptedEngine::slow_and_tagged("hello", Duration::from_millis(700));
+        let (harness, rx) = build(samples, Arc::clone(&engine) as Arc<dyn TranscriptionEngine>).expect("harness");
+
+        run_session(&harness, rx, Duration::from_millis(300)).await;
+
+        assert_eq!(
+            harness.injector.delivered.lock().clone().as_deref(),
+            Some("Hello 0."),
+            "the words of the chunk still decoding at the stop were lost"
+        );
+    }
+
+    /**
+     * SOURCE OF TRUTH KEYWORDS: backlog_regression, no_chunk_left_behind_e2e
+     * WHAT:  A recording long enough to overflow the ASR queue loses no chunk.
+     * WHY:   A full queue used to DROP the chunk — recorded speech silently
+     *        missing from the transcript. Audio is replayed instantly and the
+     *        decode is slow, which is the overflow case at its starkest. The
+     *        expected number of decodes is worked out by pushing the same audio
+     *        through a fresh chunker, so the assertion does not depend on how the
+     *        engine happened to be fed. It must also be large enough to overflow
+     *        the queue, or the test proves nothing.
+     * WHERE: Guards pipeline/backlog.rs and its use in SessionActor::handle_capture.
+     */
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn a_recording_that_overflows_the_asr_queue_loses_no_chunk() {
+        // Six phrases, each a little over the four seconds a chunk needs before it
+        // may close at a pause, then a pause: six chunks and a short tail.
+        let mut samples = Vec::new();
+        for _ in 0..6 {
+            samples.extend(crate::testing::synthetic_voice(4_500, 130.0));
+            samples.extend(vec![0.0; 16_000 * 6 / 5]);
+        }
+
+        let expected = {
+            let mut chunker = crate::pipeline::Chunker::new();
+            let closed = samples.chunks(320).filter(|block| chunker.push(block).is_some()).count();
+            closed + usize::from(chunker.close_tail().is_some())
+        };
+        assert!(expected >= 5, "the audio must overflow a queue of three, got {expected} chunks");
+
+        let engine = ScriptedEngine::slow_and_tagged("part", Duration::from_millis(1_000));
+        let (harness, rx) = build(samples, Arc::clone(&engine) as Arc<dyn TranscriptionEngine>).expect("harness");
+
+        // Long enough for the actor to chew through every block in a debug build;
+        // in production the audio arrives in real time and this is not a concern.
+        run_session(&harness, rx, Duration::from_secs(6)).await;
+
+        assert_eq!(engine.starts.lock().len(), expected, "chunks were dropped before they reached the engine");
+        let pasted = harness.injector.delivered.lock().clone().unwrap_or_default().to_lowercase();
+        for start in engine.starts.lock().iter() {
+            assert!(
+                pasted.contains(&format!("part {}", start / 1_000)),
+                "the words of the chunk at {start} ms are missing from: {pasted}"
+            );
+        }
+    }
+
+
+    /**
+     * SOURCE OF TRUTH KEYWORDS: grammar_never_holds_the_paste_e2e, grammar_hard_limit_e2e
+     * WHAT:  A grammar model that takes far longer than its budget does not delay
+     *        the paste: the text arrives as the rules wrote it, in about the
+     *        budget, not in the model's time.
+     * WHY:   "With the local model on it takes more than a second or two to
+     *        paste." The model here ignores its deadline entirely — the worst
+     *        case, a call that never honours the limit it was given — so only the
+     *        hard limit in grammar_step::correct stands between the paste and a
+     *        five-second wait. Synthetic voice, so it runs on every host.
+     * WHERE: Guards grammar_step::correct and the budget in pipeline/grammar.
+     */
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn a_slow_grammar_model_cannot_hold_the_paste_past_its_budget() {
+        let mut samples = crate::testing::synthetic_voice(4_500, 130.0);
+        samples.extend(vec![0.0; 16_000 * 2]);
+        let model = crate::testing::ScriptedGrammar::slow(&[(RULED, FIXED)], Duration::from_secs(5));
+        let (harness, rx) = build_with(
+            samples,
+            ScriptedEngine::saying(SAID),
+            Arc::new(AlwaysGranted),
+            Arc::clone(&model) as Arc<dyn crate::ports::GrammarModel>,
+        )
+        .expect("harness");
+        set(&harness.db, crate::registry::keys::AI_GRAMMAR, SettingValue::Bool(true));
+
+        let started = std::time::Instant::now();
+        run_session(&harness, rx, Duration::from_millis(300)).await;
+
+        assert!(
+            started.elapsed() < Duration::from_secs(3),
+            "the paste waited on the model: {:?}",
+            started.elapsed()
+        );
+        assert_eq!(
+            harness.injector.delivered.lock().clone().as_deref(),
+            Some(RULED),
+            "past its budget the text must go out as the rules wrote it"
         );
     }
 

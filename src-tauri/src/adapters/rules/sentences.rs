@@ -31,7 +31,7 @@ fn is_closer(ch: char) -> bool {
 
 /// True when the whitespace-delimited word ending at the end of `text` is an
 /// abbreviation rather than the end of a sentence.
-fn ends_abbreviation(text: &str) -> bool {
+pub(super) fn ends_abbreviation(text: &str) -> bool {
     let word = text
         .rsplit(char::is_whitespace)
         .next()

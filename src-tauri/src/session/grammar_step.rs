@@ -30,6 +30,10 @@ use crate::session::SessionSettings;
 use crate::services;
 use crate::types::{CorrectionEdit, DictionaryEntry, LanguageCode, Tone};
 
+/// How much longer than the pass's own budget the delivery worker will wait for
+/// it before giving up on the model for this paste. See `correct`.
+const HARD_LIMIT_GRACE: std::time::Duration = std::time::Duration::from_millis(250);
+
 /// Whether this session should use the model at all, before the language is known.
 fn wanted(ctx: &SessionContext, settings: &SessionSettings) -> bool {
     settings.ai_grammar && settings.tone != Tone::Literal && ctx.grammar.is_available()
@@ -152,11 +156,36 @@ pub async fn correct(
     if !wanted(ctx, settings) || !reads(language) {
         return GrammarResult { text, edits };
     }
+    // A bounded pass never loads the weights itself (they would blow its budget),
+    // so a model that was unloaded since the recording began is brought back in
+    // the background for the NEXT dictation rather than left cold.
+    warm(ctx, settings);
     let grammar = ctx.grammar.clone();
     let options = PassOptions { formal: settings.tone == Tone::Formal, ..PassOptions::default() };
     let original = text.clone();
 
-    let outcome = tokio::task::spawn_blocking(move || grammar.correct(&text, &dictionary, options)).await;
+    /*
+     * SOURCE OF TRUTH KEYWORDS: grammar_hard_deadline, paste_never_waits_on_the_model
+     * The pass bounds its own model calls (RewriteLimit), so this should never
+     * fire. It is here because the delivery worker is ONE task for every
+     * recording: anything that wedges inside this await — a saturated blocking
+     * pool, a model call that stops honouring its deadline — would hold every
+     * later paste behind it. The abandoned blocking task finishes by itself, since
+     * its deadline has passed; the person gets the rules' text now.
+     */
+    let hard_limit = options.budget + HARD_LIMIT_GRACE;
+    let outcome = match tokio::time::timeout(
+        hard_limit,
+        tokio::task::spawn_blocking(move || grammar.correct(&text, &dictionary, options)),
+    )
+    .await
+    {
+        Ok(joined) => joined,
+        Err(_elapsed) => {
+            tracing::warn!(limit_ms = hard_limit.as_millis() as u64, "the grammar pass overran its hard limit; using the rules' text");
+            return GrammarResult { text: original, edits };
+        }
+    };
     match outcome {
         Ok(outcome) => {
             tracing::info!(

@@ -53,6 +53,27 @@ impl AudioChunk {
         matches!(self.kind, ChunkKind::Tail)
     }
 
+    /**
+     * SOURCE OF TRUTH KEYWORDS: AudioChunk::barrier, is_barrier, tail_barrier
+     * WHAT:  A Tail that carries no audio, positioned at `at_ms`.
+     * WHY:   The ASR queue is FIFO, so a Tail submitted after every interior
+     *        chunk is the only signal that those chunks have all been decoded.
+     *        When a recording stops in a pause there is no audio left to decode,
+     *        and finishing it on the spot raced the interior chunk still in the
+     *        queue: its words arrived after the recording was delivered, were
+     *        dropped as belonging to no session, and the person got nothing
+     *        pasted. The barrier closes that race without decoding anything.
+     * WHERE: Built by session/actor.rs::hand_off_to_delivery; recognised by
+     *        pipeline/worker.rs, which answers it without calling the engine.
+     */
+    pub fn barrier(at_ms: u64) -> Self {
+        Self { samples: Vec::new(), start_ms: at_ms, end_ms: at_ms, kind: ChunkKind::Tail }
+    }
+
+    pub fn is_barrier(&self) -> bool {
+        self.is_tail() && self.samples.is_empty()
+    }
+
     /// Whether the engine may shrink its encoder context for this decode. Every
     /// kind does: the tail to be fast when the user is waiting, an interim
     /// snapshot to be cheap while they talk, and an interior chunk so that a

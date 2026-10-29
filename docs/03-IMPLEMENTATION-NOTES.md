@@ -123,6 +123,23 @@ stutters — but the timestamps are real and available if wanted.
 
 With temperature fallback off (§2.2) nothing breaks a decoder loop. Real History rows: `*Scoffs*`, `*punch*`, and a 2.4 s recording returned as 217 words of "the one who is…". `adapters/whisper/degenerate.rs` strips `*…*`/`[…]`/`(…)` tags and collapses a phrase repeated 3+ times (a single word 5+); a looping decode is retried once at `RETRY_TEMPERATURE` and a chunk that loops twice is discarded as non-speech.
 
+### 2.2c Accuracy mode: the speed/accuracy dial (`types/accuracy.rs`)
+
+`transcription.accuracy` lets a person move along the one trade-off the latency budget fixed for them. **Fast** (the default) is exactly the budgeted setting — greedy decoding, `audio_ctx` floor 256 and headroom 128 — and `the_default_accuracy_is_exactly_the_budgeted_context` pins it to the constants above so the numbers in this file stay true. **Balanced** widens the encoder margin (floor 512, headroom 256): encoder time only. **Accurate** adds beam search (5) on a floor of 768 / headroom 384. **[VERIFY]** None of the three has been measured against a reference corpus on the build machine; the WER and tail-latency deltas still have to be recorded here before the defaults are reconsidered.
+
+### 2.2d Stopping in a pause, and the queue that must not drop speech
+
+Two bugs shared one symptom — "I spoke and nothing was pasted" — and both were data loss, not decoding.
+
+- **No tail is not "nothing left to wait for".** `close_tail()` is `None` when the buffer is empty or silent, which is the ordinary state when someone finishes a sentence and stops in the pause. The recording used to be finished at once; the chunk that pause had closed was still in the ASR queue, its words arrived after delivery and were dropped as belonging to no session. `AudioChunk::barrier` is an empty `Tail` queued behind everything else: the FIFO worker answers it without calling the engine, which proves every earlier chunk has been decoded. Regression: `stopping_in_a_pause_still_delivers_the_chunk_that_is_still_decoding`.
+- **A full queue used to drop the chunk.** `QUEUE_DEPTH` is 3 on purpose, and `submit` threw away whatever did not fit. `pipeline/backlog.rs` holds those chunks, in order, and the actor hands them over as decodes finish; the tail waits for the backlog to drain (bounded by the finalize timeout). Past 12 waiting chunks the OLDEST is evicted and logged, so the loss is at least visible. Regression: `a_recording_that_overflows_the_asr_queue_loses_no_chunk` — against the old code it decoded 4 of 6 chunks.
+
+Both regressions drive the real chunker, worker and actor with `testing::synthetic_voice`, which the VAD accepts as speech. The `say`-based fixtures used by most end-to-end tests skip silently on any other host, so a bug that only a synthetic signal can reproduce stays covered on every machine.
+
+### 2.2e The grammar model's budget is enforced inside the call
+
+`GRAMMAR_BUDGET` used to be checked only *between* sentences, so it could not bound the three things that overrun it: waiting for the model's lock while the live prefetch holds it, loading the weights cold, and one long sentence mid-decode. `RewriteLimit` (a deadline and a cancel flag) now travels into `GrammarModel::rewrite`: the adapter waits for the lock only until the deadline, never cold-loads under a deadline (the next recording's `warm` does that), and checks the limit every token. The stop-time pass also tells a running prefetch to yield (`yield_to_final_pass`). `grammar_step::correct` adds a hard outer limit (budget + 250 ms) because the delivery worker is one task for every recording and must never be held by a model call that ignores its limit; the injection has the same guard. The budget is now 500 ms. Regression: `a_slow_grammar_model_cannot_hold_the_paste_past_its_budget`.
+
 ### 2.3 The `initial_prompt` trick — this is how the custom dictionary earns its keep
 
 Whisper accepts an initial prompt (up to ~224 tokens) that biases decoding toward that vocabulary. Feeding the user's dictionary terms in as a prompt makes the model **recognize** them correctly, rather than mis-hearing them and relying on a post-hoc string replacement.
@@ -362,3 +379,16 @@ It stays behind an off-by-default cargo feature. Anyone who turns it on gets a s
 **4. Real paste-timing delays** across TextEdit, Terminal, Slack, VS Code and a browser — still to measure, and this one CANNOT be automated: it requires dictating into each app and watching what arrives. Defaults are 40 ms / 500 ms (the restore no longer blocks delivery — it runs on its own thread, so it can be long enough for an Electron app that reads the clipboard lazily; a paste delay under 30 ms is raised to 30), which is the middle of the range that works across native apps, Terminal and Electron. Both are exposed as advanced settings precisely because no single number fits every target, so a user who hits it can fix their own case immediately. The symptom to watch for is a paste arriving with the PREVIOUS clipboard contents (raise `output.paste_delay_ms`) or arriving empty in one specific app (turn off `output.restore_clipboard`).
 
 **What could not be verified without a person.** The end-to-end tests replay synthesised speech through a fake `AudioSource`, which exercises the chunker, the VAD, the engine, the assembler, the enhancement rules, the database and the FSM. What they do NOT exercise is the CoreAudio driver itself and the real synthetic-paste path into a third-party app. Those two need a human with a microphone, and no amount of test scaffolding substitutes for it.
+
+---
+
+## 10. Updates: why a check used to feel slow
+
+Three separate causes, fixed together (`ipc/commands/updates.rs`, `ipc/update_cache.rs`):
+
+- **No timeout.** The updater plugin's request has none by default, so a network that accepts the connection and then goes quiet left the button on "Checking" indefinitely. A check now gives up after 10 s and says it was slow rather than unreachable. The plugin's timeout is a *total request* timeout, so the install path sets its own (30 minutes) on the `Update` before downloading — reusing the check's would cut a download off after ten seconds.
+- **Three round trips for one decision.** The dashboard bar and the Settings card each asked GitHub on every mount, and installing asked again before it would start. `UpdateCache` keeps the last answer (and the downloadable `Update`) for ten minutes; only a pressed button or the daily timer passes `force`. A gate serialises concurrent checks so a burst of windows makes one request. The download still verifies the signature, so a release pulled in between fails safely.
+- **A failed launch check waited a day.** The first check often runs while the Mac is still joining wifi. The scheduler now retries after 2, 10 and 30 minutes before returning to the 24-hour cadence (`update_retry_delay`).
+
+`install_update` ends in `app.restart()`: the person never has to remember the second half of "Install and restart". **What's new** (`ipc/commands/whats_new.rs`) is keyed on the running VERSION against the last version Rust recorded, so it appears however the new build arrived; a fresh install records the version silently and is not greeted with a changelog.
+

@@ -13,7 +13,7 @@
  */
 
 use crate::error::AppResult;
-use crate::types::{AudioChunk, EngineCapabilities, LanguageHint, TranscriptSegment};
+use crate::types::{AccuracyMode, AudioChunk, EngineCapabilities, LanguageHint, TranscriptSegment};
 
 /**
  * SOURCE OF TRUTH KEYWORDS: TranscribeRequest
@@ -29,6 +29,9 @@ pub struct TranscribeRequest {
     pub language: LanguageHint,
     /// Vocabulary bias. Ignored by engines without EngineFeature::InitialPrompt.
     pub prompt: Option<String>,
+    /// How much compute to spend on this decode. An engine with one setting
+    /// ignores it.
+    pub accuracy: AccuracyMode,
 }
 
 pub trait TranscriptionEngine: Send + Sync {

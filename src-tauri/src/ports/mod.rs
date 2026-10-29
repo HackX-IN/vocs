@@ -17,6 +17,7 @@ pub mod enhancer;
 pub mod grammar;
 pub mod injector;
 pub mod models;
+pub mod organizer;
 pub mod permissions;
 pub mod speaker;
 
@@ -24,8 +25,9 @@ pub use audio::{AudioSource, CaptureConfig, CaptureEvent, CaptureSession, Sample
 pub use engine::{TranscribeRequest, TranscriptionEngine};
 pub use events::{EventSink, NullEventSink};
 pub use enhancer::{EnhanceContext, TextEnhancer};
-pub use grammar::GrammarModel;
+pub use grammar::{GrammarModel, RewriteLimit};
 pub use injector::{FrontmostApp, InjectionOutcome, InjectionRequest, TextInjector};
 pub use models::{ModelStatus, ModelStore};
+pub use organizer::TextOrganizer;
 pub use permissions::{OsPermission, PermissionProvider, PermissionState};
 pub use speaker::{DuckGuard, NullSpeakerDucker, SpeakerDucker};

@@ -109,7 +109,7 @@ fn register(app: &AppHandle, binding: &HotkeyBinding) -> AppResult<()> {
     Ok(())
 }
 
-fn is_enabled(db: &crate::db::Database) -> bool {
+pub(crate) fn is_enabled(db: &crate::db::Database) -> bool {
     matches!(
         services::settings::get_setting(db, keys::COPY_LAST_ENABLED).ok().flatten(),
         Some(SettingValue::Bool(true))
@@ -117,7 +117,7 @@ fn is_enabled(db: &crate::db::Database) -> bool {
 }
 
 /// The user's binding if they have set one, otherwise the registry default.
-fn copy_last_binding(db: &crate::db::Database) -> HotkeyBinding {
+pub(crate) fn copy_last_binding(db: &crate::db::Database) -> HotkeyBinding {
     if let Some(SettingValue::Hotkey(binding)) =
         services::settings::get_setting(db, keys::COPY_LAST_HOTKEY).ok().flatten()
     {

@@ -1,0 +1,259 @@
+/**
+ * SOURCE OF TRUTH KEYWORDS: site-showcase, new-section, feature-demos, scratch-that-demo,
+ *   scratchpad-demo, language-keys-demo, accuracy-demo
+ * WHAT:  The "New in 1.1" section: a small picture above each of the new features, drawn in
+ *        CSS — a sentence being struck out, the scratchpad turning a ramble into a list, the
+ *        language shortcuts, the speed-or-accuracy picker, the update bar.
+ * WHY:   The product is the persuasion on this page (see index.html), so each feature is shown
+ *        doing its one thing rather than described. Everything is markup and tokens: no images
+ *        to load, both colour schemes for free, and with reduced motion the animated picture
+ *        rests in its finished state. Its own file because sections.css is at the size where a
+ *        new section belongs beside it, not inside it.
+ * WHERE: Loaded by site/index.html after sections.css; responsive rules live in responsive.css.
+ */
+
+.demo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  min-height: 150px;
+  margin-bottom: var(--space-5);
+  padding: var(--space-5);
+  border-radius: var(--radius-input);
+  background: var(--sunken);
+}
+.demo p,
+.demo .say {
+  margin: 0;
+}
+.say {
+  font-family: var(--font-mono);
+  font-size: 12.5px;
+  color: var(--text-3);
+}
+.demo .line {
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-input);
+  background: var(--card);
+  border: 0.5px solid var(--hairline);
+  box-shadow: var(--shadow-card);
+  font-size: 16px;
+  color: var(--text);
+}
+
+/* Scratch that: the first sentence is struck out, then the correction stands. */
+.line s {
+  color: var(--text-3);
+  text-decoration-line: line-through;
+  text-decoration-thickness: 2px;
+  text-decoration-color: var(--accent);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .line s {
+    animation: strike 5s ease-in-out infinite;
+  }
+}
+@keyframes strike {
+  0%,
+  18% {
+    color: var(--text);
+    text-decoration-color: transparent;
+  }
+  34%,
+  86% {
+    color: var(--text-3);
+    text-decoration-color: var(--accent);
+  }
+  100% {
+    color: var(--text);
+    text-decoration-color: transparent;
+  }
+}
+
+/* The scratchpad: a ramble above, the organised list below. */
+.pad {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  width: 100%;
+  max-width: 340px;
+  padding: var(--space-4);
+  border-radius: var(--radius-input);
+  background: var(--card);
+  border: 0.5px solid var(--hairline);
+  box-shadow: var(--shadow-card);
+  font-size: 14px;
+  color: var(--text);
+  text-align: left;
+}
+.pad .ramble {
+  color: var(--text-3);
+}
+.pad .label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+.pad .keys-hint {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  color: var(--text-3);
+  font-size: 12.5px;
+}
+
+/* Language hotkeys: a key chord, and what it listens for. */
+.chords {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+.chord {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  color: var(--text-2);
+  font-size: 15px;
+}
+.chord strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+/* Reliability: three situations, one outcome. */
+.checks {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.checks li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-input);
+  background: var(--card);
+  border: 0.5px solid var(--hairline);
+  font-size: 14px;
+  color: var(--text);
+}
+.checks li::before {
+  content: "✓";
+  color: var(--signal);
+  font-weight: 700;
+}
+.checks li span {
+  margin-left: auto;
+  color: var(--text-3);
+  font-size: 12.5px;
+}
+
+/* Speed or accuracy: three segments, one lit. */
+.segments {
+  display: inline-flex;
+  padding: var(--space-1);
+  border-radius: var(--radius-input);
+  background: var(--sunken-strong);
+  font-size: 14px;
+}
+.segments span {
+  padding: var(--space-1) var(--space-4);
+  border-radius: var(--radius-input);
+  color: var(--text-2);
+}
+.segments .on {
+  background: var(--card);
+  color: var(--text);
+  box-shadow: var(--shadow-card);
+}
+
+/* The update bar, as it sits at the bottom of the app window. */
+.update-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-4);
+  width: 100%;
+  max-width: 360px;
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-input);
+  background: var(--card);
+  border: 0.5px solid var(--hairline);
+  box-shadow: var(--shadow-card);
+  font-size: 13.5px;
+  color: var(--text-2);
+}
+.update-bar b {
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radius-input);
+  background: var(--sunken);
+  border: 0.5px solid var(--hairline);
+  color: var(--text);
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+/* The floating "New in 1.1" pointer. It scrolls to the section, and gets out of the way once
+   that section is on screen so it never sits on top of the thing it points at. */
+.new-fab {
+  position: fixed;
+  right: var(--space-5);
+  bottom: var(--space-5);
+  z-index: 15;
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-full);
+  background: var(--night);
+  color: var(--night-ink);
+  border: 0.5px solid var(--night-hairline);
+  box-shadow: var(--shadow-panel);
+  font-size: 14px;
+  font-weight: 550;
+  text-decoration: none;
+  transition:
+    opacity 0.24s ease,
+    transform 0.24s ease;
+}
+.new-fab:hover {
+  transform: translateY(-2px);
+}
+.new-fab[data-hidden="true"] {
+  opacity: 0;
+  transform: translateY(var(--space-3));
+  pointer-events: none;
+}
+.new-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--accent);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .new-dot {
+    animation: pulse 2.4s ease-in-out infinite;
+  }
+}
+@keyframes pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .new-fab {
+    transition: opacity 0.12s linear;
+  }
+  .new-fab:hover {
+    transform: none;
+  }
+}
+

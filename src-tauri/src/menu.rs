@@ -223,7 +223,7 @@ fn check_for_updates(app: &AppHandle) {
     let app = app.clone();
 
     tauri::async_runtime::spawn(async move {
-        let message = match look_for_update(&state).await {
+        let message = match look_for_update(&state, true).await {
             Ok(UpdateCheck::Available { version, current_version, notes, .. }) => {
                 let event = crate::ipc::events::UpdateAvailable { version, current_version, notes };
                 if let Err(err) = event.emit(&app) {
@@ -240,7 +240,7 @@ fn check_for_updates(app: &AppHandle) {
             }
             Err(err) => {
                 tracing::info!(error = %err, "could not check for updates");
-                "Vocs could not reach the update server. Check your connection and try again.".to_string()
+                err.message
             }
         };
         app.dialog().message(message).title("Vocs").show(|_| {});

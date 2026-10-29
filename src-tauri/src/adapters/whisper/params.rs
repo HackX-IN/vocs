@@ -27,7 +27,7 @@ use std::ffi::c_int;
 
 use whisper_rs::{FullParams, SamplingStrategy};
 
-use crate::types::{AudioChunk, LanguageHint, TARGET_SAMPLE_RATE};
+use crate::types::{AccuracyMode, AudioChunk, LanguageHint, TARGET_SAMPLE_RATE};
 
 /// The encoder context that corresponds to whisper's full 30-second window.
 pub const FULL_AUDIO_CTX: c_int = 1500;
@@ -115,6 +115,16 @@ impl DecodeProfile {
  * WHERE: adapters/whisper/engine.rs, tail decodes only.
  */
 pub fn audio_ctx_for(sample_count: usize) -> c_int {
+    audio_ctx_for_accuracy(sample_count, AccuracyMode::Fast)
+}
+
+/**
+ * WHAT:  `audio_ctx_for` with the margin and floor of an AccuracyMode.
+ * WHY:   The same formula, because the ratio is exact; only the headroom and the
+ *        floor are choices, and they are the accuracy dial (types/accuracy.rs).
+ *        Fast reproduces the constants above, which a test pins.
+ */
+pub fn audio_ctx_for_accuracy(sample_count: usize, accuracy: AccuracyMode) -> c_int {
     let seconds = sample_count as f64 / f64::from(TARGET_SAMPLE_RATE);
     let scaled = (seconds / 30.0 * f64::from(FULL_AUDIO_CTX)).ceil();
 
@@ -128,8 +138,8 @@ pub fn audio_ctx_for(sample_count: usize) -> c_int {
     };
 
     requested
-        .saturating_add(AUDIO_CTX_HEADROOM)
-        .clamp(MIN_AUDIO_CTX, FULL_AUDIO_CTX)
+        .saturating_add(accuracy.audio_ctx_headroom())
+        .clamp(accuracy.min_audio_ctx(), FULL_AUDIO_CTX)
 }
 
 /**
@@ -156,10 +166,10 @@ pub fn decode_thread_count() -> c_int {
  *        must never be computed separately.
  * WHERE: build_full_params, and engine.rs after each decode.
  */
-pub fn audio_ctx_for_profile(profile: DecodeProfile, sample_count: usize) -> c_int {
+pub fn audio_ctx_for_profile(profile: DecodeProfile, sample_count: usize, accuracy: AccuracyMode) -> c_int {
     match profile {
         DecodeProfile::Background => FULL_AUDIO_CTX,
-        DecodeProfile::Tail => audio_ctx_for(sample_count),
+        DecodeProfile::Tail => audio_ctx_for_accuracy(sample_count, accuracy),
     }
 }
 
@@ -181,9 +191,35 @@ pub fn build_full_params<'a>(
     n_threads: c_int,
     temperature: f32,
 ) -> FullParams<'a, 'a> {
-    // Greedy with best_of = 1: temperature is pinned to 0.0, so sampling more
-    // candidates would cost time and return identical text.
-    let mut params = FullParams::new(SamplingStrategy::Greedy { best_of: 1 });
+    build_full_params_for(profile, sample_count, language, prompt, n_threads, temperature, AccuracyMode::Fast)
+}
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: build_full_params_for
+ * WHAT:  `build_full_params` at a chosen AccuracyMode.
+ * WHY:   The original keeps its signature (the benchmark and the live tests build
+ *        parameters at the budgeted setting by design); this is the one the
+ *        engine calls, so the speed/accuracy choice reaches every decode.
+ * WHERE: adapters/whisper/engine.rs::decode_once.
+ */
+pub fn build_full_params_for<'a>(
+    profile: DecodeProfile,
+    sample_count: usize,
+    language: Option<&'a str>,
+    prompt: Option<&str>,
+    n_threads: c_int,
+    temperature: f32,
+    accuracy: AccuracyMode,
+) -> FullParams<'a, 'a> {
+    // Greedy with best_of = 1 unless the person asked for accuracy: temperature
+    // is pinned to 0.0, so sampling more candidates would cost time and return
+    // identical text. A beam is different — it explores alternatives
+    // deterministically, which is what makes it worth its cost.
+    let strategy = match accuracy.beam_size() {
+        Some(beam_size) => SamplingStrategy::BeamSearch { beam_size, patience: -1.0 },
+        None => SamplingStrategy::Greedy { best_of: 1 },
+    };
+    let mut params = FullParams::new(strategy);
 
     params.set_n_threads(n_threads);
 
@@ -242,7 +278,7 @@ pub fn build_full_params<'a>(
     params.set_print_special(false);
     params.set_print_timestamps(false);
 
-    params.set_audio_ctx(audio_ctx_for_profile(profile, sample_count));
+    params.set_audio_ctx(audio_ctx_for_profile(profile, sample_count, accuracy));
 
     if let Some(prompt) = prompt {
         params.set_initial_prompt(prompt);
@@ -281,6 +317,33 @@ mod tests {
             audio_ctx_for(TARGET_SAMPLE_RATE as usize * 600),
             FULL_AUDIO_CTX
         );
+    }
+
+    #[test]
+    fn the_default_accuracy_is_exactly_the_budgeted_context() {
+        // The latency numbers in docs/03 were measured with these two constants;
+        // Fast must stay a pure alias for them or the budget quietly stops
+        // describing the product.
+        assert_eq!(AccuracyMode::Fast.min_audio_ctx(), MIN_AUDIO_CTX);
+        assert_eq!(AccuracyMode::Fast.audio_ctx_headroom(), AUDIO_CTX_HEADROOM);
+        for seconds in [1, 4, 12, 30] {
+            let samples = TARGET_SAMPLE_RATE as usize * seconds;
+            assert_eq!(audio_ctx_for_accuracy(samples, AccuracyMode::Fast), audio_ctx_for(samples));
+        }
+    }
+
+    #[test]
+    fn higher_accuracy_never_shrinks_the_context_and_never_exceeds_the_models_own() {
+        for seconds in [1, 4, 12, 30, 90] {
+            let samples = TARGET_SAMPLE_RATE as usize * seconds;
+            let fast = audio_ctx_for_accuracy(samples, AccuracyMode::Fast);
+            let balanced = audio_ctx_for_accuracy(samples, AccuracyMode::Balanced);
+            let accurate = audio_ctx_for_accuracy(samples, AccuracyMode::Accurate);
+            assert!(fast <= balanced && balanced <= accurate, "{seconds}s: {fast} {balanced} {accurate}");
+            assert!(accurate <= FULL_AUDIO_CTX);
+        }
+        // The floor is what a short fragment pays for.
+        assert_eq!(audio_ctx_for_accuracy(TARGET_SAMPLE_RATE as usize, AccuracyMode::Accurate), 768);
     }
 
     #[test]

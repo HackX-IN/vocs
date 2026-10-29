@@ -20,9 +20,34 @@
  */
 
 use std::path::PathBuf;
-use std::time::Duration;
+use std::sync::atomic::AtomicBool;
+use std::time::{Duration, Instant};
 
 use crate::error::AppResult;
+
+/**
+ * SOURCE OF TRUTH KEYWORDS: RewriteLimit, rewrite_deadline, rewrite_cancel,
+ *   bounded_rewrite
+ * WHAT:  How long one `rewrite` may take and how it can be told to stop: an
+ *        optional wall-clock deadline and an optional cancel flag.
+ * WHY:   The caller's time budget used to be checked only BETWEEN sentences, so
+ *        it could not bound the things that actually blow it: waiting for the
+ *        model's lock while the live prefetch holds it, loading the weights
+ *        cold, and one long sentence mid-decode. A paste that is due now cannot
+ *        wait on any of those, so the limit travels INTO the call and the
+ *        adapter honours it at each of those three points. `cancel` is how the
+ *        stop-time pass tells a prefetch that is still running to get out of the
+ *        way. `Default` is "no limit", which is what a background prefetch
+ *        wants.
+ * WHERE: Built by pipeline/grammar/pass.rs; honoured by adapters/t5.
+ */
+#[derive(Clone, Copy, Default)]
+pub struct RewriteLimit<'a> {
+    /// Return an error rather than finish after this instant.
+    pub deadline: Option<Instant>,
+    /// Return an error as soon as this is set.
+    pub cancel: Option<&'a AtomicBool>,
+}
 
 pub trait GrammarModel: Send + Sync {
     fn id(&self) -> &'static str;
@@ -52,5 +77,10 @@ pub trait GrammarModel: Send + Sync {
     /// The model's own correction of one sentence. Blocking. The result is
     /// UNTRUSTED — it may have changed meaning — which is why the caller runs
     /// it through the edit guard instead of pasting it.
-    fn rewrite(&self, sentence: &str) -> AppResult<String>;
+    ///
+    /// With a `deadline` in `limit` the call never loads the weights (that is
+    /// the caller's `warm`, off the critical path), never waits for the model
+    /// past the deadline and abandons a decode that would overrun it. Each of
+    /// those is an `Err`, and the caller leaves the sentence as it was.
+    fn rewrite(&self, sentence: &str, limit: RewriteLimit<'_>) -> AppResult<String>;
 }

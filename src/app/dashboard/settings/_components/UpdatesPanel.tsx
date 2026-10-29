@@ -31,6 +31,7 @@ import { unwrapCommand } from "@/lib/ipc";
 import { formatBytes, formatTimeOfDay, plainReleaseNotes } from "@/lib/format";
 import { useTauriEvent } from "@/lib/use-event";
 import { Button, ErrorSurface, ProgressBar } from "@/components/global";
+import { slidesFor, WhatsNewDialog } from "../../_components/whats-new";
 
 type Available = Extract<UpdateCheck, { kind: "AVAILABLE" }>;
 
@@ -55,12 +56,14 @@ function formatPublished(iso: string | null): string | null {
 export function UpdatesPanel() {
   const [version, setVersion] = useState<string | null>(null);
   const [phase, setPhase] = useState<Phase>({ kind: "IDLE" });
+  const [notesOpen, setNotesOpen] = useState(false);
 
   // `quiet` is the check on mount: it may report what it finds but never an error, since the
   // person did not ask and an offline Mac would otherwise open Settings to a red box.
   const check = useCallback(async (quiet: boolean) => {
     if (!quiet) setPhase({ kind: "CHECKING" });
-    const result = await unwrapCommand(commands.checkForUpdate);
+    // The button forces a real look; the quiet one on mount may reuse a recent answer.
+    const result = await unwrapCommand(() => commands.checkForUpdate({ force: !quiet }));
 
     if (result.status === "error") {
       setPhase(quiet ? { kind: "IDLE" } : { kind: "FAILED", error: result.error });
@@ -113,14 +116,22 @@ export function UpdatesPanel() {
           <p className="text-body text-text-primary">{version ? `Vocs ${version}` : "Vocs"}</p>
           <p className="text-caption text-text-secondary">{summary(phase)}</p>
         </div>
-        {phase.kind === "AVAILABLE" ? (
-          <Button onClick={() => install(phase.update)}>Install and restart</Button>
-        ) : (
-          <Button disabled={checking || installing} onClick={() => void check(false)}>
-            {checking ? "Checking" : phase.kind === "FAILED" ? "Try again" : "Check for updates"}
-          </Button>
-        )}
+        <div className="flex items-center gap-2">
+          {version && slidesFor(version).length > 0 ? (
+            <Button variant="ghost" onClick={() => setNotesOpen(true)}>
+              What's new
+            </Button>
+          ) : null}
+          {phase.kind === "AVAILABLE" ? (
+            <Button onClick={() => install(phase.update)}>Install and restart</Button>
+          ) : (
+            <Button disabled={checking || installing} onClick={() => void check(false)}>
+              {checking ? "Checking" : phase.kind === "FAILED" ? "Try again" : "Check for updates"}
+            </Button>
+          )}
+        </div>
       </div>
+      {version ? <WhatsNewDialog version={version} open={notesOpen} onClose={() => setNotesOpen(false)} /> : null}
 
       {phase.kind === "AVAILABLE" || phase.kind === "INSTALLING" ? <ReleaseNotes update={phase.update} /> : null}
 

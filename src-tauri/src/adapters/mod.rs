@@ -90,6 +90,17 @@ pub fn build_model_store(
 }
 
 /**
+ * SOURCE OF TRUTH KEYWORDS: build_organizer
+ * WHAT:  Constructs the scratchpad's text organiser.
+ * WHY:   The rule-based one is the only implementation today; this is the single
+ *        place a language-model organiser would be selected instead.
+ * WHERE: App bootstrap; the handle goes into Ports.
+ */
+pub fn build_organizer() -> Arc<dyn crate::ports::TextOrganizer> {
+    Arc::new(rules::organize::RuleOrganizer::new())
+}
+
+/**
  * SOURCE OF TRUTH KEYWORDS: build_grammar_model
  * WHAT:  Constructs the on-device grammar model, empty: no file registered, no
  *        weights loaded.

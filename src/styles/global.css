@@ -28,6 +28,7 @@
 @import "./tokens.css";
 
 @theme inline {
+  --color-scrim: var(--scrim);
   --color-glass: var(--surface-glass);
   --color-elevated: var(--surface-elevated);
   --color-sunken: var(--surface-sunken);
@@ -335,7 +336,8 @@
    * exactly one surface from edge to edge.
    */
   body[data-window="dashboard"],
-  body[data-window="onboarding"] {
+  body[data-window="onboarding"],
+  body[data-window="scratchpad"] {
     background: var(--page-glow), var(--surface-glass);
   }
 

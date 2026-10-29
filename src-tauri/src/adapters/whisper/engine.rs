@@ -35,7 +35,7 @@ use super::coreml::coreml_encoder_path;
 use super::degenerate::clean_segment;
 use super::hallucination::{is_digital_silence, is_hallucination, rms_dbfs};
 use super::params::{
-    audio_ctx_for_profile, build_full_params, decode_thread_count, language_code, DecodeProfile,
+    audio_ctx_for_profile, build_full_params_for, decode_thread_count, language_code, DecodeProfile,
     RETRY_TEMPERATURE,
 };
 use super::priming::{prime_detection_context, should_prime};
@@ -363,13 +363,14 @@ impl WhisperEngine {
             .and_then(|prompt| self.fit_prompt_for(model, prompt));
 
         let profile = DecodeProfile::for_chunk(chunk, self.coreml_in_use());
-        let params = build_full_params(
+        let params = build_full_params_for(
             profile,
             chunk.samples.len(),
             language,
             prompt.as_deref(),
             self.n_threads,
             temperature,
+            request.accuracy,
         );
 
         let mut lease = model.states.acquire(&model.context)?;
@@ -381,7 +382,7 @@ impl WhisperEngine {
         }
         // Recorded before the decode: the state remembers it from the moment
         // whisper.cpp assigns it, even if the decode then fails.
-        lease.note_audio_ctx(audio_ctx_for_profile(profile, chunk.samples.len()));
+        lease.note_audio_ctx(audio_ctx_for_profile(profile, chunk.samples.len(), request.accuracy));
         let state = lease.get()?;
 
         state.full(params, &chunk.samples).map_err(|err| {

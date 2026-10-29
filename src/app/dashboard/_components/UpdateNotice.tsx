@@ -1,6 +1,6 @@
 /**
  * SOURCE OF TRUTH KEYWORDS: UpdateNotice, updateAvailable, checkForUpdate,
- *   installUpdate, UpdateCheck, update-bar
+ *   installUpdate, UpdateCheck, update-bar, updateProgress, install-and-restart
  * WHAT:  A quiet bar along the bottom of the dashboard offering to install a
  *        newer version. Absent entirely until there is one.
  * WHY:   IT MUST NEVER TAKE THE SCREEN. The person using this app is usually
@@ -21,6 +21,17 @@
  *        listens for the event to catch a check that lands while it is open.
  *        Same shape as the pill: a command for first paint, events after that.
  *
+ *        IT SHOWS THE DOWNLOAD AS IT HAPPENS. A button that said "Installing" and
+ *        then nothing for as long as a connection takes looks like a hang, so the
+ *        bar reports real percentages from `UpdateProgress` and, once the bytes are
+ *        in, says Vocs is restarting — which it does by itself: there is no second
+ *        click, because the whole point of "Install and restart" is that the person
+ *        never has to remember the second half.
+ *
+ *        THE QUIET LOOK ON MOUNT REUSES THE CACHED ANSWER (force: false). Opening
+ *        the dashboard used to cost a request to GitHub every time; the backend now
+ *        answers from the last check and only a pressed button goes back out.
+ *
  *        THE RESTART IS IN THE BUTTON, not in a sentence beside it. Installing
  *        swaps the running app, and the label is the last thing read before
  *        committing — putting it anywhere else means it can be missed by
@@ -36,7 +47,7 @@
 
 import { useEffect, useState } from "react";
 import { X } from "lucide-react";
-import { commands, events, type AppError } from "@/lib/bindings";
+import { commands, events, type AppError, type UpdateProgress } from "@/lib/bindings";
 import { unwrapCommand } from "@/lib/ipc";
 import { Button } from "@/components/global";
 import { useTauriEvent } from "@/lib/use-event";
@@ -46,10 +57,12 @@ export function UpdateNotice() {
   const [installing, setInstalling] = useState(false);
   const [error, setError] = useState<AppError | null>(null);
   const [dismissed, setDismissed] = useState(false);
+  const [progress, setProgress] = useState<UpdateProgress | null>(null);
 
-  // The answer that may already exist from the launch check.
+  // The answer that may already exist from the launch check. Not forced: a recent
+  // answer is as good as a new one, and it costs no round trip.
   useEffect(() => {
-    void unwrapCommand(commands.checkForUpdate).then((result) => {
+    void unwrapCommand(() => commands.checkForUpdate({ force: false })).then((result) => {
       if (result.status === "ok" && result.data.kind === "AVAILABLE") {
         setVersion(result.data.version);
       }
@@ -62,11 +75,14 @@ export function UpdateNotice() {
     setDismissed(false);
   });
 
+  useTauriEvent(events.updateProgress, (next) => setProgress(next));
+
   if (!version || dismissed) return null;
 
   const install = () => {
     setInstalling(true);
     setError(null);
+    setProgress(null);
     void unwrapCommand(commands.installUpdate).then((result) => {
       // On success the app is replaced and restarts, so there is no success
       // state to render — only the failure needs somewhere to go.
@@ -85,6 +101,8 @@ export function UpdateNotice() {
       <p className="min-w-0 truncate text-label text-text-secondary">
         {error ? (
           <span className="text-danger">{error.message}</span>
+        ) : installing ? (
+          installingLabel(version, progress)
         ) : (
           <>Vocs {version} is ready to install.</>
         )}
@@ -92,17 +110,26 @@ export function UpdateNotice() {
 
       <div className="flex shrink-0 items-center gap-1">
         <Button onClick={install} disabled={installing} className="h-[var(--control-height-sm)] text-label">
-          {installing ? "Installing" : error ? "Try again" : "Install and restart"}
+          {installing ? "Installing…" : error ? "Try again" : "Install and restart"}
         </Button>
-        <button
+        {installing ? null : <button
           type="button"
           onClick={() => setDismissed(true)}
           aria-label="Dismiss until the next check"
           className="flex size-[var(--control-height-sm)] items-center justify-center rounded-input text-text-tertiary transition-colors hover:bg-sunken hover:text-text-secondary"
         >
           <X className="size-3.5" />
-        </button>
+        </button>}
       </div>
     </div>
   );
+}
+
+/** What the bar says while the update downloads, then installs and restarts. */
+function installingLabel(version: string, progress: UpdateProgress | null): string {
+  if (progress === null) return `Downloading Vocs ${version}…`;
+  const { received_bytes: received, total_bytes: total } = progress;
+  if (total === null || total <= 0) return `Downloading Vocs ${version}…`;
+  const percent = Math.min(100, Math.floor((received / total) * 100));
+  return percent >= 100 ? `Installing Vocs ${version} — it restarts by itself.` : `Downloading Vocs ${version} — ${percent}%`;
 }

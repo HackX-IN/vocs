@@ -28,6 +28,7 @@ use crate::error::{AppError, AppResult};
 const MENU_DASHBOARD: &str = "dashboard";
 const MENU_QUIT: &str = "quit";
 const MENU_COPY_LAST: &str = "copy_last";
+const MENU_SCRATCHPAD: &str = "scratchpad";
 
 /**
  * SOURCE OF TRUTH KEYWORDS: install_tray
@@ -37,6 +38,10 @@ const MENU_COPY_LAST: &str = "copy_last";
 pub fn install_tray(app: &AppHandle) -> AppResult<()> {
     let dashboard = MenuItem::with_id(app, MENU_DASHBOARD, "Open Vocs", true, None::<&str>)
         .map_err(menu_error)?;
+    // Always offered, whether or not its shortcut is switched on: the menu is how
+    // someone finds the scratchpad in the first place.
+    let scratchpad = MenuItem::with_id(app, MENU_SCRATCHPAD, "Open Scratchpad", true, None::<&str>)
+        .map_err(menu_error)?;
     let copy_last =
         MenuItem::with_id(app, MENU_COPY_LAST, "Copy Last Transcript", true, None::<&str>)
             .map_err(menu_error)?;
@@ -44,7 +49,7 @@ pub fn install_tray(app: &AppHandle) -> AppResult<()> {
     let quit = MenuItem::with_id(app, MENU_QUIT, "Quit Vocs", true, Some("Cmd+Q"))
         .map_err(menu_error)?;
 
-    let menu = Menu::with_items(app, &[&dashboard, &copy_last, &separator, &quit]).map_err(menu_error)?;
+    let menu = Menu::with_items(app, &[&dashboard, &scratchpad, &copy_last, &separator, &quit]).map_err(menu_error)?;
 
     TrayIconBuilder::with_id("vocs")
         // The identity mark (docs/04 §12), not the app icon. A menu-bar glyph
@@ -63,6 +68,7 @@ pub fn install_tray(app: &AppHandle) -> AppResult<()> {
         .show_menu_on_left_click(true)
         .on_menu_event(|app, event| match event.id().as_ref() {
             MENU_DASHBOARD => show_dashboard(app),
+            MENU_SCRATCHPAD => crate::scratchpad::show(app),
             MENU_COPY_LAST => copy_last_transcript(app),
             MENU_QUIT => app.exit(0),
             other => tracing::debug!(id = other, "unhandled tray menu item"),

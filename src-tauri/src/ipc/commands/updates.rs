@@ -10,20 +10,30 @@
  *        a network client and then declines to use it is one refactor away
  *        from being no gate at all.
  *
- *        `install_update` re-runs the check rather than reusing the handle
- *        `check_for_update` obtained. An `Update` cannot cross the IPC
- *        boundary, so the alternative is parking one in AppState and hoping
- *        the version the user clicked is the version still sitting there. The
- *        second check costs one request and removes that whole class of
- *        mismatch — and it is the request that matters, because it is the one
- *        whose signature is verified before anything is written to disk.
+ *        `install_update` uses the `Update` the last check obtained when there is a
+ *        recent one (the cache parks it in Rust, beside the answer it belongs to,
+ *        and the UI cannot hold one across IPC anyway) and otherwise looks again.
+ *        Either way the signature is verified by the download before anything is
+ *        written to disk, so a release pulled in between fails safely.
  *
  *        Signature verification itself is the plugin's, keyed by the public
  *        key in tauri.conf.json. Nothing here reimplements it, and nothing
  *        here can bypass it.
+ *
+ *        SLOW CHECKS, three causes. The updater had NO timeout, so a network
+ *        that accepts the connection and then says nothing left the button on
+ *        "Checking" indefinitely: a check is now bounded (CHECK_TIMEOUT), and says
+ *        so when it overruns. Every window that opened asked the server again, and
+ *        installing asked a third time: answers are now cached (ipc/update_cache.rs),
+ *        only a pressed button or the daily timer goes back to the network, and
+ *        install reuses the `Update` the check already found. The launch check ran
+ *        once and then waited a day even when it had failed because the Mac was
+ *        still joining wifi: the scheduler now retries a failure soon.
  * WHERE: Registered in ipc/bindings.rs; driven by the Settings view's update
  *        section. The signing side is .github/workflows/release.yml.
  */
+
+use std::time::Duration;
 
 use tauri::State;
 use tauri_plugin_updater::UpdaterExt;
@@ -33,7 +43,7 @@ use crate::db::Database;
 use crate::error::{AppError, ErrorCode};
 use crate::ipc::context::AppState;
 use crate::ipc::events::UpdateProgress;
-use crate::ipc::factory::{execute, CommandSpec};
+use crate::ipc::factory::{execute, CommandSpec, Validate};
 use crate::registry::{self, keys, CapabilityKey};
 use crate::services::settings;
 use crate::types::{SessionState, SettingValue};
@@ -86,16 +96,28 @@ fn updates_enabled(db: &Database) -> bool {
     matches!(value, Some(SettingValue::Bool(true)))
 }
 
+/// How long a check may take. The endpoint is one small JSON file behind two
+/// redirects; ten seconds is generous for a working connection and short enough
+/// that a dead one says so instead of leaving the button on "Checking".
+const CHECK_TIMEOUT: Duration = Duration::from_secs(10);
+
+/// How long the whole download may take. It is a total request timeout in the
+/// plugin, not an idle one, so it has to cover a slow connection fetching a
+/// bundle of tens of megabytes.
+const DOWNLOAD_TIMEOUT: Duration = Duration::from_secs(30 * 60);
+
 /// The plugin's errors are network and signature failures, which are a user's
 /// problem to retry rather than a bug to report — so they map to Network with
-/// the detail kept for the log.
+/// the detail kept for the log. A timeout is told apart, because "slow" and
+/// "unreachable" call for different things from the person.
 fn updater_error(err: tauri_plugin_updater::Error) -> AppError {
-    AppError::new(
-        ErrorCode::Network,
-        "Vocs could not reach the update server. Check your connection and try again.",
-    )
-    .recoverable()
-    .with_detail(err)
+    let timed_out = matches!(&err, tauri_plugin_updater::Error::Reqwest(inner) if inner.is_timeout());
+    let message = if timed_out {
+        "The update server took too long to answer. Try again in a moment."
+    } else {
+        "Vocs could not reach the update server. Check your connection and try again."
+    };
+    AppError::new(ErrorCode::Network, message).recoverable().with_detail(err)
 }
 
 /// Without a known length, report every this many bytes.
@@ -122,40 +144,91 @@ fn progress_step(received: u64, announced: Option<u64>, total: Option<u64>) -> O
 const CHECK: CommandSpec = CommandSpec::new("check_for_update", CapabilityKey::Updates);
 
 /**
+ * SOURCE OF TRUTH KEYWORDS: CheckForUpdateInput, force_check
+ * WHAT:  Whether this check must go to the network (`force`) or may reuse an
+ *        answer a few minutes old.
+ * WHY:   The button a person pressed must really look; the quiet look on opening
+ *        a window must not cost a round trip each time. See ipc/update_cache.rs.
+ */
+#[derive(Debug, serde::Deserialize, specta::Type)]
+pub struct CheckForUpdateInput {
+    pub force: bool,
+}
+
+impl Validate for CheckForUpdateInput {
+    fn validate(&self) -> Result<(), String> {
+        Ok(())
+    }
+}
+
+/**
  * SOURCE OF TRUTH KEYWORDS: look_for_update
  * WHAT:  The update check itself, without the command wrapper.
- * WHY:   Two callers need it — this command, and the scheduler in bootstrap
- *        that honours the setting's promise of "on launch and once a day". They
- *        share ONE implementation so the setting check, the version comparison
- *        and the error mapping cannot drift between a manual press and an
- *        automatic check. That drift is exactly how a control ends up meaning
- *        something different depending on who triggered it.
- * WHERE: check_for_update below, and bootstrap::start_update_checks.
+ * WHY:   Three callers need it — this command, the scheduler in bootstrap that
+ *        honours the setting's promise of "on launch and once a day", and the
+ *        application menu. They share ONE implementation so the setting check,
+ *        the version comparison, the timeout and the error mapping cannot drift
+ *        between a manual press and an automatic check. That drift is exactly how
+ *        a control ends up meaning something different depending on who
+ *        triggered it.
+ *
+ *        Takes the cache's gate for the length of a request: a second caller
+ *        waits for the first and then finds its answer cached, so a burst of
+ *        windows opening makes one request. Disabled is answered before the
+ *        gate, the cache or the updater, and clears the cache, so switching the
+ *        setting off can never be followed by a stale "available".
+ * WHERE: check_for_update below, bootstrap::start_update_checks and menu.rs.
  */
-pub(crate) async fn look_for_update(state: &AppState) -> Result<UpdateCheck, AppError> {
+pub(crate) async fn look_for_update(state: &AppState, force: bool) -> Result<UpdateCheck, AppError> {
     if !updates_enabled(&state.db) {
+        state.updates.forget();
         return Ok(UpdateCheck::Disabled);
     }
 
-    let current_version = state.app.package_info().version.to_string();
-    let updater = state.app.updater().map_err(updater_error)?;
+    if !force {
+        if let Some(cached) = state.updates.fresh() {
+            return Ok(cached);
+        }
+    }
 
-    match updater.check().await.map_err(updater_error)? {
-        Some(update) => Ok(UpdateCheck::Available {
+    let _on_the_wire = state.updates.gate().await;
+    // Another caller may have answered while this one waited for the gate.
+    if !force {
+        if let Some(cached) = state.updates.fresh() {
+            return Ok(cached);
+        }
+    }
+
+    let current_version = state.app.package_info().version.to_string();
+    let updater = state
+        .app
+        .updater_builder()
+        .timeout(CHECK_TIMEOUT)
+        .build()
+        .map_err(updater_error)?;
+
+    let found = updater.check().await.map_err(updater_error)?;
+    let check = match &found {
+        Some(update) => UpdateCheck::Available {
             version: update.version.clone(),
             current_version,
             notes: update.body.clone(),
             published_at: update.date.map(|date| date.to_string()),
-        }),
-        None => Ok(UpdateCheck::UpToDate { current_version }),
-    }
+        },
+        None => UpdateCheck::UpToDate { current_version },
+    };
+    state.updates.store(check.clone(), found);
+    Ok(check)
 }
 
 #[tauri::command]
 #[specta::specta]
-pub async fn check_for_update(state: State<'_, AppState>) -> Result<UpdateCheck, AppError> {
-    execute(&state, CHECK, (), |ctx, ()| async move {
-        look_for_update(&ctx.state).await
+pub async fn check_for_update(
+    state: State<'_, AppState>,
+    input: CheckForUpdateInput,
+) -> Result<UpdateCheck, AppError> {
+    execute(&state, CHECK, input, |ctx, input| async move {
+        look_for_update(&ctx.state, input.force).await
     })
     .await
 }
@@ -197,16 +270,32 @@ pub async fn install_update(state: State<'_, AppState>) -> Result<(), AppError> 
             .recoverable());
         }
 
-        let updater = ctx.state.app.updater().map_err(updater_error)?;
-        let Some(update) = updater.check().await.map_err(updater_error)? else {
-            // Something else installed it, or the release was pulled between
-            // the check and the click. Not an error the user caused.
-            return Err(AppError::new(
-                ErrorCode::NotFound,
-                "That update is no longer available. Check again.",
-            )
-            .recoverable());
+        // The update the last check found, when it is recent: no second round trip
+        // between the click and the download starting.
+        let mut update = match ctx.state.updates.available_update() {
+            Some(update) => update,
+            None => {
+                let updater = ctx
+                    .state
+                    .app
+                    .updater_builder()
+                    .timeout(CHECK_TIMEOUT)
+                    .build()
+                    .map_err(updater_error)?;
+                let Some(update) = updater.check().await.map_err(updater_error)? else {
+                    // Something else installed it, or the release was pulled between
+                    // the check and the click. Not an error the user caused.
+                    return Err(AppError::new(
+                        ErrorCode::NotFound,
+                        "That update is no longer available. Check again.",
+                    )
+                    .recoverable());
+                };
+                update
+            }
         };
+        // The check's short timeout would cut a download off after ten seconds.
+        update.timeout = Some(DOWNLOAD_TIMEOUT);
 
         let version = update.version.clone();
         let app = ctx.state.app.clone();
@@ -233,6 +322,8 @@ pub async fn install_update(state: State<'_, AppState>) -> Result<(), AppError> 
             .map_err(updater_error)?;
 
         tracing::info!(version, "update installed; restarting");
+        // The cached answer describes a build that is no longer the running one.
+        ctx.state.updates.forget();
         // Diverges. The new bundle is already on disk; the running process is
         // the old one, so there is nothing sensible to do but hand over.
         ctx.state.app.restart();

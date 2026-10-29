@@ -25,6 +25,7 @@ use std::time::{Duration, Instant};
 use std::sync::Arc;
 use std::thread::JoinHandle;
 
+use crate::pipeline::backlog::Deferred;
 use crate::ports::engine::{TranscribeRequest, TranscriptionEngine};
 use crate::types::{AudioChunk, ChunkKind, LatencyStage, TranscriptSegment, SessionId};
 
@@ -72,6 +73,10 @@ pub struct DecodeResult {
     pub stage: LatencyStage,
     /// Set when the decode failed. The session continues on whatever succeeded.
     pub error: Option<String>,
+    /// True for the empty Tail that only marks the end of a recording's queue
+    /// (AudioChunk::barrier). It decoded nothing, so it has no timing worth
+    /// filing against the tail-decode stage.
+    pub barrier: bool,
 }
 
 /**
@@ -124,8 +129,16 @@ impl AsrWorker {
                         ChunkKind::Interior | ChunkKind::Interim => LatencyStage::ChunkDecode,
                     };
 
+                    // A barrier is answered without touching the engine: it only
+                    // proves everything queued ahead of it has been decoded.
+                    let barrier = chunk.is_barrier();
+
                     let started = Instant::now();
-                    let outcome = engine.transcribe(&chunk, &request);
+                    let outcome = if barrier {
+                        Ok(Vec::new())
+                    } else {
+                        engine.transcribe(&chunk, &request)
+                    };
                     let elapsed_ms = started.elapsed().as_secs_f64() * 1000.0;
 
                     let result = match outcome {
@@ -136,6 +149,7 @@ impl AsrWorker {
                             elapsed_ms,
                             stage,
                             error: None,
+                            barrier,
                         },
                         Err(err) => {
                             tracing::warn!(error = %err, ?kind, "decode failed");
@@ -146,6 +160,7 @@ impl AsrWorker {
                                 elapsed_ms,
                                 stage,
                                 error: Some(err.message),
+                                barrier,
                             }
                         }
                     };
@@ -199,6 +214,34 @@ impl AsrWorker {
             Err(TrySendError::Disconnected(_)) => {
                 tracing::error!("ASR worker is gone");
                 false
+            }
+        }
+    }
+
+    /**
+     * SOURCE OF TRUTH KEYWORDS: offer, refuse_and_return
+     * WHAT:  Queues a chunk if there is room, otherwise hands it back.
+     * WHY:   `submit` consumes its chunk, so a full queue meant the chunk was
+     *        gone. Interior chunks are real speech, so the caller needs the
+     *        chunk back to hold it (pipeline/backlog.rs) instead of losing it.
+     * WHERE: Called by session/actor.rs when draining its ChunkBacklog.
+     */
+    pub fn offer(&self, job: Deferred) -> Result<(), Box<Deferred>> {
+        let item = WorkItem::Decode {
+            chunk: job.chunk,
+            request: job.request,
+            session_id: job.session_id,
+        };
+        match self.sender.try_send(item) {
+            Ok(()) => Ok(()),
+            Err(TrySendError::Full(WorkItem::Decode { chunk, request, session_id })) => {
+                Err(Box::new(Deferred { chunk, request, session_id }))
+            }
+            // Only Decode items are ever offered, so a Shutdown coming back is
+            // unreachable; treating it like a dead worker is the safe reading.
+            Err(TrySendError::Full(WorkItem::Shutdown)) | Err(TrySendError::Disconnected(_)) => {
+                tracing::error!("ASR worker is gone; a chunk cannot be decoded");
+                Ok(())
             }
         }
     }
@@ -372,6 +415,38 @@ mod tests {
 
         assert_eq!(result.stage, LatencyStage::TailDecode);
         assert!(result.stage.is_critical_path());
+    }
+
+    #[tokio::test]
+    async fn a_barrier_comes_back_after_everything_queued_ahead_of_it_without_decoding() {
+        // The property the no-paste fix rests on: a recording that stops in a
+        // pause waits on this, so it cannot be delivered before its interior
+        // chunk has been decoded.
+        let (tx, mut rx) = tokio::sync::mpsc::channel(8);
+        let worker = AsrWorker::spawn(
+            Arc::new(FakeEngine { delay: std::time::Duration::from_millis(20) }),
+            tx,
+        )
+        .expect("spawn");
+        let session = SessionId::new();
+
+        assert!(worker.submit(chunk(0, ChunkKind::Interior), TranscribeRequest::default(), session.clone()));
+        assert!(worker.submit_tail(
+            AudioChunk::barrier(1_000),
+            TranscribeRequest::default(),
+            Duration::from_secs(1),
+            session,
+        ));
+
+        let first = rx.recv().await.expect("the interior chunk");
+        assert_eq!(first.kind, ChunkKind::Interior);
+        assert_eq!(first.segments.len(), 1);
+        assert!(!first.barrier);
+
+        let barrier = rx.recv().await.expect("the barrier");
+        assert!(barrier.barrier, "answered as a barrier");
+        assert!(barrier.segments.is_empty(), "the engine was never asked to decode it");
+        assert_eq!(barrier.kind, ChunkKind::Tail);
     }
 
     #[tokio::test]

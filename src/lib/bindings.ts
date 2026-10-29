@@ -84,6 +84,16 @@ export const commands = {
 	 *  
 	 */
 	suggestTone: (input: SuggestToneInput) => typedError<string, AppError>(__TAURI_INVOKE("suggest_tone", { input })),
+	/**
+	 * 
+	 *  * WHAT:  `text` restructured per `mode`.
+	 *  * WHY:   The language comes from the person's settings, so a Hindi note is laid
+	 *  *        out but never sorted with English cues.
+	 *  
+	 */
+	organizeText: (input: OrganizeInput) => typedError<string, AppError>(__TAURI_INVOKE("organize_text", { input })),
+	scratchpadInsert: (input: InsertInput) => typedError<DeliveryKind, AppError>(__TAURI_INVOKE("scratchpad_insert", { input })),
+	hideScratchpad: () => typedError<null, AppError>(__TAURI_INVOKE("hide_scratchpad")),
 	getStats: () => typedError<StatsSummary, AppError>(__TAURI_INVOKE("get_stats")),
 	listDictionary: () => typedError<DictionaryEntry[], AppError>(__TAURI_INVOKE("list_dictionary")),
 	createDictionaryEntry: (input: CreateDictionaryEntryInput) => typedError<DictionaryId, AppError>(__TAURI_INVOKE("create_dictionary_entry", { input })),
@@ -120,8 +130,12 @@ export const commands = {
 	openTextFile: (input: OpenTextFileInput) => typedError<string | null, AppError>(__TAURI_INVOKE("open_text_file", { input })),
 	startMicTest: () => typedError<null, AppError>(__TAURI_INVOKE("start_mic_test")),
 	stopMicTest: () => typedError<null, AppError>(__TAURI_INVOKE("stop_mic_test")),
-	checkForUpdate: () => typedError<UpdateCheck, AppError>(__TAURI_INVOKE("check_for_update")),
+	checkForUpdate: (input: CheckForUpdateInput) => typedError<UpdateCheck, AppError>(__TAURI_INVOKE("check_for_update", { input })),
 	installUpdate: () => typedError<null, AppError>(__TAURI_INVOKE("install_update")),
+	getWhatsNew: () => typedError<{
+	version: string,
+} | null, AppError>(__TAURI_INVOKE("get_whats_new")),
+	markWhatsNewSeen: () => typedError<null, AppError>(__TAURI_INVOKE("mark_whats_new_seen")),
 };
 
 /** Events */
@@ -271,6 +285,19 @@ export type Caption =
  */
 export type CaptionChanged = {
 	caption: Caption | null,
+};
+
+/**
+ * 
+ *  * SOURCE OF TRUTH KEYWORDS: CheckForUpdateInput, force_check
+ *  * WHAT:  Whether this check must go to the network (`force`) or may reuse an
+ *  *        answer a few minutes old.
+ *  * WHY:   The button a person pressed must really look; the quiet look on opening
+ *  *        a window must not cost a round trip each time. See ipc/update_cache.rs.
+ *  
+ */
+export type CheckForUpdateInput = {
+	force: boolean,
 };
 
 /**
@@ -571,6 +598,10 @@ export type ImportSummary = {
 	profiles_added: number,
 	profiles_updated: number,
 	profiles_skipped: number,
+};
+
+export type InsertInput = {
+	text: string,
 };
 
 export type KeyModifier = "COMMAND" | "CONTROL" | "OPTION" | "SHIFT";
@@ -874,6 +905,24 @@ export type OpenTextFileInput = {
 	/**  Without the dot, e.g. ["json"]. */
 	extensions: string[],
 };
+
+export type OrganizeInput = {
+	text: string,
+	mode: OrganizeMode,
+};
+
+export type OrganizeMode = 
+/**
+ *  Action items and notes when there are tasks, bullets for a longer
+ *  ramble, a paragraph for a short one.
+ */
+"AUTO" | 
+/**  One bullet per thought. */
+"BULLETS" | 
+/**  A checklist of what has to be done; says so when there is nothing to do. */
+"ACTIONS" | 
+/**  The same words as one clean paragraph. */
+"PARAGRAPH";
 
 /**
  * 
@@ -1349,6 +1398,18 @@ export type UpdateHistoryInput = {
 export type UpdateProgress = {
 	received_bytes: number,
 	total_bytes: number | null,
+};
+
+/**
+ * 
+ *  * SOURCE OF TRUTH KEYWORDS: WhatsNew
+ *  * WHAT:  The version whose notes are due.
+ *  * WHERE: Returned by get_whats_new; the slides themselves are the frontend's copy,
+ *  *        keyed by this version.
+ *  
+ */
+export type WhatsNew = {
+	version: string,
 };
 
 /* Tauri Specta runtime */

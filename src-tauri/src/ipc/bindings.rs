@@ -63,6 +63,10 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             commands::profiles::save_app_profile,
             commands::profiles::delete_app_profile,
             commands::profiles::suggest_tone,
+            // Dictation scratchpad
+            commands::scratchpad::organize_text,
+            commands::scratchpad::scratchpad_insert,
+            commands::scratchpad::hide_scratchpad,
             // Stats
             commands::stats::get_stats,
             // Dictionary
@@ -101,6 +105,9 @@ pub fn specta_builder() -> Builder<tauri::Wry> {
             // Updates
             commands::updates::check_for_update,
             commands::updates::install_update,
+            // What's new
+            commands::whats_new::get_whats_new,
+            commands::whats_new::mark_whats_new_seen,
         ])
         .events(collect_events![
             events::SessionStateChanged,

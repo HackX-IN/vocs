@@ -61,6 +61,8 @@ vocs/
         ├── main.rs · lib.rs         # wiring only, no logic
         ├── bootstrap.rs             # ★ the ONLY file naming a concrete adapter
         ├── copy_last_hotkey.rs      # optional global shortcut: copy the last transcript
+        ├── extra_hotkeys.rs         # optional shortcuts: language-pinned dictation, scratchpad toggle
+        ├── scratchpad.rs            # the floating scratchpad window; sends its text onward
         ├── tray.rs                  # menu bar item; pill and caption show/hide
         ├── menu.rs                  # the application menu bar (Vocs, File, Edit, View, Window, Help)
         │
@@ -90,7 +92,8 @@ vocs/
         ├── pipeline/
         │   ├── vad.rs               # speech detection, silence gating
         │   ├── chunker.rs           # 8–15s chunks at silence, 200ms overlap
-        │   ├── worker.rs            # dedicated ASR thread + bounded queue
+        │   ├── worker.rs            # dedicated ASR thread + bounded queue (+ tail barrier)
+        │   ├── backlog.rs           # closed chunks the queue had no room for, kept in order
         │   ├── assembler.rs         # join segments, de-duplicate seams
         │   ├── mic_monitor.rs       # Settings microphone check: levels + watchdog
         │   ├── diff.rs              # said-vs-fixed word diff for History
@@ -98,7 +101,8 @@ vocs/
         │                            #   guard.rs keeps only SAFE word edits from the model
         │
         ├── ports/                   # ★ traits only — zero implementation
-        │   └── engine · audio · enhancer · grammar · injector · models · permissions
+        │   └── engine · audio · enhancer · organizer · grammar · injector · models
+        │       permissions
         │
         ├── adapters/                # mod.rs is the factory; one impl per port
         │   ├── whisper/             #   engine, params, prompt, blocklist,
@@ -110,6 +114,7 @@ vocs/
         │   │                        #   and config embedded; weights downloaded)
         │   ├── rules/               #   text.rs (commands, dictionary, punctuation),
         │   │                        #   fillers.rs, grammar.rs, repeats.rs, sentences.rs,
+        │   │                        #   rollback.rs ("scratch that"), organize.rs (scratchpad),
         │   │                        #   corpus.rs (the 150+ sentence acceptance test)
         │   └── http_models/         #   catalog, download, store, disk (free space)
         │

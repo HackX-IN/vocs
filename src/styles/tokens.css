@@ -86,6 +86,11 @@
   --shadow-card:
     0 1px 2px rgba(28, 24, 20, 0.04), 0 8px 24px rgba(28, 24, 20, 0.06);
 
+  /* A modal dialog (docs/04 §17): the dimmed page behind it, and its size. */
+  --scrim: rgba(27, 26, 23, 0.34);
+  --dialog-width: 560px;
+  --dialog-visual-height: 188px;
+
   /* ── Materials (docs/04 §3) ───────────────────────────────────────────
    * Three, and only three. Native NSVisualEffectView vibrancy is the actual
    * material; these three-part treatments are the web layer's entire
@@ -576,6 +581,7 @@
     --shadow-pill: 0 12px 40px rgba(0, 0, 0, 0.5);
     --shadow-panel: 0 24px 64px rgba(0, 0, 0, 0.46);
     --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 24px rgba(0, 0, 0, 0.28);
+    --scrim: rgba(0, 0, 0, 0.52);
   }
 }
 

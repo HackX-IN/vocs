@@ -188,6 +188,47 @@ fn dynamic_choice(
     }
 }
 
+/**
+ * SOURCE OF TRUTH KEYWORDS: hotkey_setting, language_choice
+ * WHAT:  A key-combination setting, and a language-picker setting.
+ * WHY:   Three places declared these by hand (dictation, copy-last, the pinned
+ *        language hotkeys). One constructor each, so a change to how a hotkey or
+ *        the language list is declared is made once.
+ */
+fn hotkey_setting(
+    key: &str,
+    label: &str,
+    description: &str,
+    section: SettingSection,
+    default: HotkeyBinding,
+) -> SettingDef {
+    SettingDef {
+        key: text(key),
+        label: text(label),
+        description: text(description),
+        section,
+        kind: SettingKind::Hotkey,
+        default: SettingValue::Hotkey(default),
+        requires_engine: vec![],
+        requires_permission: vec![],
+        advanced: false,
+    }
+}
+
+fn language_choice(key: &str, label: &str, description: &str, section: SettingSection) -> SettingDef {
+    SettingDef {
+        key: text(key),
+        label: text(label),
+        description: text(description),
+        section,
+        kind: SettingKind::DynamicChoice { source: ChoiceSource::Languages },
+        default: SettingValue::Choice(text(crate::types::AUTO_LANGUAGE)),
+        requires_engine: vec![EngineFeature::LanguageAutoDetect],
+        requires_permission: vec![],
+        advanced: false,
+    }
+}
+
 /// Marks a setting as depending on an OS grant. See SettingDef.
 fn needs_permission(mut def: SettingDef, permission: OsPermission) -> SettingDef {
     def.requires_permission.push(permission);
@@ -213,6 +254,22 @@ fn default_hotkey() -> HotkeyBinding {
     HotkeyBinding {
         modifiers: vec![KeyModifier::Option],
         key: text("Space"),
+    }
+}
+
+/// ⌃⌥N — the default for the scratchpad ("N" for note).
+fn scratchpad_default_hotkey() -> HotkeyBinding {
+    HotkeyBinding {
+        modifiers: vec![KeyModifier::Control, KeyModifier::Option],
+        key: text("KeyN"),
+    }
+}
+
+/// ⌃⌥1 and ⌃⌥2 — the defaults for the two language-pinned dictation hotkeys.
+fn language_hotkey_default(digit: &str) -> HotkeyBinding {
+    HotkeyBinding {
+        modifiers: vec![KeyModifier::Control, KeyModifier::Option],
+        key: text(digit),
     }
 }
 
@@ -250,17 +307,13 @@ fn build_capabilities() -> Vec<Capability> {
                 metric(LatencyStage::TotalFinalize, "Stop to pasted", true),
             ],
             settings: vec![
-                SettingDef {
-                    key: text(keys::DICTATION_HOTKEY),
-                    label: text("Dictation hotkey"),
-                    description: text("The key you press anywhere to start and stop."),
-                    section: SettingSection::Recording,
-                    kind: SettingKind::Hotkey,
-                    default: SettingValue::Hotkey(default_hotkey()),
-                    requires_engine: vec![],
-                    requires_permission: vec![],
-                    advanced: false,
-                },
+                hotkey_setting(
+                    keys::DICTATION_HOTKEY,
+                    "Dictation hotkey",
+                    "The key you press anywhere to start and stop.",
+                    SettingSection::Recording,
+                    default_hotkey(),
+                ),
                 choice(
                     keys::DICTATION_MODE,
                     "Hotkey behaviour",
@@ -328,6 +381,60 @@ fn build_capabilities() -> Vec<Capability> {
                     SettingSection::Recording,
                     false,
                 ),
+                toggle(
+                    keys::LANG_HOTKEY_1_ENABLED,
+                    "Language hotkey 1",
+                    "A second dictation hotkey that always listens for one language, so you never depend on auto-detection when you switch between languages. Off until you turn it on, because a global shortcut takes a key from every other app.",
+                    SettingSection::Recording,
+                    false,
+                ),
+                hotkey_setting(
+                    keys::LANG_HOTKEY_1_HOTKEY,
+                    "Language hotkey 1 keys",
+                    "Use a key combination such as ⌃⌥1. It starts and stops dictation exactly like the main hotkey. A single modifier on its own cannot be used here.",
+                    SettingSection::Recording,
+                    language_hotkey_default("Digit1"),
+                ),
+                language_choice(
+                    keys::LANG_HOTKEY_1_LANGUAGE,
+                    "Language hotkey 1 language",
+                    "The language this hotkey listens for, whatever the main language is set to. Auto makes it the detect-for-me key.",
+                    SettingSection::Recording,
+                ),
+                toggle(
+                    keys::LANG_HOTKEY_2_ENABLED,
+                    "Language hotkey 2",
+                    "A second dictation hotkey that always listens for one language, so you never depend on auto-detection when you switch between languages. Off until you turn it on, because a global shortcut takes a key from every other app.",
+                    SettingSection::Recording,
+                    false,
+                ),
+                hotkey_setting(
+                    keys::LANG_HOTKEY_2_HOTKEY,
+                    "Language hotkey 2 keys",
+                    "Use a key combination such as ⌃⌥2. It starts and stops dictation exactly like the main hotkey. A single modifier on its own cannot be used here.",
+                    SettingSection::Recording,
+                    language_hotkey_default("Digit2"),
+                ),
+                language_choice(
+                    keys::LANG_HOTKEY_2_LANGUAGE,
+                    "Language hotkey 2 language",
+                    "The language this hotkey listens for, whatever the main language is set to. Auto makes it the detect-for-me key.",
+                    SettingSection::Recording,
+                ),
+                toggle(
+                    keys::SCRATCHPAD_ENABLED,
+                    "Scratchpad shortcut",
+                    "Turn on a global shortcut for the dictation scratchpad: a floating notepad where you dictate with your usual hotkey, ramble as long as you like, then press Return to have Vocs turn the ramble into bullets, a task list or a clean paragraph, and ⌘Return to send the result to the app you came from. It is always in the menu bar menu; this only adds the shortcut, which is off because a global shortcut takes a key from every other app.",
+                    SettingSection::Recording,
+                    false,
+                ),
+                hotkey_setting(
+                    keys::SCRATCHPAD_HOTKEY,
+                    "Scratchpad keys",
+                    "Use a key combination such as ⌃⌥N. Press it again to put the scratchpad away. A single modifier on its own cannot be used here.",
+                    SettingSection::Recording,
+                    scratchpad_default_hotkey(),
+                ),
                 advanced(number(
                     keys::FINALIZE_TIMEOUT_MS,
                     "Finalize timeout",
@@ -357,19 +464,12 @@ fn build_capabilities() -> Vec<Capability> {
                     ChoiceSource::Models,
                     "large-v3-turbo-q5_0",
                 ),
-                SettingDef {
-                    key: text(keys::LANGUAGE),
-                    label: text("Language"),
-                    description: text("Pick your language to skip detection: each dictation finishes about a quarter of a second sooner and is a little more accurate. Leave it on Auto if you switch between languages."),
-                    section: SettingSection::Transcription,
-                    kind: SettingKind::DynamicChoice {
-                        source: ChoiceSource::Languages,
-                    },
-                    default: SettingValue::Choice(text("auto")),
-                    requires_engine: vec![EngineFeature::LanguageAutoDetect],
-                    requires_permission: vec![],
-                    advanced: false,
-                },
+                language_choice(
+                    keys::LANGUAGE,
+                    "Language",
+                    "Pick your language to skip detection: each dictation finishes about a quarter of a second sooner and is a little more accurate. Leave it on Auto if you switch between languages — or keep it on Auto and give each language its own hotkey under Recording.",
+                    SettingSection::Transcription,
+                ),
                 SettingDef {
                     requires_engine: vec![EngineFeature::InitialPrompt],
                     ..free_text(
@@ -380,6 +480,18 @@ fn build_capabilities() -> Vec<Capability> {
                         ("e.g. Rust, Tauri, Kubernetes, Wire One Labs", CONTEXT_PROMPT_MAX_LEN),
                     )
                 },
+                choice(
+                    keys::ACCURACY,
+                    "Speed or accuracy",
+                    "How hard Vocs works on each recognition. Fast is what the speed figures on the dashboard are measured with. Balanced listens with more context and costs a little time. Accurate also weighs several possible wordings at every step, so it makes the fewest mistakes (live captions included) and takes the longest — a noticeable pause after you stop on a slower Mac.",
+                    SettingSection::Transcription,
+                    &[
+                        ("fast", "Fast", "The quickest; the default"),
+                        ("balanced", "Balanced", "More context for a little more time"),
+                        ("accurate", "Accurate", "Fewest mistakes, slowest"),
+                    ],
+                    "fast",
+                ),
             ],
         },
         Capability {
@@ -429,17 +541,13 @@ fn build_capabilities() -> Vec<Capability> {
                     SettingSection::Output,
                     false,
                 ),
-                SettingDef {
-                    key: text(keys::COPY_LAST_HOTKEY),
-                    label: text("Copy-last shortcut keys"),
-                    description: text("Use a key combination such as ⌃⌥C. A single modifier on its own cannot be used here."),
-                    section: SettingSection::Output,
-                    kind: SettingKind::Hotkey,
-                    default: SettingValue::Hotkey(copy_last_default_hotkey()),
-                    requires_engine: vec![],
-                    requires_permission: vec![],
-                    advanced: false,
-                },
+                hotkey_setting(
+                    keys::COPY_LAST_HOTKEY,
+                    "Copy-last shortcut keys",
+                    "Use a key combination such as ⌃⌥C. A single modifier on its own cannot be used here.",
+                    SettingSection::Output,
+                    copy_last_default_hotkey(),
+                ),
                 toggle(
                     keys::PREVIEW_BEFORE_PASTE,
                     "Preview before pasting",
@@ -523,7 +631,7 @@ fn build_capabilities() -> Vec<Capability> {
                 toggle(
                     keys::SPOKEN_COMMANDS,
                     "Spoken formatting",
-                    "Turn “new line”, “new paragraph”, “comma” and “period” into the thing you said.",
+                    "Turn “new line”, “new paragraph”, “comma” and “period” into the thing you said. Also lets you take words back by voice: say “scratch that” to drop the sentence you just spoke, “undo last sentence” to drop the one before, or “scratch everything” to start the dictation again. English only.",
                     SettingSection::Writing,
                     true,
                 ),
@@ -838,10 +946,19 @@ mod tests {
             keys::INPUT_DEVICE,
             keys::AUDIO_FEEDBACK,
             keys::LIVE_CAPTIONS,
+            keys::LANG_HOTKEY_1_ENABLED,
+            keys::LANG_HOTKEY_1_HOTKEY,
+            keys::LANG_HOTKEY_1_LANGUAGE,
+            keys::LANG_HOTKEY_2_ENABLED,
+            keys::LANG_HOTKEY_2_HOTKEY,
+            keys::LANG_HOTKEY_2_LANGUAGE,
+            keys::SCRATCHPAD_ENABLED,
+            keys::SCRATCHPAD_HOTKEY,
             keys::TRANSCRIPTION_MODEL,
             keys::LANGUAGE,
             keys::FINALIZE_TIMEOUT_MS,
             keys::CONTEXT_PROMPT,
+            keys::ACCURACY,
             keys::AUTO_PASTE,
             keys::RESTORE_CLIPBOARD,
             keys::PASTE_DELAY_MS,

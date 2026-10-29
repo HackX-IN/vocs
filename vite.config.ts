@@ -28,6 +28,7 @@ export default defineConfig(async () => ({
         caption: fileURLToPath(new URL("./caption.html", import.meta.url)),
         onboarding: fileURLToPath(new URL("./onboarding.html", import.meta.url)),
         sidebar: fileURLToPath(new URL("./sidebar.html", import.meta.url)),
+        scratchpad: fileURLToPath(new URL("./scratchpad.html", import.meta.url)),
       },
     },
   },

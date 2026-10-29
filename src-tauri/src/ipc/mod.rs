@@ -14,6 +14,7 @@ pub mod commands;
 pub mod context;
 pub mod events;
 pub mod factory;
+pub mod update_cache;
 
 pub use context::{AppState, CommandContext, Ports, SessionContext, SessionHandle};
 pub use factory::{execute, CommandSpec, Reentrancy, ResourceUse, Validate};
