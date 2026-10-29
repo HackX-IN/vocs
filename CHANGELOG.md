@@ -6,6 +6,7 @@ versions follow [Semantic Versioning](https://semver.org/).
 ## [1.1.0] - 2026-10-28
 
 ### Fixed
+- **A fresh install no longer says "Vocs is still starting up" forever.** After the first-run model download the speech model was never loaded until Vocs was quit and reopened, so the setup's "Try it" step (and every hotkey press) was refused. The model now loads as soon as the download finishes, and pressing the hotkey on a model that is on disk but not loaded starts loading it instead of leaving you stuck. If you are on 1.0.2 and hit this, quit Vocs from the menu bar and open it again once.
 - **"I spoke and nothing was pasted."** Stopping in a pause, while the last piece of speech was still being recognised, could finish the dictation before those words arrived and then drop them. Vocs now waits for everything you said to be recognised before it pastes, however you stop.
 - **No more silently dropped speech on a slow Mac.** If recognition fell behind, a finished piece of speech could be thrown away because the queue was full. Vocs now holds it and recognises it as soon as there is room, in order.
 - **The on-device grammar model can no longer make a paste slow.** Its time limit is now enforced inside each correction, not only between sentences; a sentence it has no time for goes out as the rules wrote it, in half a second at most.

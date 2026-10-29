@@ -476,6 +476,10 @@ impl SessionActor {
         // explanation. Failing fast with a sentence they can act on is far
         // better than a recording that quietly produces no words.
         if !self.ctx.ports.engine.is_ready() {
+            // Not a dead end: if the model is on disk but was never loaded (a first
+            // run, or a load that failed once), start loading it now so the NEXT
+            // press works. A load already in progress is left to finish.
+            super::engine_warmup::prepare_in_background(Arc::clone(&self.ctx.ports.engine));
             let err = AppError::new(
                 ErrorCode::EngineNotReady,
                 "Vocs is still starting up. Try again in a moment.",
