@@ -1,6 +1,6 @@
 /**
  * SOURCE OF TRUTH KEYWORDS: Scratchpad, dictation-canvas, organise-on-enter,
- *   scratchpad-insert, brain-dump
+ *   scratchpad-insert, brain-dump, scratchpad-dictation, addDictation
  * WHAT:  The floating scratchpad: a page to talk or type a ramble into, which
  *        Return turns into bullets, a task list or a paragraph, and ⌘Return sends
  *        to the app you came from.
@@ -8,6 +8,12 @@
  *        brain-dump, where the useful thing happens AFTER the talking. Dictation
  *        needs nothing special to work here — the normal hotkey pastes into the
  *        focused text field, and in this window that is the pad.
+ *
+ *        But a synthetic paste into our own window only lands while the text
+ *        field has keyboard focus, which a click on a button or the window being
+ *        shown again takes away. So when the pad is open Rust sends the finished
+ *        text as a ScratchpadDictation event instead, and addDictation puts it
+ *        at the caret (or the end) whatever has focus.
  *
  *        Return organises and Shift+Return is a newline, because the point of the
  *        window is the organising; ⌘Return is the commit. Organising is
@@ -25,8 +31,9 @@ import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "re
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Undo2, X } from "lucide-react";
-import { commands, type AppError, type OrganizeMode } from "@/lib/bindings";
+import { commands, events, type AppError, type OrganizeMode } from "@/lib/bindings";
 import { unwrapCommand } from "@/lib/ipc";
+import { useTauriEvent } from "@/lib/use-event";
 import { Button, Keycap, SegmentedControl, ErrorSurface } from "@/components/global";
 import { MODE_OPTIONS, readStoredMode, scratchpadSchema, storeMode, type ScratchpadValues } from "./scratchpad-schema";
 
@@ -97,6 +104,30 @@ export function Scratchpad() {
     }
     setBusy(null);
   }, [busy, getValues, reset]);
+
+  // Dictation arrives as an event rather than a paste, so it lands even when
+  // the text field has lost keyboard focus. See PadRoutedInjector.
+  const addDictation = useCallback(
+    (spoken: string) => {
+      const field = textarea.current;
+      const current = getValues("text");
+      const start = field?.selectionStart ?? current.length;
+      const end = field?.selectionEnd ?? current.length;
+      const head = current.slice(0, start);
+      // Two dictations in a row would otherwise run together.
+      const gap = head.length > 0 && !/\s$/.test(head) ? " " : "";
+      setValue("text", head + gap + spoken + current.slice(end), { shouldDirty: true });
+      // Dictating after an organise makes the snapshot stale; Undo would drop it.
+      setBefore(null);
+      const caret = head.length + gap.length + spoken.length;
+      requestAnimationFrame(() => {
+        field?.focus();
+        field?.setSelectionRange(caret, caret);
+      });
+    },
+    [getValues, setValue],
+  );
+  useTauriEvent(events.scratchpadDictation, ({ text: spoken }) => addDictation(spoken));
 
   const undo = useCallback(() => {
     if (before === null) return;

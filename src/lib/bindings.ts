@@ -147,6 +147,7 @@ export const events = {
 	modelStateChanged: makeEvent<ModelStateChanged>("model-state-changed"),
 	onboardingProgress: makeEvent<OnboardingProgress>("onboarding-progress"),
 	permissionsChanged: makeEvent<PermissionsChanged>("permissions-changed"),
+	scratchpadDictation: makeEvent<ScratchpadDictation>("scratchpad-dictation"),
 	sessionStateChanged: makeEvent<SessionStateChanged>("session-state-changed"),
 	settingsChanged: makeEvent<SettingsChanged>("settings-changed"),
 	transcriptDelivered: makeEvent<TranscriptDelivered>("transcript-delivered"),
@@ -1033,6 +1034,23 @@ export type SaveTextFileInput = {
 	contents: string,
 	/**  Offered in the dialog. The user may change it. */
 	suggested_name: string,
+};
+
+/**
+ * 
+ *  * SOURCE OF TRUTH KEYWORDS: ScratchpadDictation, scratchpad_dictation, route_to_pad
+ *  * WHAT:  A dictation's finished text, addressed to the scratchpad window.
+ *  * WHY:   The pad is the one place Vocs is its own paste target, and a synthetic
+ *  *        ⌘V into your own window only lands if the text field happens to hold
+ *  *        keyboard focus at that instant — a click on a button, or the window
+ *  *        being re-shown, and the words go nowhere while the dictation is still
+ *  *        reported as pasted. Handing the text over as an event makes the pad
+ *  *        insert it itself, wherever focus is.
+ *  * WHERE: Emitted by scratchpad::PadRoutedInjector; consumed by Scratchpad.tsx.
+ *  
+ */
+export type ScratchpadDictation = {
+	text: string,
 };
 
 /**
