@@ -147,6 +147,7 @@ export const events = {
 	modelStateChanged: makeEvent<ModelStateChanged>("model-state-changed"),
 	onboardingProgress: makeEvent<OnboardingProgress>("onboarding-progress"),
 	permissionsChanged: makeEvent<PermissionsChanged>("permissions-changed"),
+	scratchpadDictation: makeEvent<ScratchpadDictation>("scratchpad-dictation"),
 	sessionStateChanged: makeEvent<SessionStateChanged>("session-state-changed"),
 	settingsChanged: makeEvent<SettingsChanged>("settings-changed"),
 	transcriptDelivered: makeEvent<TranscriptDelivered>("transcript-delivered"),
@@ -1036,6 +1037,23 @@ export type SaveTextFileInput = {
 };
 
 /**
+ * 
+ *  * SOURCE OF TRUTH KEYWORDS: ScratchpadDictation, scratchpad_dictation, route_to_pad
+ *  * WHAT:  A dictation's finished text, addressed to the scratchpad window.
+ *  * WHY:   The pad is the one place Vocs is its own paste target, and a synthetic
+ *  *        ⌘V into your own window only lands if the text field happens to hold
+ *  *        keyboard focus at that instant — a click on a button, or the window
+ *  *        being re-shown, and the words go nowhere while the dictation is still
+ *  *        reported as pasted. Handing the text over as an event makes the pad
+ *  *        insert it itself, wherever focus is.
+ *  * WHERE: Emitted by scratchpad::PadRoutedInjector; consumed by Scratchpad.tsx.
+ *  
+ */
+export type ScratchpadDictation = {
+	text: string,
+};
+
+/**
  *  Correlation id shared by the database row, the tracing span, and the logs,
  *  so one string ties a user report to everything that happened.
  */
@@ -1217,7 +1235,18 @@ export type SettingKind = { kind: "TOGGLE" } | { kind: "TEXT"; placeholder: stri
  *  * WHERE: On every SettingDef; used by the Settings view to build its sections.
  *  
  */
-export type SettingSection = "RECORDING" | "TRANSCRIPTION" | 
+export type SettingSection = "RECORDING" | 
+/**
+ *  The extra dictation hotkeys that each listen for one language. Its own
+ *  section so they read as a group, as a card below the main recording
+ *  settings, rather than as a run of rows in the middle of them.
+ */
+"LANGUAGE_HOTKEYS" | 
+/**
+ *  The floating dictation scratchpad and its shortcut. A feature in its own
+ *  right, so it gets its own page rather than a few rows among Recording's.
+ */
+"SCRATCHPAD" | "TRANSCRIPTION" | 
 /**  Cleanup and style applied to the words: punctuation, fillers, tone. */
 "WRITING" | 
 /**

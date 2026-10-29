@@ -322,7 +322,10 @@ fn build_ports(app: &AppHandle, paths: &AppPaths) -> AppResult<Ports> {
         enhancer: Arc::new(RuleEnhancer::new()),
         organizer: adapters::build_organizer(),
         grammar: adapters::build_grammar_model(),
-        injector: Arc::new(MacosInjector::new(MacosPermissions::new())),
+        injector: Arc::new(crate::scratchpad::PadRoutedInjector::new(
+            app.clone(),
+            Arc::new(MacosInjector::new(MacosPermissions::new())),
+        )),
         models,
         permissions: Arc::new(MacosPermissions::new()),
         speakers: speaker_ducker,

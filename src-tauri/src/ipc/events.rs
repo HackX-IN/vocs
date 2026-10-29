@@ -66,6 +66,22 @@ pub struct TranscriptDelivered {
 }
 
 /**
+ * SOURCE OF TRUTH KEYWORDS: ScratchpadDictation, scratchpad_dictation, route_to_pad
+ * WHAT:  A dictation's finished text, addressed to the scratchpad window.
+ * WHY:   The pad is the one place Vocs is its own paste target, and a synthetic
+ *        ⌘V into your own window only lands if the text field happens to hold
+ *        keyboard focus at that instant — a click on a button, or the window
+ *        being re-shown, and the words go nowhere while the dictation is still
+ *        reported as pasted. Handing the text over as an event makes the pad
+ *        insert it itself, wherever focus is.
+ * WHERE: Emitted by scratchpad::PadRoutedInjector; consumed by Scratchpad.tsx.
+ */
+#[derive(Debug, Clone, Serialize, Deserialize, Type, Event)]
+pub struct ScratchpadDictation {
+    pub text: String,
+}
+
+/**
  * SOURCE OF TRUTH KEYWORDS: PermissionsChanged
  * WHAT:  The OS grants, pushed whenever one of them actually changes.
  * WHY:   A permission is granted in System Settings — a DIFFERENT app — and
