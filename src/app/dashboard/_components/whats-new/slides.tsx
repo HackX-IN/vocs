@@ -154,7 +154,7 @@ export const WHATS_NEW_SLIDES: Readonly<Record<string, readonly Slide[]>> = {
       icon: ListChecks,
       eyebrow: "Scratchpad",
       title: "Ramble first. Tidy second.",
-      body: "Open the scratchpad from the menu bar, talk freely, press Return to turn it into bullets, tasks or a paragraph, and ⌘Return to send it to the app you came from.",
+      body: "Open the scratchpad from the menu bar, talk freely, press Return to turn it into bullets, tasks or a paragraph, and ⌘Return to send it to the app you came from. Settings → Scratchpad adds a shortcut.",
       visual: ScratchpadVisual,
     },
     {
